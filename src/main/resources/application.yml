@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: nexusfin-equity
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:nexusfin_equity}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
+
+server:
+  port: ${SERVER_PORT:8080}
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      table-underline: true
+
+logging:
+  level:
+    com.nexusfin.equity: INFO
+
+nexusfin:
+  signature:
+    app-id: ${NEXUSFIN_APP_ID:abs-app}
+    secret: ${NEXUSFIN_APP_SECRET:abs-secret-key}
+    max-skew-seconds: 300
+    protected-path-prefixes:
+      - /api/users/register
+      - /api/callbacks

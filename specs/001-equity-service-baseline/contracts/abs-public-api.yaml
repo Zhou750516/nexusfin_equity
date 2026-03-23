@@ -1,0 +1,269 @@
+openapi: 3.0.3
+info:
+  title: NexusFin Equity Public API
+  version: 1.0.0
+  description: >
+    ABS-side public and H5-facing contracts for the NexusFin equity distribution
+    baseline.
+servers:
+  - url: https://abs.example.com
+components:
+  securitySchemes:
+    appSignature:
+      type: apiKey
+      in: header
+      name: X-Signature
+  parameters:
+    XAppId:
+      name: X-App-Id
+      in: header
+      required: true
+      schema:
+        type: string
+    XTimestamp:
+      name: X-Timestamp
+      in: header
+      required: true
+      schema:
+        type: string
+    XNonce:
+      name: X-Nonce
+      in: header
+      required: true
+      schema:
+        type: string
+    XSignature:
+      name: X-Signature
+      in: header
+      required: true
+      schema:
+        type: string
+  schemas:
+    Result:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          nullable: true
+      required:
+        - code
+        - message
+    RegisterUserRequest:
+      type: object
+      required:
+        - request_id
+        - channel_code
+        - user_info
+      properties:
+        request_id:
+          type: string
+        channel_code:
+          type: string
+        user_info:
+          type: object
+          required:
+            - external_user_id
+            - mobile_encrypted
+            - id_card_encrypted
+            - real_name_encrypted
+          properties:
+            external_user_id:
+              type: string
+            mobile_encrypted:
+              type: string
+            id_card_encrypted:
+              type: string
+            real_name_encrypted:
+              type: string
+    RegisterUserResponse:
+      type: object
+      properties:
+        member_id:
+          type: string
+        register_status:
+          type: string
+          enum: [SUCCESS, DUPLICATE]
+    ProductPageResponse:
+      type: object
+      properties:
+        product_code:
+          type: string
+        product_name:
+          type: string
+        fee_rate:
+          type: number
+        fee_amount:
+          type: number
+        loan_amount:
+          type: number
+        agreements:
+          type: array
+          items:
+            type: object
+        member_id:
+          type: string
+        external_user_id:
+          type: string
+    CreateOrderRequest:
+      type: object
+      required:
+        - member_id
+        - product_code
+        - loan_amount
+        - agreement_signed
+      properties:
+        member_id:
+          type: string
+        product_code:
+          type: string
+        loan_amount:
+          type: number
+        agreement_signed:
+          type: boolean
+    CreateOrderResponse:
+      type: object
+      properties:
+        benefit_order_no:
+          type: string
+        order_status:
+          type: string
+        redirect_url:
+          type: string
+    OrderStatusResponse:
+      type: object
+      properties:
+        benefit_order_no:
+          type: string
+        order_status:
+          type: string
+        qw_first_deduct_status:
+          type: string
+        qw_fallback_deduct_status:
+          type: string
+        qw_exercise_status:
+          type: string
+        grant_status:
+          type: string
+    ExerciseUrlResponse:
+      type: object
+      properties:
+        exercise_url:
+          type: string
+        expire_time:
+          type: string
+paths:
+  /api/users/register:
+    post:
+      summary: Silent-register a diverted rejected user
+      security:
+        - appSignature: []
+      parameters:
+        - $ref: '#/components/parameters/XAppId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterUserRequest'
+      responses:
+        '200':
+          description: Registration accepted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RegisterUserResponse'
+  /api/equity/products/{productCode}:
+    get:
+      summary: Get equity product purchase page data
+      parameters:
+        - name: productCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Product data loaded
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ProductPageResponse'
+  /api/equity/orders:
+    post:
+      summary: Create a benefit order from the ABS H5 flow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '200':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CreateOrderResponse'
+  /api/equity/orders/{benefitOrderNo}:
+    get:
+      summary: Query the current benefit order status
+      parameters:
+        - name: benefitOrderNo
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Current order status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OrderStatusResponse'
+  /api/equity/exercise-url/{benefitOrderNo}:
+    get:
+      summary: Get the supplier exercise URL for a granted order
+      parameters:
+        - name: benefitOrderNo
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Exercise URL ready
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ExerciseUrlResponse'

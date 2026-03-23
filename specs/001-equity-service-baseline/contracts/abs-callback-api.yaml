@@ -1,0 +1,297 @@
+openapi: 3.0.3
+info:
+  title: NexusFin Equity Callback API
+  version: 1.0.0
+  description: >
+    ABS-side callback contracts for payment supplier and YunKa notifications in
+    the NexusFin equity baseline.
+servers:
+  - url: https://abs.example.com
+components:
+  parameters:
+    XAppId:
+      name: X-App-Id
+      in: header
+      required: true
+      schema:
+        type: string
+    XTimestamp:
+      name: X-Timestamp
+      in: header
+      required: true
+      schema:
+        type: string
+    XNonce:
+      name: X-Nonce
+      in: header
+      required: true
+      schema:
+        type: string
+    XSignature:
+      name: X-Signature
+      in: header
+      required: true
+      schema:
+        type: string
+  schemas:
+    Result:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          nullable: true
+      required:
+        - code
+        - message
+    DeductionCallback:
+      type: object
+      required:
+        - request_id
+        - benefit_order_no
+        - qw_trade_no
+        - deduct_status
+        - deduct_amount
+      properties:
+        request_id:
+          type: string
+        benefit_order_no:
+          type: string
+        qw_trade_no:
+          type: string
+        deduct_status:
+          type: string
+          enum: [SUCCESS, FAIL]
+        deduct_amount:
+          type: number
+        fail_reason:
+          type: string
+          nullable: true
+        deduct_time:
+          type: string
+    ExerciseCallback:
+      type: object
+      required:
+        - request_id
+        - benefit_order_no
+        - exercise_status
+      properties:
+        request_id:
+          type: string
+        benefit_order_no:
+          type: string
+        exercise_status:
+          type: string
+          enum: [SUCCESS, FAIL]
+        exercise_time:
+          type: string
+        exercise_detail:
+          type: string
+    RefundCallback:
+      type: object
+      required:
+        - request_id
+        - benefit_order_no
+        - refund_status
+        - refund_amount
+      properties:
+        request_id:
+          type: string
+        benefit_order_no:
+          type: string
+        refund_status:
+          type: string
+          enum: [SUCCESS, FAIL]
+        refund_amount:
+          type: number
+        refund_time:
+          type: string
+        refund_reason:
+          type: string
+    GrantForwardCallback:
+      type: object
+      required:
+        - request_id
+        - benefit_order_no
+        - grant_status
+        - actual_amount
+        - timestamp
+      properties:
+        request_id:
+          type: string
+        benefit_order_no:
+          type: string
+        grant_status:
+          type: string
+          enum: [SUCCESS, FAIL]
+        actual_amount:
+          type: number
+        loan_order_no:
+          type: string
+        fail_reason:
+          type: string
+          nullable: true
+        grant_time:
+          type: string
+        timestamp:
+          type: integer
+          format: int64
+    RepaymentForwardCallback:
+      type: object
+      required:
+        - request_id
+        - benefit_order_no
+        - loan_order_no
+        - term_no
+        - repayment_status
+        - timestamp
+      properties:
+        request_id:
+          type: string
+        benefit_order_no:
+          type: string
+        loan_order_no:
+          type: string
+        term_no:
+          type: integer
+        repayment_status:
+          type: string
+          enum: [PAID, OVERDUE, SETTLED]
+        paid_amount:
+          type: number
+        paid_time:
+          type: string
+        overdue_days:
+          type: integer
+        timestamp:
+          type: integer
+          format: int64
+paths:
+  /api/callbacks/first-deduction:
+    post:
+      summary: Receive first deduction result from supplier
+      parameters:
+        - $ref: '#/components/parameters/XAppId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeductionCallback'
+      responses:
+        '200':
+          description: Callback accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+  /api/callbacks/fallback-deduction:
+    post:
+      summary: Receive fallback deduction result from supplier
+      parameters:
+        - $ref: '#/components/parameters/XAppId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeductionCallback'
+      responses:
+        '200':
+          description: Callback accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+  /api/callbacks/exercise-equity:
+    post:
+      summary: Receive exercise result from supplier
+      parameters:
+        - $ref: '#/components/parameters/XAppId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExerciseCallback'
+      responses:
+        '200':
+          description: Callback accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+  /api/callbacks/refund:
+    post:
+      summary: Receive refund result from supplier
+      parameters:
+        - $ref: '#/components/parameters/XAppId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundCallback'
+      responses:
+        '200':
+          description: Callback accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+  /api/callbacks/grant/forward:
+    post:
+      summary: Receive grant result forwarded by YunKa
+      parameters:
+        - $ref: '#/components/parameters/XAppId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrantForwardCallback'
+      responses:
+        '200':
+          description: Callback accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'
+  /api/callbacks/repayment/forward:
+    post:
+      summary: Receive repayment status forwarded by YunKa
+      parameters:
+        - $ref: '#/components/parameters/XAppId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XNonce'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepaymentForwardCallback'
+      responses:
+        '200':
+          description: Callback accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Result'

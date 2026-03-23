@@ -9,21 +9,27 @@ src/main/java/com/nexusfin/equity/
 ├── controller/    # REST API 入口
 ├── service/       # 业务逻辑层
 ├── service/impl/  # 业务实现
-├── mapper/        # MyBatis Mapper
-├── model/
-│   ├── entity/    # 数据库实体
-│   ├── dto/       # 数据传输对象
-│   ├── vo/        # 视图对象
-│   └── enums/     # 枚举类
+├── repository/    # 数据访问层
+├── entity/        # 数据库实体
+├── dto/
+│   ├── request/   # 请求 DTO
+│   └── response/  # 响应 DTO
 ├── config/        # 配置类
-├── common/        # 公共工具
-└── integration/   # 外部接口调用（齐为、云卡）
+├── exception/     # 异常定义与统一处理
+├── enums/         # 枚举类
+└── util/          # 公共工具
 
 ## 构建与运行
 - 构建: mvn clean package -DskipTests
 - 运行: java -jar target/nexusfin-equity.jar
 - 测试: mvn test
+- MySQL回归: MYSQL_IT_ENABLED=true MYSQL_IT_DATABASE=nexusfin_equity mvn -Dtest=MySqlRoundTripIntegrationTest,MySqlCallbackFlowIntegrationTest test
 - 代码检查: mvn checkstyle:check
+
+## 本地数据库
+- 复用现有数据库 `nexusfin_equity`
+- 连接方式: `mysql -uroot`
+- 默认不重建数据库和数据表
 
 ## 编码规范
 - 所有 REST 接口统一返回 Result<T> 包装类
@@ -45,3 +51,11 @@ src/main/java/com/nexusfin/equity/
 - 代码编译通过，无 checkstyle 告警
 - 单元测试覆盖核心业务方法
 - 接口参数有 @Valid 校验注解
+
+## Active Technologies
+- Java 17 + Spring Boot 3.2.x, Spring Validation, MyBatis-Plus, (001-equity-service-baseline)
+- MySQL 8.0 (`nexusfin_equity`), optional Redis/Redisson for (001-equity-service-baseline)
+
+## Recent Changes
+- 001-equity-service-baseline: Added Java 17 + Spring Boot 3.2.x, Spring Validation, MyBatis-Plus,
+- 001-equity-service-baseline: Added H2/MySQL integration coverage, quickstart smoke flow, downstream sync idempotency, and reconciliation query support
