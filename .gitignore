@@ -1,0 +1,15 @@
+.DS_Store
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Java / Maven
+target/
+out/
+*.class
+*.log
+
+# OS temp files
+Thumbs.db
