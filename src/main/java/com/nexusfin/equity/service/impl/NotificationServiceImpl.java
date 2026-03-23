@@ -47,21 +47,33 @@ public class NotificationServiceImpl implements NotificationService {
         if (idempotencyService.isProcessed(request.requestId())) {
             return;
         }
-        // 先记通知日志，再更新订单状态，这样即使中途失败也能知道通知曾经到达过。
+        // 先记收到通知的事实，再根据实际处理结果更新状态。
+        NotificationReceiveLog notificationLog = logNotificationReceived(
+                request.requestId(),
+                request.benefitOrderNo(),
+                NotificationTypeEnum.GRANT_RESULT,
+                request.toString()
+        );
         BenefitOrder order = benefitOrderRepository.selectById(request.benefitOrderNo());
-        logNotification(request.requestId(), request.benefitOrderNo(), NotificationTypeEnum.GRANT_RESULT, request.toString());
         if (order == null) {
+            markNotification(notificationLog, NotificationProcessStatusEnum.FAILED);
             return;
         }
-        boolean success = "SUCCESS".equalsIgnoreCase(request.grantStatus());
-        OrderStateMachine.applyGrantResult(order, success, request.loanOrderNo());
-        if (success && BenefitOrderStatusEnum.FIRST_DEDUCT_FAIL.name().equals(order.getOrderStatus())) {
-            // 只有“首扣失败且已放款成功”的订单，才进入自动兜底代扣。
-            fallbackDeductService.triggerFallback(order, request);
+        try {
+            boolean success = "SUCCESS".equalsIgnoreCase(request.grantStatus());
+            OrderStateMachine.applyGrantResult(order, success, request.loanOrderNo());
+            if (success && BenefitOrderStatusEnum.FIRST_DEDUCT_FAIL.name().equals(order.getOrderStatus())) {
+                // 只有“首扣失败且已放款成功”的订单，才进入自动兜底代扣。
+                fallbackDeductService.triggerFallback(order, request);
+            }
+            order.setUpdatedTs(LocalDateTime.now());
+            benefitOrderRepository.updateById(order);
+            markNotification(notificationLog, NotificationProcessStatusEnum.PROCESSED);
+            idempotencyService.markProcessed(request.requestId(), "GRANT", request.benefitOrderNo(), request.grantStatus());
+        } catch (RuntimeException ex) {
+            markNotification(notificationLog, NotificationProcessStatusEnum.FAILED);
+            throw ex;
         }
-        order.setUpdatedTs(LocalDateTime.now());
-        benefitOrderRepository.updateById(order);
-        idempotencyService.markProcessed(request.requestId(), "GRANT", request.benefitOrderNo(), request.grantStatus());
     }
 
     @Override
@@ -70,7 +82,18 @@ public class NotificationServiceImpl implements NotificationService {
         if (idempotencyService.isProcessed(request.requestId())) {
             return;
         }
-        logNotification(request.requestId(), request.benefitOrderNo(), NotificationTypeEnum.REPAYMENT_STATUS, request.toString());
+        NotificationReceiveLog notificationLog = logNotificationReceived(
+                request.requestId(),
+                request.benefitOrderNo(),
+                NotificationTypeEnum.REPAYMENT_STATUS,
+                request.toString()
+        );
+        BenefitOrder order = benefitOrderRepository.selectById(request.benefitOrderNo());
+        if (order == null) {
+            markNotification(notificationLog, NotificationProcessStatusEnum.FAILED);
+            return;
+        }
+        markNotification(notificationLog, NotificationProcessStatusEnum.PROCESSED);
         idempotencyService.markProcessed(request.requestId(), "REPAYMENT", request.benefitOrderNo(), request.repaymentStatus());
     }
 
@@ -80,14 +103,27 @@ public class NotificationServiceImpl implements NotificationService {
         if (idempotencyService.isProcessed(request.requestId())) {
             return;
         }
+        NotificationReceiveLog notificationLog = logNotificationReceived(
+                request.requestId(),
+                request.benefitOrderNo(),
+                NotificationTypeEnum.EXERCISE_RESULT,
+                request.toString()
+        );
         BenefitOrder order = benefitOrderRepository.selectById(request.benefitOrderNo());
-        logNotification(request.requestId(), request.benefitOrderNo(), NotificationTypeEnum.EXERCISE_RESULT, request.toString());
-        if (order != null) {
+        if (order == null) {
+            markNotification(notificationLog, NotificationProcessStatusEnum.FAILED);
+            return;
+        }
+        try {
             OrderStateMachine.applyExerciseResult(order, "SUCCESS".equalsIgnoreCase(request.exerciseStatus()));
             order.setUpdatedTs(LocalDateTime.now());
             benefitOrderRepository.updateById(order);
+            markNotification(notificationLog, NotificationProcessStatusEnum.PROCESSED);
+            idempotencyService.markProcessed(request.requestId(), "EXERCISE", request.benefitOrderNo(), request.exerciseStatus());
+        } catch (RuntimeException ex) {
+            markNotification(notificationLog, NotificationProcessStatusEnum.FAILED);
+            throw ex;
         }
-        idempotencyService.markProcessed(request.requestId(), "EXERCISE", request.benefitOrderNo(), request.exerciseStatus());
     }
 
     @Override
@@ -96,22 +132,40 @@ public class NotificationServiceImpl implements NotificationService {
         if (idempotencyService.isProcessed(request.requestId())) {
             return;
         }
+        NotificationReceiveLog notificationLog = logNotificationReceived(
+                request.requestId(),
+                request.benefitOrderNo(),
+                NotificationTypeEnum.REFUND_RESULT,
+                request.toString()
+        );
         BenefitOrder order = benefitOrderRepository.selectById(request.benefitOrderNo());
-        logNotification(request.requestId(), request.benefitOrderNo(), NotificationTypeEnum.REFUND_RESULT, request.toString());
-        if (order != null) {
+        if (order == null) {
+            markNotification(notificationLog, NotificationProcessStatusEnum.FAILED);
+            return;
+        }
+        try {
             OrderStateMachine.applyRefundResult(order, "SUCCESS".equalsIgnoreCase(request.refundStatus()));
             order.setUpdatedTs(LocalDateTime.now());
             benefitOrderRepository.updateById(order);
+            markNotification(notificationLog, NotificationProcessStatusEnum.PROCESSED);
+            idempotencyService.markProcessed(request.requestId(), "REFUND", request.benefitOrderNo(), request.refundStatus());
+        } catch (RuntimeException ex) {
+            markNotification(notificationLog, NotificationProcessStatusEnum.FAILED);
+            throw ex;
         }
-        idempotencyService.markProcessed(request.requestId(), "REFUND", request.benefitOrderNo(), request.refundStatus());
     }
 
-    private void logNotification(String requestId, String benefitOrderNo, NotificationTypeEnum type, String payload) {
+    private NotificationReceiveLog logNotificationReceived(
+            String requestId,
+            String benefitOrderNo,
+            NotificationTypeEnum type,
+            String payload
+    ) {
         NotificationReceiveLog existing = notificationReceiveLogRepository.selectOne(Wrappers.<NotificationReceiveLog>lambdaQuery()
                 .eq(NotificationReceiveLog::getRequestId, requestId)
                 .last("limit 1"));
         if (existing != null) {
-            return;
+            return existing;
         }
         // 回调日志是对账和人工排障的基础数据，统一记录通知类型、请求号、原始载荷和处理时间。
         NotificationReceiveLog notificationReceiveLog = new NotificationReceiveLog();
@@ -119,11 +173,17 @@ public class NotificationServiceImpl implements NotificationService {
         notificationReceiveLog.setBenefitOrderNo(benefitOrderNo);
         notificationReceiveLog.setNotifyType(type.name());
         notificationReceiveLog.setRequestId(requestId);
-        notificationReceiveLog.setProcessStatus(NotificationProcessStatusEnum.PROCESSED.name());
+        notificationReceiveLog.setProcessStatus(NotificationProcessStatusEnum.RECEIVED.name());
         notificationReceiveLog.setPayload(payload);
         notificationReceiveLog.setRetryCount(0);
         notificationReceiveLog.setReceivedTs(LocalDateTime.now());
-        notificationReceiveLog.setProcessedTs(LocalDateTime.now());
         notificationReceiveLogRepository.insert(notificationReceiveLog);
+        return notificationReceiveLog;
+    }
+
+    private void markNotification(NotificationReceiveLog notificationReceiveLog, NotificationProcessStatusEnum processStatus) {
+        notificationReceiveLog.setProcessStatus(processStatus.name());
+        notificationReceiveLog.setProcessedTs(LocalDateTime.now());
+        notificationReceiveLogRepository.updateById(notificationReceiveLog);
     }
 }

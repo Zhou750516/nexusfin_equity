@@ -2,6 +2,7 @@ package com.nexusfin.equity.service;
 
 import com.nexusfin.equity.dto.request.ExerciseCallbackRequest;
 import com.nexusfin.equity.dto.request.GrantForwardCallbackRequest;
+import com.nexusfin.equity.dto.request.RepaymentForwardCallbackRequest;
 import com.nexusfin.equity.dto.request.RefundCallbackRequest;
 import com.nexusfin.equity.entity.BenefitOrder;
 import com.nexusfin.equity.entity.NotificationReceiveLog;
@@ -60,7 +61,7 @@ class NotificationServiceTest {
     void shouldIgnoreDuplicateRepaymentNotification() {
         when(idempotencyService.isProcessed("req-2")).thenReturn(true);
 
-        notificationService.handleRepayment(new com.nexusfin.equity.dto.request.RepaymentForwardCallbackRequest(
+        notificationService.handleRepayment(new RepaymentForwardCallbackRequest(
                 "req-2", "ord-2", "loan-2", 1, "PAID", 100L, "2026-03-23T20:33:00", 0, 1711197180L));
 
         verify(notificationReceiveLogRepository, never()).insert(any());
@@ -103,5 +104,22 @@ class NotificationServiceTest {
         verify(notificationReceiveLogRepository).insert(captor.capture());
         assertThat(captor.getValue().getNotifyType()).isEqualTo("GRANT_RESULT");
         assertThat(captor.getValue().getRequestId()).isEqualTo("req-5");
+        verify(notificationReceiveLogRepository).updateById(captor.capture());
+        assertThat(captor.getAllValues().get(1).getProcessStatus()).isEqualTo("PROCESSED");
+    }
+
+    @Test
+    void shouldMarkNotificationFailedWhenRepaymentOrderMissing() {
+        when(idempotencyService.isProcessed("req-6")).thenReturn(false);
+        when(benefitOrderRepository.selectById("ord-missing")).thenReturn(null);
+        when(notificationReceiveLogRepository.selectOne(any())).thenReturn(null);
+
+        notificationService.handleRepayment(new RepaymentForwardCallbackRequest(
+                "req-6", "ord-missing", "loan-missing", 1, "PAID", 100L, "2026-03-23T20:35:00", 0, 1711197300L));
+
+        ArgumentCaptor<NotificationReceiveLog> captor = ArgumentCaptor.forClass(NotificationReceiveLog.class);
+        verify(notificationReceiveLogRepository).updateById(captor.capture());
+        assertThat(captor.getValue().getProcessStatus()).isEqualTo("FAILED");
+        verify(idempotencyService, never()).markProcessed(any(), any(), any(), any());
     }
 }

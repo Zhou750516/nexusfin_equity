@@ -139,6 +139,37 @@ class NotificationCallbackControllerIntegrationTest {
     }
 
     @Test
+    void shouldMarkMissingRepaymentOrderAsFailed() throws Exception {
+        String requestId = "req-repayment-missing-" + UUID.randomUUID().toString().replace("-", "");
+
+        mockMvc.perform(post("/api/callbacks/repayment/forward")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .headers(signatureHeaders("nonce-repayment-missing"))
+                        .content("""
+                                {
+                                  "requestId": "%s",
+                                  "benefitOrderNo": "ord-missing",
+                                  "loanOrderNo": "loan-missing",
+                                  "termNo": 1,
+                                  "repaymentStatus": "PAID",
+                                  "paidAmount": 680000,
+                                  "paidTime": "2026-03-23T20:12:00",
+                                  "overdueDays": 0,
+                                  "timestamp": 1711195920
+                                }
+                                """.formatted(requestId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0));
+
+        NotificationReceiveLog log = notificationReceiveLogRepository.selectOne(Wrappers.<NotificationReceiveLog>lambdaQuery()
+                .eq(NotificationReceiveLog::getRequestId, requestId)
+                .last("limit 1"));
+        assertThat(log).isNotNull();
+        assertThat(log.getProcessStatus()).isEqualTo("FAILED");
+        assertThat(idempotencyRecordRepository.selectById(requestId)).isNull();
+    }
+
+    @Test
     void shouldUpdateOrderForExerciseAndRefundCallbacks() throws Exception {
         BenefitOrder exerciseOrder = createOrder("ord-exercise", "user-exercise");
         BenefitOrder refundOrder = createOrder("ord-refund", "user-refund");

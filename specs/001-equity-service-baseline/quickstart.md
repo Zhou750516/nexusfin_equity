@@ -72,6 +72,7 @@ flows:
    - channel linkage is present
 
 2. Create a benefit order and confirm:
+   - the same `request_id` replays the same `benefit_order_no`
    - a `benefit_order_no` is created
    - signing tasks are generated or tracked
    - downstream sync is recorded for both the direct-continue path and the

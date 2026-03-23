@@ -19,6 +19,7 @@ import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.AgreementService;
 import com.nexusfin.equity.service.BenefitOrderService;
+import com.nexusfin.equity.service.IdempotencyService;
 import com.nexusfin.equity.util.OrderStateMachine;
 import com.nexusfin.equity.util.RequestIdUtil;
 import java.time.LocalDateTime;
@@ -38,19 +39,22 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
     private final MemberInfoRepository memberInfoRepository;
     private final MemberChannelRepository memberChannelRepository;
     private final AgreementService agreementService;
+    private final IdempotencyService idempotencyService;
 
     public BenefitOrderServiceImpl(
             BenefitProductRepository benefitProductRepository,
             BenefitOrderRepository benefitOrderRepository,
             MemberInfoRepository memberInfoRepository,
             MemberChannelRepository memberChannelRepository,
-            AgreementService agreementService
+            AgreementService agreementService,
+            IdempotencyService idempotencyService
     ) {
         this.benefitProductRepository = benefitProductRepository;
         this.benefitOrderRepository = benefitOrderRepository;
         this.memberInfoRepository = memberInfoRepository;
         this.memberChannelRepository = memberChannelRepository;
         this.agreementService = agreementService;
+        this.idempotencyService = idempotencyService;
     }
 
     @Override
@@ -76,6 +80,14 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
     @Override
     @Transactional
     public CreateBenefitOrderResponse createOrder(CreateBenefitOrderRequest request) {
+        if (idempotencyService.isProcessed(request.requestId())) {
+            String benefitOrderNo = idempotencyService.getByRequestId(request.requestId()).getBizKey();
+            BenefitOrder existingOrder = benefitOrderRepository.selectById(benefitOrderNo);
+            if (existingOrder == null) {
+                throw new BizException("ORDER_NOT_FOUND", "Benefit order already processed but record missing");
+            }
+            return buildCreateOrderResponse(existingOrder);
+        }
         OrderStateMachine.ensureCanCreateOrder(Boolean.TRUE.equals(request.agreementSigned()));
         BenefitProduct product = benefitProductRepository.selectById(request.productCode());
         if (product == null || !"ACTIVE".equals(product.getStatus())) {
@@ -108,18 +120,20 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         benefitOrder.setRefundStatus(PaymentStatusEnum.NONE.name());
         benefitOrder.setGrantStatus("PENDING");
         benefitOrder.setSyncStatus(BenefitOrderStatusEnum.SYNC_PENDING.name());
-        benefitOrder.setRequestId(RequestIdUtil.nextId("req"));
+        benefitOrder.setRequestId(request.requestId());
         benefitOrder.setCreatedTs(LocalDateTime.now());
         benefitOrder.setUpdatedTs(LocalDateTime.now());
         benefitOrderRepository.insert(benefitOrder);
         // 创建订单后立即补齐协议任务与归档，确保后续支付和审计链路都有完整基础数据。
         agreementService.ensureAgreementArtifacts(benefitOrder);
-        log.info("traceId={} bizOrderNo={} order created", com.nexusfin.equity.util.TraceIdUtil.getTraceId(), benefitOrder.getBenefitOrderNo());
-        return new CreateBenefitOrderResponse(
+        idempotencyService.markProcessed(
+                request.requestId(),
+                "CREATE_ORDER",
                 benefitOrder.getBenefitOrderNo(),
-                benefitOrder.getOrderStatus(),
-                "/h5/equity/orders/" + benefitOrder.getBenefitOrderNo()
+                benefitOrder.getOrderStatus()
         );
+        log.info("traceId={} bizOrderNo={} order created", com.nexusfin.equity.util.TraceIdUtil.getTraceId(), benefitOrder.getBenefitOrderNo());
+        return buildCreateOrderResponse(benefitOrder);
     }
 
     @Override
@@ -150,5 +164,13 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
             throw new BizException("ORDER_NOT_FOUND", "Benefit order not found");
         }
         return order;
+    }
+
+    private CreateBenefitOrderResponse buildCreateOrderResponse(BenefitOrder order) {
+        return new CreateBenefitOrderResponse(
+                order.getBenefitOrderNo(),
+                order.getOrderStatus(),
+                "/h5/equity/orders/" + order.getBenefitOrderNo()
+        );
     }
 }

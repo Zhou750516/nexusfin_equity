@@ -128,6 +128,7 @@ class NexusfinEquityApplicationTests {
     private String createOrderRequest(String memberId) {
         return """
                 {
+                  "requestId": "req-quickstart-create-order",
                   "memberId": "%s",
                   "productCode": "QS-PROD-001",
                   "loanAmount": 880000,

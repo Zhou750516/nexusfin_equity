@@ -44,6 +44,9 @@ class BenefitOrderServiceTest {
     @Mock
     private AgreementService agreementService;
 
+    @Mock
+    private IdempotencyService idempotencyService;
+
     @InjectMocks
     private BenefitOrderServiceImpl benefitOrderService;
 
@@ -80,9 +83,10 @@ class BenefitOrderServiceTest {
         when(benefitProductRepository.selectById("P-2")).thenReturn(product);
         when(memberInfoRepository.selectById("mem-2")).thenReturn(memberInfo);
         when(memberChannelRepository.selectOne(any())).thenReturn(memberChannel);
+        when(idempotencyService.isProcessed("req-order-1")).thenReturn(false);
 
         CreateBenefitOrderResponse response = benefitOrderService.createOrder(
-                new CreateBenefitOrderRequest("mem-2", "P-2", 680000L, true)
+                new CreateBenefitOrderRequest("req-order-1", "mem-2", "P-2", 680000L, true)
         );
 
         ArgumentCaptor<BenefitOrder> captor = ArgumentCaptor.forClass(BenefitOrder.class);
@@ -92,14 +96,36 @@ class BenefitOrderServiceTest {
         assertThat(response.orderStatus()).isEqualTo("FIRST_DEDUCT_PENDING");
         assertThat(captor.getValue().getProductCode()).isEqualTo("P-2");
         assertThat(captor.getValue().getMemberId()).isEqualTo("mem-2");
+        assertThat(captor.getValue().getRequestId()).isEqualTo("req-order-1");
+        verify(idempotencyService).markProcessed("req-order-1", "CREATE_ORDER", captor.getValue().getBenefitOrderNo(), "FIRST_DEDUCT_PENDING");
+    }
+
+    @Test
+    void shouldReplayExistingOrderForDuplicateCreateRequest() {
+        BenefitOrder existingOrder = new BenefitOrder();
+        existingOrder.setBenefitOrderNo("ord-duplicate-1");
+        existingOrder.setOrderStatus("FIRST_DEDUCT_PENDING");
+        com.nexusfin.equity.entity.IdempotencyRecord idempotencyRecord = new com.nexusfin.equity.entity.IdempotencyRecord();
+        idempotencyRecord.setBizKey(existingOrder.getBenefitOrderNo());
+        when(idempotencyService.isProcessed("req-order-duplicate")).thenReturn(true);
+        when(idempotencyService.getByRequestId("req-order-duplicate")).thenReturn(idempotencyRecord);
+        when(benefitOrderRepository.selectById(existingOrder.getBenefitOrderNo())).thenReturn(existingOrder);
+
+        CreateBenefitOrderResponse response = benefitOrderService.createOrder(
+                new CreateBenefitOrderRequest("req-order-duplicate", "mem-2", "P-2", 680000L, true)
+        );
+
+        assertThat(response.benefitOrderNo()).isEqualTo(existingOrder.getBenefitOrderNo());
+        assertThat(response.orderStatus()).isEqualTo("FIRST_DEDUCT_PENDING");
     }
 
     @Test
     void shouldRejectOrderCreationWhenProductMissing() {
         when(benefitProductRepository.selectById("P-3")).thenReturn(null);
+        when(idempotencyService.isProcessed("req-order-3")).thenReturn(false);
 
         assertThatThrownBy(() -> benefitOrderService.createOrder(
-                new CreateBenefitOrderRequest("mem-3", "P-3", 680000L, true)))
+                new CreateBenefitOrderRequest("req-order-3", "mem-3", "P-3", 680000L, true)))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("PRODUCT_NOT_FOUND");
     }

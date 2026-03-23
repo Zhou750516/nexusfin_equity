@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.nexusfin.equity.entity.BenefitOrder;
 import com.nexusfin.equity.entity.BenefitProduct;
 import com.nexusfin.equity.entity.ContractArchive;
+import com.nexusfin.equity.entity.IdempotencyRecord;
 import com.nexusfin.equity.entity.MemberChannel;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.entity.SignTask;
@@ -11,6 +12,7 @@ import com.nexusfin.equity.enums.MemberStatusEnum;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.repository.BenefitProductRepository;
 import com.nexusfin.equity.repository.ContractArchiveRepository;
+import com.nexusfin.equity.repository.IdempotencyRecordRepository;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
@@ -24,6 +26,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -56,11 +59,15 @@ class BenefitOrderControllerIntegrationTest {
     @Autowired
     private ContractArchiveRepository contractArchiveRepository;
 
+    @Autowired
+    private IdempotencyRecordRepository idempotencyRecordRepository;
+
     @BeforeEach
     void setUp() {
         contractArchiveRepository.delete(null);
         signTaskRepository.delete(null);
         benefitOrderRepository.delete(null);
+        idempotencyRecordRepository.delete(null);
         memberChannelRepository.delete(null);
         memberInfoRepository.delete(null);
         benefitProductRepository.delete(null);
@@ -91,6 +98,7 @@ class BenefitOrderControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
+                                  "requestId": "req-order-create-001",
                                   "memberId": "%s",
                                   "productCode": "%s",
                                   "loanAmount": 800000,
@@ -116,6 +124,46 @@ class BenefitOrderControllerIntegrationTest {
                 .in(ContractArchive::getTaskNo, signTasks.stream().map(SignTask::getTaskNo).toList()));
         assertThat(signTasks).hasSize(2);
         assertThat(archives).hasSize(2);
+        IdempotencyRecord idempotencyRecord = idempotencyRecordRepository.selectById("req-order-create-001");
+        assertThat(idempotencyRecord).isNotNull();
+        assertThat(idempotencyRecord.getBizKey()).isEqualTo(order.getBenefitOrderNo());
+    }
+
+    @Test
+    void shouldReplayDuplicateCreateOrderRequest() throws Exception {
+        BenefitProduct product = createProduct("P-002-D");
+        MemberInfo memberInfo = createMember("mem-002-d", "user-order-duplicate");
+        createChannel(memberInfo.getMemberId(), "user-order-duplicate");
+
+        String body = """
+                {
+                  "requestId": "req-order-create-duplicate",
+                  "memberId": "%s",
+                  "productCode": "%s",
+                  "loanAmount": 800000,
+                  "agreementSigned": true
+                }
+                """.formatted(memberInfo.getMemberId(), product.getProductCode());
+
+        MvcResult firstResponse = mockMvc.perform(post("/api/equity/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andReturn();
+
+        MvcResult secondResponse = mockMvc.perform(post("/api/equity/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andReturn();
+
+        String firstOrderNo = com.jayway.jsonpath.JsonPath.read(firstResponse.getResponse().getContentAsString(), "$.data.benefitOrderNo");
+        String secondOrderNo = com.jayway.jsonpath.JsonPath.read(secondResponse.getResponse().getContentAsString(), "$.data.benefitOrderNo");
+        assertThat(secondOrderNo).isEqualTo(firstOrderNo);
+        assertThat(benefitOrderRepository.selectCount(Wrappers.<BenefitOrder>lambdaQuery()
+                .eq(BenefitOrder::getRequestId, "req-order-create-duplicate"))).isEqualTo(1);
     }
 
     @Test

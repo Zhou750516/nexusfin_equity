@@ -110,12 +110,13 @@ class MySqlRoundTripIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
+                                  "requestId": "%s-order",
                                   "memberId": "%s",
                                   "productCode": "%s",
                                   "loanAmount": 680000,
                                   "agreementSigned": true
                                 }
-                                """.formatted(memberInfo.getMemberId(), productCode)))
+                                """.formatted(requestId, memberInfo.getMemberId(), productCode)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.benefitOrderNo").isNotEmpty())
                 .andReturn();

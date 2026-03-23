@@ -110,11 +110,14 @@ components:
     CreateOrderRequest:
       type: object
       required:
+        - request_id
         - member_id
         - product_code
         - loan_amount
         - agreement_signed
       properties:
+        request_id:
+          type: string
         member_id:
           type: string
         product_code:
