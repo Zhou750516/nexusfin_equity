@@ -7,6 +7,7 @@ import com.nexusfin.equity.dto.response.ExerciseUrlResponse;
 import com.nexusfin.equity.dto.response.ProductPageResponse;
 import com.nexusfin.equity.dto.response.Result;
 import com.nexusfin.equity.service.BenefitOrderService;
+import com.nexusfin.equity.util.AuthContextUtil;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,7 +17,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Validated
@@ -33,17 +33,16 @@ public class BenefitOrderController {
     }
 
     @GetMapping("/products/{productCode}")
-    public Result<ProductPageResponse> getProductPage(
-            @PathVariable String productCode,
-            @RequestParam(required = false) String memberId
-    ) {
+    public Result<ProductPageResponse> getProductPage(@PathVariable String productCode) {
+        String memberId = AuthContextUtil.getRequiredPrincipal().memberId();
         return Result.success(benefitOrderService.getProductPage(productCode, memberId));
     }
 
     @PostMapping("/orders")
     public Result<CreateBenefitOrderResponse> createOrder(@Valid @RequestBody CreateBenefitOrderRequest request) {
         // Controller 只做参数接收和响应包装，订单编排全部放在 service 层。
-        CreateBenefitOrderResponse response = benefitOrderService.createOrder(request);
+        String memberId = AuthContextUtil.getRequiredPrincipal().memberId();
+        CreateBenefitOrderResponse response = benefitOrderService.createOrder(memberId, request);
         log.info("traceId={} bizOrderNo={} benefit order created via controller",
                 com.nexusfin.equity.util.TraceIdUtil.getTraceId(), response.benefitOrderNo());
         return Result.success(response);

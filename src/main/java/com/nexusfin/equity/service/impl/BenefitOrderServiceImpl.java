@@ -79,7 +79,7 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
 
     @Override
     @Transactional
-    public CreateBenefitOrderResponse createOrder(CreateBenefitOrderRequest request) {
+    public CreateBenefitOrderResponse createOrder(String memberId, CreateBenefitOrderRequest request) {
         if (idempotencyService.isProcessed(request.requestId())) {
             String benefitOrderNo = idempotencyService.getByRequestId(request.requestId()).getBizKey();
             BenefitOrder existingOrder = benefitOrderRepository.selectById(benefitOrderNo);
@@ -93,12 +93,12 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         if (product == null || !"ACTIVE".equals(product.getStatus())) {
             throw new BizException("PRODUCT_NOT_FOUND", "Benefit product not found");
         }
-        MemberInfo memberInfo = memberInfoRepository.selectById(request.memberId());
+        MemberInfo memberInfo = memberInfoRepository.selectById(memberId);
         if (memberInfo == null) {
             throw new BizException("MEMBER_NOT_FOUND", "Member not found");
         }
         MemberChannel link = memberChannelRepository.selectOne(Wrappers.<MemberChannel>lambdaQuery()
-                .eq(MemberChannel::getMemberId, request.memberId())
+                .eq(MemberChannel::getMemberId, memberId)
                 .orderByDesc(MemberChannel::getCreatedTs)
                 .last("limit 1"));
         if (link == null) {

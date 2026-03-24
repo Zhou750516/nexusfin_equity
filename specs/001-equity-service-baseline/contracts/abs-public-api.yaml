@@ -1,14 +1,19 @@
 openapi: 3.0.3
 info:
   title: NexusFin Equity Public API
-  version: 1.0.0
+  version: 1.1.0
   description: >
-    ABS-side public and H5-facing contracts for the NexusFin equity distribution
-    baseline.
+    Public ABS-side contracts after cross-domain auth migration. Browser entry
+    uses SSO callback plus local JWT cookie. Business APIs derive member context
+    from local auth state rather than client-supplied member IDs.
 servers:
   - url: https://abs.example.com
 components:
   securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: NEXUSFIN_AUTH
     appSignature:
       type: apiKey
       in: header
@@ -51,132 +56,108 @@ components:
       required:
         - code
         - message
-    RegisterUserRequest:
-      type: object
-      required:
-        - request_id
-        - channel_code
-        - user_info
-      properties:
-        request_id:
-          type: string
-        channel_code:
-          type: string
-        user_info:
-          type: object
-          required:
-            - external_user_id
-            - mobile_encrypted
-            - id_card_encrypted
-            - real_name_encrypted
-          properties:
-            external_user_id:
-              type: string
-            mobile_encrypted:
-              type: string
-            id_card_encrypted:
-              type: string
-            real_name_encrypted:
-              type: string
-    RegisterUserResponse:
+    CurrentUserResponse:
       type: object
       properties:
-        member_id:
+        memberId:
           type: string
-        register_status:
+        techPlatformUserId:
           type: string
-          enum: [SUCCESS, DUPLICATE]
+        externalUserId:
+          type: string
+        memberStatus:
+          type: string
     ProductPageResponse:
       type: object
       properties:
-        product_code:
+        productCode:
           type: string
-        product_name:
+        productName:
           type: string
-        fee_rate:
-          type: number
-        fee_amount:
-          type: number
-        loan_amount:
-          type: number
+        feeRate:
+          type: integer
         agreements:
           type: array
           items:
-            type: object
-        member_id:
+            type: string
+        memberId:
           type: string
-        external_user_id:
+        externalUserId:
           type: string
     CreateOrderRequest:
       type: object
       required:
-        - request_id
-        - member_id
-        - product_code
-        - loan_amount
-        - agreement_signed
+        - requestId
+        - productCode
+        - loanAmount
+        - agreementSigned
       properties:
-        request_id:
+        requestId:
           type: string
-        member_id:
+        productCode:
           type: string
-        product_code:
-          type: string
-        loan_amount:
-          type: number
-        agreement_signed:
+        loanAmount:
+          type: integer
+          format: int64
+        agreementSigned:
           type: boolean
     CreateOrderResponse:
       type: object
       properties:
-        benefit_order_no:
+        benefitOrderNo:
           type: string
-        order_status:
+        orderStatus:
           type: string
-        redirect_url:
+        redirectUrl:
           type: string
     OrderStatusResponse:
       type: object
       properties:
-        benefit_order_no:
+        benefitOrderNo:
           type: string
-        order_status:
+        orderStatus:
           type: string
-        qw_first_deduct_status:
+        qwFirstDeductStatus:
           type: string
-        qw_fallback_deduct_status:
+        qwFallbackDeductStatus:
           type: string
-        qw_exercise_status:
+        qwExerciseStatus:
           type: string
-        grant_status:
+        grantStatus:
           type: string
     ExerciseUrlResponse:
       type: object
       properties:
-        exercise_url:
+        exerciseUrl:
           type: string
-        expire_time:
+        expireTime:
           type: string
 paths:
-  /api/users/register:
-    post:
-      summary: Silent-register a diverted rejected user
-      security:
-        - appSignature: []
+  /api/auth/sso-callback:
+    get:
+      summary: Verify upstream token, provision member, set local JWT cookie, and redirect
       parameters:
-        - $ref: '#/components/parameters/XAppId'
-        - $ref: '#/components/parameters/XTimestamp'
-        - $ref: '#/components/parameters/XNonce'
-        - $ref: '#/components/parameters/XSignature'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RegisterUserRequest'
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: redirect_url
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Browser redirected with local auth cookie issued
+  /api/users/me:
+    get:
+      summary: Resolve current logged-in ABS-side member
+      security:
+        - cookieAuth: []
       responses:
         '200':
-          description: Registration accepted
+          description: Current user resolved
           content:
             application/json:
               schema:
@@ -185,10 +166,12 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/RegisterUserResponse'
+                        $ref: '#/components/schemas/CurrentUserResponse'
   /api/equity/products/{productCode}:
     get:
-      summary: Get equity product purchase page data
+      summary: Get equity product purchase page data for current user
+      security:
+        - cookieAuth: []
       parameters:
         - name: productCode
           in: path
@@ -209,7 +192,9 @@ paths:
                         $ref: '#/components/schemas/ProductPageResponse'
   /api/equity/orders:
     post:
-      summary: Create a benefit order from the ABS H5 flow
+      summary: Create a benefit order from the ABS H5 flow for current user
+      security:
+        - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -231,6 +216,8 @@ paths:
   /api/equity/orders/{benefitOrderNo}:
     get:
       summary: Query the current benefit order status
+      security:
+        - cookieAuth: []
       parameters:
         - name: benefitOrderNo
           in: path
@@ -251,7 +238,9 @@ paths:
                         $ref: '#/components/schemas/OrderStatusResponse'
   /api/equity/exercise-url/{benefitOrderNo}:
     get:
-      summary: Get the supplier exercise URL for a granted order
+      summary: Get exercise URL for an existing order
+      security:
+        - cookieAuth: []
       parameters:
         - name: benefitOrderNo
           in: path
@@ -260,7 +249,7 @@ paths:
             type: string
       responses:
         '200':
-          description: Exercise URL ready
+          description: Exercise URL loaded
           content:
             application/json:
               schema:

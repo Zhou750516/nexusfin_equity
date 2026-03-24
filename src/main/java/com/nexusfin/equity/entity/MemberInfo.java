@@ -9,6 +9,7 @@ public class MemberInfo {
 
     @TableId
     private String memberId;
+    private String techPlatformUserId;
     private String externalUserId;
     private String mobileEncrypted;
     private String mobileHash;
@@ -29,6 +30,14 @@ public class MemberInfo {
 
     public String getExternalUserId() {
         return externalUserId;
+    }
+
+    public String getTechPlatformUserId() {
+        return techPlatformUserId;
+    }
+
+    public void setTechPlatformUserId(String techPlatformUserId) {
+        this.techPlatformUserId = techPlatformUserId;
     }
 
     public void setExternalUserId(String externalUserId) {

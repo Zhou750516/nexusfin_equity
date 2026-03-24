@@ -16,6 +16,7 @@ import com.nexusfin.equity.repository.IdempotencyRecordRepository;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
+import com.nexusfin.equity.util.JwtUtil;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -62,6 +63,9 @@ class BenefitOrderControllerIntegrationTest {
     @Autowired
     private IdempotencyRecordRepository idempotencyRecordRepository;
 
+    @Autowired
+    private JwtUtil jwtUtil;
+
     @BeforeEach
     void setUp() {
         contractArchiveRepository.delete(null);
@@ -79,7 +83,7 @@ class BenefitOrderControllerIntegrationTest {
         MemberInfo memberInfo = createMember("mem-001", "user-product");
 
         mockMvc.perform(get("/api/equity/products/{productCode}", product.getProductCode())
-                        .param("memberId", memberInfo.getMemberId()))
+                        .cookie(authCookie(memberInfo)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.productCode").value(product.getProductCode()))
@@ -95,16 +99,16 @@ class BenefitOrderControllerIntegrationTest {
         createChannel(memberInfo.getMemberId(), "user-order");
 
         mockMvc.perform(post("/api/equity/orders")
+                        .cookie(authCookie(memberInfo))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "requestId": "req-order-create-001",
-                                  "memberId": "%s",
                                   "productCode": "%s",
                                   "loanAmount": 800000,
                                   "agreementSigned": true
                                 }
-                                """.formatted(memberInfo.getMemberId(), product.getProductCode())))
+                                """.formatted(product.getProductCode())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.benefitOrderNo").isNotEmpty())
@@ -138,14 +142,14 @@ class BenefitOrderControllerIntegrationTest {
         String body = """
                 {
                   "requestId": "req-order-create-duplicate",
-                  "memberId": "%s",
                   "productCode": "%s",
                   "loanAmount": 800000,
                   "agreementSigned": true
                 }
-                """.formatted(memberInfo.getMemberId(), product.getProductCode());
+                """.formatted(product.getProductCode());
 
         MvcResult firstResponse = mockMvc.perform(post("/api/equity/orders")
+                        .cookie(authCookie(memberInfo))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk())
@@ -153,6 +157,7 @@ class BenefitOrderControllerIntegrationTest {
                 .andReturn();
 
         MvcResult secondResponse = mockMvc.perform(post("/api/equity/orders")
+                        .cookie(authCookie(memberInfo))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk())
@@ -173,7 +178,8 @@ class BenefitOrderControllerIntegrationTest {
         createChannel(memberInfo.getMemberId(), "user-status");
         BenefitOrder order = createOrder(memberInfo, product);
 
-        mockMvc.perform(get("/api/equity/orders/{benefitOrderNo}", order.getBenefitOrderNo()))
+        mockMvc.perform(get("/api/equity/orders/{benefitOrderNo}", order.getBenefitOrderNo())
+                        .cookie(authCookie(memberInfo)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.benefitOrderNo").value(order.getBenefitOrderNo()))
@@ -197,6 +203,7 @@ class BenefitOrderControllerIntegrationTest {
     private MemberInfo createMember(String memberId, String externalUserId) {
         MemberInfo memberInfo = new MemberInfo();
         memberInfo.setMemberId(memberId);
+        memberInfo.setTechPlatformUserId(externalUserId);
         memberInfo.setExternalUserId(externalUserId);
         memberInfo.setMobileEncrypted("enc-mobile-" + UUID.randomUUID());
         memberInfo.setMobileHash("hash-mobile-" + UUID.randomUUID());
@@ -242,5 +249,12 @@ class BenefitOrderControllerIntegrationTest {
         order.setUpdatedTs(LocalDateTime.now());
         benefitOrderRepository.insert(order);
         return order;
+    }
+
+    private jakarta.servlet.http.Cookie authCookie(MemberInfo memberInfo) {
+        return new jakarta.servlet.http.Cookie(
+                "NEXUSFIN_AUTH",
+                jwtUtil.generateToken(memberInfo.getMemberId(), memberInfo.getExternalUserId())
+        );
     }
 }

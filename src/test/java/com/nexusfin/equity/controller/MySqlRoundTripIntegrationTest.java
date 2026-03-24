@@ -17,9 +17,12 @@ import com.nexusfin.equity.repository.IdempotencyRecordRepository;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
-import com.nexusfin.equity.util.SignatureUtil;
+import com.nexusfin.equity.util.JwtUtil;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,8 +31,8 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -77,8 +80,15 @@ class MySqlRoundTripIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @BeforeEach
     void setUp() {
+        alignMemberInfoSchema();
         cleanupTestData();
     }
 
@@ -89,34 +99,20 @@ class MySqlRoundTripIntegrationTest {
         String externalUserId = EXTERNAL_USER_PREFIX + uniqueId;
         String productCode = PRODUCT_CODE_PREFIX + uniqueId;
         createProduct(productCode);
-
-        mockMvc.perform(post("/api/users/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .headers(signatureHeaders("mysql-nonce-1"))
-                        .content(registerRequest(requestId, externalUserId)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.registerStatus").value("SUCCESS"));
-
-        MemberChannel memberChannel = memberChannelRepository.selectOne(Wrappers.<MemberChannel>lambdaQuery()
-                .eq(MemberChannel::getChannelCode, "KJ")
-                .eq(MemberChannel::getExternalUserId, externalUserId)
-                .last("limit 1"));
-        assertThat(memberChannel).isNotNull();
-
-        MemberInfo memberInfo = memberInfoRepository.selectById(memberChannel.getMemberId());
-        assertThat(memberInfo).isNotNull();
+        MemberInfo memberInfo = createMember("mem-" + uniqueId, externalUserId);
+        createChannel(memberInfo.getMemberId(), externalUserId);
 
         MvcResult createOrderResult = mockMvc.perform(post("/api/equity/orders")
+                        .cookie(authCookie(memberInfo))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "requestId": "%s-order",
-                                  "memberId": "%s",
                                   "productCode": "%s",
                                   "loanAmount": 680000,
                                   "agreementSigned": true
                                 }
-                                """.formatted(requestId, memberInfo.getMemberId(), productCode)))
+                                """.formatted(requestId, productCode)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.benefitOrderNo").isNotEmpty())
                 .andReturn();
@@ -136,14 +132,15 @@ class MySqlRoundTripIntegrationTest {
         assertThat(contractArchiveRepository.selectCount(Wrappers.<ContractArchive>lambdaQuery()
                 .in(ContractArchive::getTaskNo, signTasks.stream().map(SignTask::getTaskNo).toList()))).isEqualTo(2);
 
-        mockMvc.perform(get("/api/equity/orders/{benefitOrderNo}", benefitOrderNo))
+        mockMvc.perform(get("/api/equity/orders/{benefitOrderNo}", benefitOrderNo)
+                        .cookie(authCookie(memberInfo)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.benefitOrderNo").value(benefitOrderNo))
                 .andExpect(jsonPath("$.data.orderStatus").value("FIRST_DEDUCT_PENDING"));
 
-        IdempotencyRecord record = idempotencyRecordRepository.selectById(requestId);
+        IdempotencyRecord record = idempotencyRecordRepository.selectById(requestId + "-order");
         assertThat(record).isNotNull();
-        assertThat(record.getBizKey()).isEqualTo(memberInfo.getMemberId());
+        assertThat(record.getBizKey()).isEqualTo(benefitOrderNo);
     }
 
     private void createProduct(String productCode) {
@@ -157,31 +154,72 @@ class MySqlRoundTripIntegrationTest {
         benefitProductRepository.insert(product);
     }
 
-    private HttpHeaders signatureHeaders(String nonce) {
-        String appId = "test-app";
-        String timestamp = String.valueOf(Instant.now().getEpochSecond());
-        String signature = SignatureUtil.sign(appId, timestamp, nonce, "test-secret");
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("X-App-Id", appId);
-        headers.add("X-Timestamp", timestamp);
-        headers.add("X-Nonce", nonce);
-        headers.add("X-Signature", signature);
-        return headers;
+    private MemberInfo createMember(String memberId, String externalUserId) {
+        MemberInfo memberInfo = new MemberInfo();
+        memberInfo.setMemberId(memberId);
+        memberInfo.setTechPlatformUserId(externalUserId);
+        memberInfo.setExternalUserId(externalUserId);
+        memberInfo.setMobileEncrypted("enc-mobile-" + UUID.randomUUID());
+        memberInfo.setMobileHash("hash-mobile-" + UUID.randomUUID());
+        memberInfo.setIdCardEncrypted("enc-id-" + UUID.randomUUID());
+        memberInfo.setIdCardHash("hash-id-" + UUID.randomUUID());
+        memberInfo.setRealNameEncrypted("enc-name-" + UUID.randomUUID());
+        memberInfo.setMemberStatus("ACTIVE");
+        memberInfo.setCreatedTs(LocalDateTime.now());
+        memberInfo.setUpdatedTs(LocalDateTime.now());
+        memberInfoRepository.insert(memberInfo);
+        return memberInfo;
     }
 
-    private String registerRequest(String requestId, String externalUserId) {
-        return """
-                {
-                  "requestId": "%s",
-                  "channelCode": "KJ",
-                  "userInfo": {
-                    "externalUserId": "%s",
-                    "mobileEncrypted": "13600000000",
-                    "idCardEncrypted": "310101199001011236",
-                    "realNameEncrypted": "李四"
-                  }
+    private void createChannel(String memberId, String externalUserId) {
+        MemberChannel memberChannel = new MemberChannel();
+        memberChannel.setMemberId(memberId);
+        memberChannel.setChannelCode("KJ");
+        memberChannel.setExternalUserId(externalUserId);
+        memberChannel.setBindStatus("BOUND");
+        memberChannel.setCreatedTs(LocalDateTime.now());
+        memberChannel.setUpdatedTs(LocalDateTime.now());
+        memberChannelRepository.insert(memberChannel);
+    }
+
+    private jakarta.servlet.http.Cookie authCookie(MemberInfo memberInfo) {
+        return new jakarta.servlet.http.Cookie(
+                "NEXUSFIN_AUTH",
+                jwtUtil.generateToken(memberInfo.getMemberId(), memberInfo.getExternalUserId())
+        );
+    }
+
+    private void alignMemberInfoSchema() {
+        jdbcTemplate.execute((Connection connection) -> {
+            DatabaseMetaData metaData = connection.getMetaData();
+            if (!hasColumn(metaData, "member_info", "tech_platform_user_id")) {
+                jdbcTemplate.execute("ALTER TABLE member_info ADD COLUMN tech_platform_user_id VARCHAR(64) NULL");
+            }
+            if (!hasUniqueIndex(metaData, "member_info", "tech_platform_user_id")) {
+                jdbcTemplate.execute(
+                        "CREATE UNIQUE INDEX uk_member_info_tech_platform_user_id ON member_info (tech_platform_user_id)"
+                );
+            }
+            return null;
+        });
+    }
+
+    private boolean hasColumn(DatabaseMetaData metaData, String tableName, String columnName) throws SQLException {
+        try (ResultSet columns = metaData.getColumns(null, null, tableName, columnName)) {
+            return columns.next();
+        }
+    }
+
+    private boolean hasUniqueIndex(DatabaseMetaData metaData, String tableName, String columnName) throws SQLException {
+        try (ResultSet indexes = metaData.getIndexInfo(null, null, tableName, true, false)) {
+            while (indexes.next()) {
+                String indexedColumn = indexes.getString("COLUMN_NAME");
+                if (columnName.equalsIgnoreCase(indexedColumn)) {
+                    return true;
                 }
-                """.formatted(requestId, externalUserId);
+            }
+        }
+        return false;
     }
 
     private void cleanupTestData() {

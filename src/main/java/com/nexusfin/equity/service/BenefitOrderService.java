@@ -10,7 +10,7 @@ public interface BenefitOrderService {
 
     ProductPageResponse getProductPage(String productCode, String memberId);
 
-    CreateBenefitOrderResponse createOrder(CreateBenefitOrderRequest request);
+    CreateBenefitOrderResponse createOrder(String memberId, CreateBenefitOrderRequest request);
 
     BenefitOrderStatusResponse getOrderStatus(String benefitOrderNo);
 

@@ -2,13 +2,16 @@ package com.nexusfin.equity;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexusfin.equity.dto.response.TechPlatformUserProfileResponse;
 import com.nexusfin.equity.service.ReconciliationService;
+import com.nexusfin.equity.service.TechPlatformUserClient;
 import com.nexusfin.equity.util.SignatureUtil;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.jdbc.Sql;
@@ -16,9 +19,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -35,30 +40,43 @@ class NexusfinEquityApplicationTests {
     @Autowired
     private ReconciliationService reconciliationService;
 
+    @MockBean
+    private TechPlatformUserClient techPlatformUserClient;
+
     @Test
     void shouldCompleteQuickstartSmokeFlow() throws Exception {
-        String registerRequestId = "req-quickstart-register";
-        MvcResult registerResult = mockMvc.perform(post("/api/users/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .headers(signatureHeaders("nonce-quickstart-register"))
-                        .content(registerRequest(registerRequestId)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.registerStatus").value("SUCCESS"))
+        when(techPlatformUserClient.getCurrentUser("tech-token-quickstart")).thenReturn(
+                new TechPlatformUserProfileResponse("quickstart-user-001", "13800138000", "李四", "310101199001011111")
+        );
+
+        MvcResult ssoResult = mockMvc.perform(get("/api/auth/sso-callback")
+                        .param("token", "tech-token-quickstart")
+                        .param("redirect_url", "/equity/index"))
+                .andExpect(status().isFound())
+                .andExpect(redirectedUrl("/equity/index"))
                 .andReturn();
 
-        JsonNode registerJson = objectMapper.readTree(registerResult.getResponse().getContentAsString());
-        String memberId = registerJson.path("data").path("memberId").asText();
-        assertThat(memberId).isNotBlank();
+        jakarta.servlet.http.Cookie authCookie = ssoResult.getResponse().getCookie("NEXUSFIN_AUTH");
+        assertThat(authCookie).isNotNull();
+
+        MvcResult currentUserResult = mockMvc.perform(get("/api/users/me")
+                        .cookie(authCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.techPlatformUserId").value("quickstart-user-001"))
+                .andReturn();
+        JsonNode currentUserJson = objectMapper.readTree(currentUserResult.getResponse().getContentAsString());
+        String memberId = currentUserJson.path("data").path("memberId").asText();
 
         mockMvc.perform(get("/api/equity/products/{productCode}", "QS-PROD-001")
-                        .param("memberId", memberId))
+                        .cookie(authCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.productCode").value("QS-PROD-001"))
                 .andExpect(jsonPath("$.data.memberId").value(memberId));
 
         MvcResult createOrderResult = mockMvc.perform(post("/api/equity/orders")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createOrderRequest(memberId)))
+                        .cookie(authCookie)
+                        .content(createOrderRequest()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.orderStatus").value("FIRST_DEDUCT_PENDING"))
                 .andReturn();
@@ -83,12 +101,14 @@ class NexusfinEquityApplicationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0));
 
-        mockMvc.perform(get("/api/equity/orders/{benefitOrderNo}", benefitOrderNo))
+        mockMvc.perform(get("/api/equity/orders/{benefitOrderNo}", benefitOrderNo)
+                        .cookie(authCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.orderStatus").value("EXERCISE_PENDING"))
                 .andExpect(jsonPath("$.data.grantStatus").value("SUCCESS"));
 
-        mockMvc.perform(get("/api/equity/exercise-url/{benefitOrderNo}", benefitOrderNo))
+        mockMvc.perform(get("/api/equity/exercise-url/{benefitOrderNo}", benefitOrderNo)
+                        .cookie(authCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.exerciseUrl").value("https://abs.example.com/exercise/" + benefitOrderNo));
 
@@ -110,31 +130,15 @@ class NexusfinEquityApplicationTests {
         return headers;
     }
 
-    private String registerRequest(String requestId) {
-        return """
-                {
-                  "requestId": "%s",
-                  "channelCode": "KJ",
-                  "userInfo": {
-                    "externalUserId": "quickstart-user-001",
-                    "mobileEncrypted": "13800138000",
-                    "idCardEncrypted": "310101199001011111",
-                    "realNameEncrypted": "李四"
-                  }
-                }
-                """.formatted(requestId);
-    }
-
-    private String createOrderRequest(String memberId) {
+    private String createOrderRequest() {
         return """
                 {
                   "requestId": "req-quickstart-create-order",
-                  "memberId": "%s",
                   "productCode": "QS-PROD-001",
                   "loanAmount": 880000,
                   "agreementSigned": true
                 }
-                """.formatted(memberId);
+                """;
     }
 
     private String firstDeductRequest(String benefitOrderNo) {

@@ -1,5 +1,6 @@
 create table if not exists member_info (
     member_id varchar(64) primary key,
+    tech_platform_user_id varchar(64) unique,
     external_user_id varchar(64) not null,
     mobile_encrypted varchar(512) not null,
     mobile_hash varchar(128) not null,

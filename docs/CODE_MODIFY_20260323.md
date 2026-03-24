@@ -7,6 +7,45 @@
 
 本次根据 `CODE_REVIEW_20260323.md` 复核后，只落地了其中真正影响当前基线规格的一部分问题，并保持现有基线范围不被无关的生产化增强项扩散。
 
+## 1.1 2026-03-24 跨域认证改造补充
+
+本次新增了一轮跨域认证改造，核心变化如下：
+
+1. 新增 `GET /api/auth/sso-callback`，用科技平台 token 做 SSO 回调登录
+2. 新增 `GET /api/users/me`，供前端判定本地登录态
+3. 新增本地 JWT + Cookie 认证过滤器
+4. `/api/equity/**` 业务接口改为从本地登录态获取当前会员，不再接收显式 `memberId`
+5. 下线旧的 `/api/users/register` 静默注册入口
+
+涉及核心文件：
+
+- `src/main/java/com/nexusfin/equity/controller/AuthController.java`
+- `src/main/java/com/nexusfin/equity/service/impl/AuthServiceImpl.java`
+- `src/main/java/com/nexusfin/equity/service/impl/TechPlatformUserClientImpl.java`
+- `src/main/java/com/nexusfin/equity/config/JwtAuthenticationFilter.java`
+- `src/main/java/com/nexusfin/equity/util/JwtUtil.java`
+- `src/main/java/com/nexusfin/equity/util/CookieUtil.java`
+- `src/main/java/com/nexusfin/equity/controller/BenefitOrderController.java`
+- `src/main/java/com/nexusfin/equity/service/impl/BenefitOrderServiceImpl.java`
+- `src/main/resources/application.yml`
+- `src/main/resources/db/schema.sql`
+
+## 1.2 本轮验证补充
+
+已执行：
+
+```bash
+mvn test
+mvn clean package -DskipTests
+mvn checkstyle:check
+```
+
+结果：
+
+- `mvn test` 通过
+- `mvn clean package -DskipTests` 通过
+- `mvn checkstyle:check` 通过
+
 本次已完成两类核心调整：
 
 1. 创建权益订单接口补齐请求级幂等能力
@@ -179,28 +218,44 @@
 已执行：
 
 ```bash
-mvn test
+mvn -q test
 ```
 
 结果：
 
 - 通过
+- 本轮最新代码状态下重新执行通过
+- 共覆盖 56 个测试用例，跳过 2 个仅在 `MYSQL_IT_ENABLED=true` 时启用的真实 MySQL 用例
 
-### 4.2 Checkstyle
+### 4.2 打包验证
 
 已执行：
 
 ```bash
-mvn checkstyle:check
+mvn -q clean package -DskipTests
 ```
 
 结果：
 
 - 通过
+- 已在最新代码状态下重新执行，产物可正常生成到 `target/`
 
-### 4.3 真实 MySQL 回归
+### 4.3 Checkstyle
 
-首次在沙箱内执行：
+已执行：
+
+```bash
+mvn -q checkstyle:check
+```
+
+结果：
+
+- 通过
+- 已在补充 MySQL 回归前置逻辑后再次确认通过
+
+### 4.4 真实 MySQL 回归
+
+已执行：
 
 ```bash
 MYSQL_IT_ENABLED=true MYSQL_IT_DATABASE=nexusfin_equity \
@@ -209,19 +264,22 @@ mvn -q -Dtest=MySqlRoundTripIntegrationTest,MySqlCallbackFlowIntegrationTest tes
 
 结果：
 
-- 未通过，但失败原因不是代码问题
-- 原因是沙箱限制本地 MySQL 连接，报错为 `java.net.SocketException: Operation not permitted`
+- 最终通过
+- `MySqlRoundTripIntegrationTest` 已验证真实 MySQL 写入并回读以下对象：
+  - `member_info`
+  - `member_channel`
+  - `benefit_product`
+  - `benefit_order`
+  - `sign_task`
+  - `contract_archive`
+  - `idempotency_record`
+- `MySqlCallbackFlowIntegrationTest` 已验证回调链路在真实 MySQL 下继续可写且可推进订单状态
 
-提权后重新执行相同命令：
+补充说明：
 
-```bash
-MYSQL_IT_ENABLED=true MYSQL_IT_DATABASE=nexusfin_equity \
-mvn -q -Dtest=MySqlRoundTripIntegrationTest,MySqlCallbackFlowIntegrationTest test
-```
-
-结果：
-
-- 通过
+- 首次真实 MySQL 回归暴露了一个存量库兼容问题：本地复用的 `nexusfin_equity.member_info` 缺少 `tech_platform_user_id` 列
+- 为兼容“复用已有本地数据库、不重建库表”的约束，已在 [MySqlRoundTripIntegrationTest](/Users/lixiaokun/Projects/nexusFin/nexusfin-equity/src/test/java/com/nexusfin/equity/controller/MySqlRoundTripIntegrationTest.java) 增加测试前置 schema 对齐逻辑
+- 当前逻辑会在真实 MySQL 回归开始前检查并补齐 `member_info.tech_platform_user_id` 列及其唯一索引，然后再执行写库验证
 
 ## 5. 总结
 

@@ -31,5 +31,32 @@ nexusfin:
     secret: ${NEXUSFIN_APP_SECRET:abs-secret-key}
     max-skew-seconds: 300
     protected-path-prefixes:
-      - /api/users/register
       - /api/callbacks
+  auth:
+    tech-platform-base-url: ${TECH_PLATFORM_BASE_URL:http://localhost:18080}
+    tech-platform-user-me-path: ${TECH_PLATFORM_USER_ME_PATH:/api/users/me}
+    connect-timeout-ms: ${TECH_PLATFORM_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${TECH_PLATFORM_READ_TIMEOUT_MS:3000}
+    default-channel-code: ${AUTH_DEFAULT_CHANNEL_CODE:KJ}
+    default-redirect-url: ${AUTH_DEFAULT_REDIRECT_URL:/equity/index}
+    redirect-whitelist:
+      - /equity/
+      - https://equity.nexusfin.com/
+    protected-path-prefixes:
+      - /api/equity/products
+      - /api/equity/orders
+      - /api/equity/exercise-url
+      - /api/users/me
+    excluded-path-prefixes:
+      - /api/equity/health
+      - /api/auth/sso-callback
+      - /api/callbacks
+    jwt:
+      issuer: ${AUTH_JWT_ISSUER:nexusfin-equity}
+      secret: ${AUTH_JWT_SECRET:equity-jwt-secret-key-equity-jwt-secret}
+      ttl-seconds: ${AUTH_JWT_TTL_SECONDS:7200}
+      cookie-name: ${AUTH_COOKIE_NAME:NEXUSFIN_AUTH}
+      cookie-path: /
+      cookie-secure: ${AUTH_COOKIE_SECURE:true}
+      cookie-http-only: true
+      cookie-same-site: Lax

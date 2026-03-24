@@ -10,6 +10,11 @@ target/
 out/
 *.class
 *.log
+*.jar
+build/
 
 # OS temp files
 Thumbs.db
+*.swp
+*.tmp
+.env*

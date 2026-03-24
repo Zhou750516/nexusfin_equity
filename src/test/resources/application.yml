@@ -15,5 +15,32 @@ nexusfin:
     secret: test-secret
     max-skew-seconds: 300
     protected-path-prefixes:
-      - /api/users/register
       - /api/callbacks
+  auth:
+    tech-platform-base-url: http://localhost:18080
+    tech-platform-user-me-path: /api/users/me
+    connect-timeout-ms: 2000
+    read-timeout-ms: 3000
+    default-channel-code: KJ
+    default-redirect-url: /equity/index
+    redirect-whitelist:
+      - /equity/
+      - https://equity.nexusfin.com/
+    protected-path-prefixes:
+      - /api/equity/products
+      - /api/equity/orders
+      - /api/equity/exercise-url
+      - /api/users/me
+    excluded-path-prefixes:
+      - /api/equity/health
+      - /api/auth/sso-callback
+      - /api/callbacks
+    jwt:
+      issuer: nexusfin-equity-test
+      secret: test-jwt-secret-key-test-jwt-secret-key
+      ttl-seconds: 7200
+      cookie-name: NEXUSFIN_AUTH
+      cookie-path: /
+      cookie-secure: false
+      cookie-http-only: true
+      cookie-same-site: Lax

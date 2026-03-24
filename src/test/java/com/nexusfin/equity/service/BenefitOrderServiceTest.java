@@ -86,7 +86,8 @@ class BenefitOrderServiceTest {
         when(idempotencyService.isProcessed("req-order-1")).thenReturn(false);
 
         CreateBenefitOrderResponse response = benefitOrderService.createOrder(
-                new CreateBenefitOrderRequest("req-order-1", "mem-2", "P-2", 680000L, true)
+                "mem-2",
+                new CreateBenefitOrderRequest("req-order-1", "P-2", 680000L, true)
         );
 
         ArgumentCaptor<BenefitOrder> captor = ArgumentCaptor.forClass(BenefitOrder.class);
@@ -112,7 +113,8 @@ class BenefitOrderServiceTest {
         when(benefitOrderRepository.selectById(existingOrder.getBenefitOrderNo())).thenReturn(existingOrder);
 
         CreateBenefitOrderResponse response = benefitOrderService.createOrder(
-                new CreateBenefitOrderRequest("req-order-duplicate", "mem-2", "P-2", 680000L, true)
+                "mem-2",
+                new CreateBenefitOrderRequest("req-order-duplicate", "P-2", 680000L, true)
         );
 
         assertThat(response.benefitOrderNo()).isEqualTo(existingOrder.getBenefitOrderNo());
@@ -125,7 +127,8 @@ class BenefitOrderServiceTest {
         when(idempotencyService.isProcessed("req-order-3")).thenReturn(false);
 
         assertThatThrownBy(() -> benefitOrderService.createOrder(
-                new CreateBenefitOrderRequest("req-order-3", "mem-3", "P-3", 680000L, true)))
+                "mem-3",
+                new CreateBenefitOrderRequest("req-order-3", "P-3", 680000L, true)))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("PRODUCT_NOT_FOUND");
     }

@@ -23,3 +23,45 @@ INSERT INTO benefit_product (
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
 );
+
+INSERT INTO member_info (
+    member_id,
+    tech_platform_user_id,
+    external_user_id,
+    mobile_encrypted,
+    mobile_hash,
+    id_card_encrypted,
+    id_card_hash,
+    real_name_encrypted,
+    member_status,
+    created_ts,
+    updated_ts
+) VALUES (
+    'mem-auth-seed-001',
+    'tech-user-seed-001',
+    'tech-user-seed-001',
+    'MTM4MDAwMDAwMDE=',
+    'seed-mobile-hash-001',
+    'c2VlZC1pZC0wMDE=',
+    'seed-id-hash-001',
+    '5byg5LiJ',
+    'ACTIVE',
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+);
+
+INSERT INTO member_channel (
+    member_id,
+    channel_code,
+    external_user_id,
+    bind_status,
+    created_ts,
+    updated_ts
+) VALUES (
+    'mem-auth-seed-001',
+    'KJ',
+    'tech-user-seed-001',
+    'BOUND',
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+);
