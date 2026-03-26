@@ -1,16 +1,19 @@
 package com.nexusfin.equity.service;
 
 import com.nexusfin.equity.config.AuthProperties;
+import com.nexusfin.equity.config.CryptoProperties;
 import com.nexusfin.equity.dto.response.CurrentUserResponse;
 import com.nexusfin.equity.dto.response.TechPlatformUserProfileResponse;
 import com.nexusfin.equity.entity.MemberChannel;
 import com.nexusfin.equity.entity.MemberInfo;
+import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.impl.AuthServiceImpl;
 import com.nexusfin.equity.util.AuthContextUtil;
 import com.nexusfin.equity.util.AuthPrincipal;
 import com.nexusfin.equity.util.JwtUtil;
+import com.nexusfin.equity.util.SensitiveDataCipher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -27,6 +31,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
+
+    private final SensitiveDataCipher sensitiveDataCipher = new SensitiveDataCipher(cryptoProperties());
 
     @Mock
     private TechPlatformUserClient techPlatformUserClient;
@@ -53,10 +59,11 @@ class AuthServiceTest {
                 memberInfoRepository,
                 memberChannelRepository,
                 new JwtUtil(authProperties),
-                authProperties
+                authProperties,
+                sensitiveDataCipher
         );
         when(techPlatformUserClient.getCurrentUser("tech-token")).thenReturn(
-                new TechPlatformUserProfileResponse("tech-001", "13800138000", "张三", "310101199001011111")
+                new TechPlatformUserProfileResponse("tech-001", "13800138000", "张三", "310101199001011111", "KJ")
         );
         when(memberInfoRepository.selectByTechPlatformUserId("tech-001")).thenReturn(null);
         when(memberChannelRepository.selectByChannelAndExternalUserId("KJ", "tech-001")).thenReturn(null);
@@ -67,6 +74,8 @@ class AuthServiceTest {
         verify(memberInfoRepository).insert(memberCaptor.capture());
         verify(memberChannelRepository).insert(any(MemberChannel.class));
         assertThat(memberCaptor.getValue().getTechPlatformUserId()).isEqualTo("tech-001");
+        assertThat(memberCaptor.getValue().getMobileEncrypted()).isNotEqualTo("13800138000");
+        assertThat(sensitiveDataCipher.decrypt(memberCaptor.getValue().getMobileEncrypted())).isEqualTo("13800138000");
         assertThat(result.redirectUrl()).isEqualTo("/equity/index");
         assertThat(result.jwtToken()).isNotBlank();
     }
@@ -79,13 +88,15 @@ class AuthServiceTest {
                 memberInfoRepository,
                 memberChannelRepository,
                 new JwtUtil(authProperties),
-                authProperties
+                authProperties,
+                sensitiveDataCipher
         );
         MemberInfo existing = new MemberInfo();
         existing.setMemberId("mem-existing");
         existing.setTechPlatformUserId("tech-001");
+        existing.setCreatedTs(java.time.LocalDateTime.now().minusDays(1));
         when(techPlatformUserClient.getCurrentUser("tech-token")).thenReturn(
-                new TechPlatformUserProfileResponse("tech-001", "13800138000", "张三", null)
+                new TechPlatformUserProfileResponse("tech-001", "13800138000", "张三", null, "KJ")
         );
         when(memberInfoRepository.selectByTechPlatformUserId("tech-001")).thenReturn(existing);
         when(memberChannelRepository.selectByChannelAndExternalUserId("KJ", "tech-001")).thenReturn(new MemberChannel());
@@ -105,7 +116,8 @@ class AuthServiceTest {
                 memberInfoRepository,
                 memberChannelRepository,
                 new JwtUtil(authProperties),
-                authProperties
+                authProperties,
+                sensitiveDataCipher
         );
         MemberInfo memberInfo = new MemberInfo();
         memberInfo.setMemberId("mem-001");
@@ -121,6 +133,27 @@ class AuthServiceTest {
         assertThat(response.techPlatformUserId()).isEqualTo("tech-001");
     }
 
+    @Test
+    void shouldRejectInvalidPhoneForNewSsoMember() {
+        AuthProperties authProperties = authProperties();
+        authService = new AuthServiceImpl(
+                techPlatformUserClient,
+                memberInfoRepository,
+                memberChannelRepository,
+                new JwtUtil(authProperties),
+                authProperties,
+                sensitiveDataCipher
+        );
+        when(techPlatformUserClient.getCurrentUser("tech-token")).thenReturn(
+                new TechPlatformUserProfileResponse("tech-001", "bad-phone", "张三", "310101199001011111", "KJ")
+        );
+        when(memberInfoRepository.selectByTechPlatformUserId("tech-001")).thenReturn(null);
+
+        assertThatThrownBy(() -> authService.loginWithTechToken("tech-token", "/equity/index"))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("PHONE_INVALID");
+    }
+
     private AuthProperties authProperties() {
         AuthProperties authProperties = new AuthProperties();
         authProperties.setDefaultChannelCode("KJ");
@@ -131,5 +164,9 @@ class AuthServiceTest {
         jwt.setSecret("test-jwt-secret-key-test-jwt-secret-key");
         authProperties.setJwt(jwt);
         return authProperties;
+    }
+
+    private CryptoProperties cryptoProperties() {
+        return new CryptoProperties();
     }
 }

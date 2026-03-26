@@ -64,7 +64,7 @@ class PaymentCallbackControllerIntegrationTest {
 
         BenefitOrder savedOrder = benefitOrderRepository.selectById(order.getBenefitOrderNo());
         assertThat(savedOrder.getOrderStatus()).isEqualTo("FIRST_DEDUCT_SUCCESS");
-        assertThat(savedOrder.getQwFirstDeductStatus()).isEqualTo("SUCCESS");
+        assertThat(savedOrder.getFirstDeductStatus()).isEqualTo("SUCCESS");
         assertThat(savedOrder.getSyncStatus()).isEqualTo("SYNC_SUCCESS");
 
         PaymentRecord paymentRecord = paymentRecordRepository.selectOne(Wrappers.<PaymentRecord>lambdaQuery()
@@ -101,7 +101,7 @@ class PaymentCallbackControllerIntegrationTest {
 
         BenefitOrder savedOrder = benefitOrderRepository.selectById(order.getBenefitOrderNo());
         assertThat(savedOrder.getOrderStatus()).isEqualTo("FIRST_DEDUCT_FAIL");
-        assertThat(savedOrder.getQwFirstDeductStatus()).isEqualTo("FAIL");
+        assertThat(savedOrder.getFirstDeductStatus()).isEqualTo("FAIL");
 
         assertThat(paymentRecordRepository.selectCount(Wrappers.<PaymentRecord>lambdaQuery()
                 .eq(PaymentRecord::getRequestId, requestId))).isEqualTo(1);
@@ -111,8 +111,8 @@ class PaymentCallbackControllerIntegrationTest {
     void shouldPersistFallbackDeductSuccess() throws Exception {
         BenefitOrder order = createOrder("ord-fallback-success", "user-fallback-success");
         order.setOrderStatus("FALLBACK_DEDUCT_PENDING");
-        order.setQwFirstDeductStatus("FAIL");
-        order.setQwFallbackDeductStatus("PENDING");
+        order.setFirstDeductStatus("FAIL");
+        order.setFallbackDeductStatus("PENDING");
         order.setUpdatedTs(LocalDateTime.now());
         benefitOrderRepository.updateById(order);
 
@@ -127,22 +127,22 @@ class PaymentCallbackControllerIntegrationTest {
 
         BenefitOrder savedOrder = benefitOrderRepository.selectById(order.getBenefitOrderNo());
         assertThat(savedOrder.getOrderStatus()).isEqualTo("FALLBACK_DEDUCT_SUCCESS");
-        assertThat(savedOrder.getQwFallbackDeductStatus()).isEqualTo("SUCCESS");
+        assertThat(savedOrder.getFallbackDeductStatus()).isEqualTo("SUCCESS");
     }
 
     private BenefitOrder createOrder(String benefitOrderNo, String externalUserId) {
         BenefitOrder order = new BenefitOrder();
         order.setBenefitOrderNo(benefitOrderNo);
         order.setMemberId("mem-" + externalUserId);
-        order.setChannelCode("KJ");
+        order.setSourceChannelCode("KJ");
         order.setExternalUserId(externalUserId);
         order.setProductCode("PROD-CALLBACK");
         order.setAgreementNo("agr-" + externalUserId);
         order.setLoanAmount(680000L);
         order.setOrderStatus("FIRST_DEDUCT_PENDING");
-        order.setQwFirstDeductStatus("PENDING");
-        order.setQwFallbackDeductStatus("NONE");
-        order.setQwExerciseStatus("NONE");
+        order.setFirstDeductStatus("PENDING");
+        order.setFallbackDeductStatus("NONE");
+        order.setExerciseStatus("NONE");
         order.setRefundStatus("NONE");
         order.setGrantStatus("PENDING");
         order.setSyncStatus("SYNC_PENDING");

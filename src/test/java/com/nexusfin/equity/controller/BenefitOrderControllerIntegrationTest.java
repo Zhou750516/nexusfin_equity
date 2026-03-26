@@ -17,6 +17,7 @@ import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
 import com.nexusfin.equity.util.JwtUtil;
+import com.nexusfin.equity.util.SensitiveDataCipher;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -65,6 +66,9 @@ class BenefitOrderControllerIntegrationTest {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private SensitiveDataCipher sensitiveDataCipher;
 
     @BeforeEach
     void setUp() {
@@ -184,8 +188,24 @@ class BenefitOrderControllerIntegrationTest {
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.benefitOrderNo").value(order.getBenefitOrderNo()))
                 .andExpect(jsonPath("$.data.orderStatus").value(order.getOrderStatus()))
-                .andExpect(jsonPath("$.data.qwFirstDeductStatus").value(order.getQwFirstDeductStatus()))
+                .andExpect(jsonPath("$.data.firstDeductStatus").value(order.getFirstDeductStatus()))
                 .andExpect(jsonPath("$.data.grantStatus").value(order.getGrantStatus()));
+    }
+
+    @Test
+    void shouldGetExerciseUrlFromQwMockClient() throws Exception {
+        BenefitProduct product = createProduct("P-004");
+        MemberInfo memberInfo = createMember("mem-004", "user-exercise-url");
+        createChannel(memberInfo.getMemberId(), "user-exercise-url");
+        BenefitOrder order = createOrder(memberInfo, product);
+
+        mockMvc.perform(get("/api/equity/exercise-url/{benefitOrderNo}", order.getBenefitOrderNo())
+                        .cookie(authCookie(memberInfo)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.exerciseUrl").value(org.hamcrest.Matchers.containsString("https://mock-qw.test/exercise")))
+                .andExpect(jsonPath("$.data.exerciseUrl").value(org.hamcrest.Matchers.containsString(order.getBenefitOrderNo())))
+                .andExpect(jsonPath("$.data.expireTime").isNotEmpty());
     }
 
     private BenefitProduct createProduct(String productCode) {
@@ -205,11 +225,11 @@ class BenefitOrderControllerIntegrationTest {
         memberInfo.setMemberId(memberId);
         memberInfo.setTechPlatformUserId(externalUserId);
         memberInfo.setExternalUserId(externalUserId);
-        memberInfo.setMobileEncrypted("enc-mobile-" + UUID.randomUUID());
+        memberInfo.setMobileEncrypted(sensitiveDataCipher.encrypt("13800138000"));
         memberInfo.setMobileHash("hash-mobile-" + UUID.randomUUID());
-        memberInfo.setIdCardEncrypted("enc-id-" + UUID.randomUUID());
+        memberInfo.setIdCardEncrypted(sensitiveDataCipher.encrypt("110101199003071234"));
         memberInfo.setIdCardHash("hash-id-" + UUID.randomUUID());
-        memberInfo.setRealNameEncrypted("enc-name-" + UUID.randomUUID());
+        memberInfo.setRealNameEncrypted(sensitiveDataCipher.encrypt("测试用户"));
         memberInfo.setMemberStatus(MemberStatusEnum.ACTIVE.name());
         memberInfo.setCreatedTs(LocalDateTime.now());
         memberInfo.setUpdatedTs(LocalDateTime.now());
@@ -232,15 +252,15 @@ class BenefitOrderControllerIntegrationTest {
         BenefitOrder order = new BenefitOrder();
         order.setBenefitOrderNo("ord-" + UUID.randomUUID().toString().replace("-", ""));
         order.setMemberId(memberInfo.getMemberId());
-        order.setChannelCode("KJ");
+        order.setSourceChannelCode("KJ");
         order.setExternalUserId(memberInfo.getExternalUserId());
         order.setProductCode(product.getProductCode());
         order.setAgreementNo("agr-" + UUID.randomUUID().toString().replace("-", ""));
         order.setLoanAmount(500000L);
         order.setOrderStatus("FIRST_DEDUCT_PENDING");
-        order.setQwFirstDeductStatus("PENDING");
-        order.setQwFallbackDeductStatus("NONE");
-        order.setQwExerciseStatus("NONE");
+        order.setFirstDeductStatus("PENDING");
+        order.setFallbackDeductStatus("NONE");
+        order.setExerciseStatus("NONE");
         order.setRefundStatus("NONE");
         order.setGrantStatus("PENDING");
         order.setSyncStatus("SYNC_PENDING");

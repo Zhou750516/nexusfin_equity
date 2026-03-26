@@ -1,6 +1,7 @@
 package com.nexusfin.equity.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.nexusfin.equity.config.BusinessProperties;
 import com.nexusfin.equity.dto.request.GrantForwardCallbackRequest;
 import com.nexusfin.equity.dto.response.PaymentStatusResponse;
 import com.nexusfin.equity.entity.BenefitOrder;
@@ -22,13 +23,16 @@ public class FallbackDeductServiceImpl implements FallbackDeductService {
 
     private final PaymentRecordRepository paymentRecordRepository;
     private final BenefitOrderRepository benefitOrderRepository;
+    private final BusinessProperties businessProperties;
 
     public FallbackDeductServiceImpl(
             PaymentRecordRepository paymentRecordRepository,
-            BenefitOrderRepository benefitOrderRepository
+            BenefitOrderRepository benefitOrderRepository,
+            BusinessProperties businessProperties
     ) {
         this.paymentRecordRepository = paymentRecordRepository;
         this.benefitOrderRepository = benefitOrderRepository;
+        this.businessProperties = businessProperties;
     }
 
     @Override
@@ -54,7 +58,7 @@ public class FallbackDeductServiceImpl implements FallbackDeductService {
         paymentRecord.setPaymentNo(RequestIdUtil.nextId("pay"));
         paymentRecord.setBenefitOrderNo(order.getBenefitOrderNo());
         paymentRecord.setPaymentType(PaymentTypeEnum.FALLBACK_DEDUCT.name());
-        paymentRecord.setChannelName("QW");
+        paymentRecord.setProviderCode(businessProperties.getDefaultProviderCode());
         paymentRecord.setAmount(request.actualAmount());
         paymentRecord.setPaymentStatus(PaymentStatusEnum.PENDING.name());
         paymentRecord.setRequestId(request.requestId());
@@ -62,7 +66,7 @@ public class FallbackDeductServiceImpl implements FallbackDeductService {
         paymentRecord.setUpdatedTs(LocalDateTime.now());
         paymentRecordRepository.insert(paymentRecord);
         order.setOrderStatus(BenefitOrderStatusEnum.FALLBACK_DEDUCT_PENDING.name());
-        order.setQwFallbackDeductStatus(PaymentStatusEnum.PENDING.name());
+        order.setFallbackDeductStatus(PaymentStatusEnum.PENDING.name());
         order.setUpdatedTs(LocalDateTime.now());
         benefitOrderRepository.updateById(order);
         return new PaymentStatusResponse(

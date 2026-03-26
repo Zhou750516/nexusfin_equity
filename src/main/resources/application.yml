@@ -26,6 +26,37 @@ logging:
     com.nexusfin.equity: INFO
 
 nexusfin:
+  business:
+    default-provider-code: ${DEFAULT_BENEFIT_PROVIDER_CODE:QW}
+  third-party:
+    qw:
+      enabled: ${QW_ENABLED:true}
+      mode: ${QW_MODE:MOCK}
+      base-url: ${QW_BASE_URL:https://t-api.test.qweimobile.com}
+      method-path: ${QW_METHOD_PATH:/api/abs/method}
+      partner-no: ${QW_PARTNER_NO:abs-app}
+      version: ${QW_VERSION:v1.0}
+      sign-key: ${QW_SIGN_KEY:abs-secret-key}
+      connect-timeout-ms: ${QW_CONNECT_TIMEOUT_MS:2000}
+      read-timeout-ms: ${QW_READ_TIMEOUT_MS:3000}
+      aes-key-base64: ${QW_AES_KEY_BASE64:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
+      aes-algorithm: ${QW_AES_ALGORITHM:AES/GCM/NoPadding}
+      gcm-tag-bits: ${QW_GCM_TAG_BITS:128}
+      iv-length-bytes: ${QW_IV_LENGTH_BYTES:12}
+      default-pay-protocol-prefix: ${QW_DEFAULT_PAY_PROTOCOL_PREFIX:proto-}
+      mock-exercise-base-url: ${QW_MOCK_EXERCISE_BASE_URL:https://mock-qw.local/exercise}
+  crypto:
+    dek:
+      key-id: ${NEXUSFIN_CRYPTO_DEK_KEY_ID:DEK_USER_PROFILE}
+      key-version: ${NEXUSFIN_CRYPTO_DEK_KEY_VERSION:1}
+      algorithm: AES/GCM/NoPadding
+      purpose: encrypt_user_sensitive_fields
+      status: ACTIVE
+      plaintext-key-base64: ${NEXUSFIN_CRYPTO_DEK_PLAINTEXT_BASE64:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
+    inbound:
+      default-mode: ${NEXUSFIN_CRYPTO_INBOUND_DEFAULT_MODE:PLAIN}
+      channel-modes:
+        KJ: ${NEXUSFIN_CRYPTO_INBOUND_KJ_MODE:PLAIN}
   signature:
     app-id: ${NEXUSFIN_APP_ID:abs-app}
     secret: ${NEXUSFIN_APP_SECRET:abs-secret-key}

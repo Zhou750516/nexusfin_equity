@@ -15,6 +15,8 @@ import com.nexusfin.equity.repository.NotificationReceiveLogRepository;
 import com.nexusfin.equity.service.FallbackDeductService;
 import com.nexusfin.equity.service.IdempotencyService;
 import com.nexusfin.equity.service.NotificationService;
+import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
+import com.nexusfin.equity.thirdparty.qw.QwLendingNotifyRequest;
 import com.nexusfin.equity.util.OrderStateMachine;
 import com.nexusfin.equity.util.RequestIdUtil;
 import java.time.LocalDateTime;
@@ -28,17 +30,20 @@ public class NotificationServiceImpl implements NotificationService {
     private final NotificationReceiveLogRepository notificationReceiveLogRepository;
     private final FallbackDeductService fallbackDeductService;
     private final IdempotencyService idempotencyService;
+    private final QwBenefitClient qwBenefitClient;
 
     public NotificationServiceImpl(
             BenefitOrderRepository benefitOrderRepository,
             NotificationReceiveLogRepository notificationReceiveLogRepository,
             FallbackDeductService fallbackDeductService,
-            IdempotencyService idempotencyService
+            IdempotencyService idempotencyService,
+            QwBenefitClient qwBenefitClient
     ) {
         this.benefitOrderRepository = benefitOrderRepository;
         this.notificationReceiveLogRepository = notificationReceiveLogRepository;
         this.fallbackDeductService = fallbackDeductService;
         this.idempotencyService = idempotencyService;
+        this.qwBenefitClient = qwBenefitClient;
     }
 
     @Override
@@ -68,6 +73,11 @@ public class NotificationServiceImpl implements NotificationService {
             }
             order.setUpdatedTs(LocalDateTime.now());
             benefitOrderRepository.updateById(order);
+            qwBenefitClient.notifyLending(new QwLendingNotifyRequest(
+                    order.getExternalUserId(),
+                    order.getBenefitOrderNo(),
+                    success ? 1 : 0
+            ));
             markNotification(notificationLog, NotificationProcessStatusEnum.PROCESSED);
             idempotencyService.markProcessed(request.requestId(), "GRANT", request.benefitOrderNo(), request.grantStatus());
         } catch (RuntimeException ex) {

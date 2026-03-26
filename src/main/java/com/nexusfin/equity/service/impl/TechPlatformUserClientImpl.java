@@ -60,7 +60,8 @@ public class TechPlatformUserClientImpl implements TechPlatformUserClient {
                     userId,
                     textValue(payload, "phone"),
                     textValue(payload, "realName"),
-                    textValue(payload, "idCard")
+                    textValue(payload, "idCard"),
+                    textValue(payload, "channelCode")
             );
         } catch (BizException exception) {
             throw exception;

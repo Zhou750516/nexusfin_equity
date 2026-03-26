@@ -58,7 +58,7 @@ class NotificationCallbackControllerIntegrationTest {
     void shouldTriggerSingleFallbackAfterGrantSuccess() throws Exception {
         BenefitOrder order = createOrder("ord-grant-fallback", "user-grant-fallback");
         order.setOrderStatus("FIRST_DEDUCT_FAIL");
-        order.setQwFirstDeductStatus("FAIL");
+        order.setFirstDeductStatus("FAIL");
         order.setUpdatedTs(LocalDateTime.now());
         benefitOrderRepository.updateById(order);
 
@@ -94,7 +94,7 @@ class NotificationCallbackControllerIntegrationTest {
         assertThat(savedOrder.getGrantStatus()).isEqualTo("SUCCESS");
         assertThat(savedOrder.getLoanOrderNo()).startsWith("loan-");
         assertThat(savedOrder.getOrderStatus()).isEqualTo("FALLBACK_DEDUCT_PENDING");
-        assertThat(savedOrder.getQwFallbackDeductStatus()).isEqualTo("PENDING");
+        assertThat(savedOrder.getFallbackDeductStatus()).isEqualTo("PENDING");
 
         assertThat(paymentRecordRepository.selectCount(Wrappers.<PaymentRecord>lambdaQuery()
                 .eq(PaymentRecord::getBenefitOrderNo, order.getBenefitOrderNo())
@@ -208,7 +208,7 @@ class NotificationCallbackControllerIntegrationTest {
         BenefitOrder savedExerciseOrder = benefitOrderRepository.selectById(exerciseOrder.getBenefitOrderNo());
         BenefitOrder savedRefundOrder = benefitOrderRepository.selectById(refundOrder.getBenefitOrderNo());
         assertThat(savedExerciseOrder.getOrderStatus()).isEqualTo("EXERCISE_SUCCESS");
-        assertThat(savedExerciseOrder.getQwExerciseStatus()).isEqualTo("SUCCESS");
+        assertThat(savedExerciseOrder.getExerciseStatus()).isEqualTo("SUCCESS");
         assertThat(savedRefundOrder.getOrderStatus()).isEqualTo("REFUND_SUCCESS");
         assertThat(savedRefundOrder.getRefundStatus()).isEqualTo("SUCCESS");
     }
@@ -217,15 +217,15 @@ class NotificationCallbackControllerIntegrationTest {
         BenefitOrder order = new BenefitOrder();
         order.setBenefitOrderNo(benefitOrderNo);
         order.setMemberId("mem-" + externalUserId);
-        order.setChannelCode("KJ");
+        order.setSourceChannelCode("KJ");
         order.setExternalUserId(externalUserId);
         order.setProductCode("PROD-NOTIFY");
         order.setAgreementNo("agr-" + externalUserId);
         order.setLoanAmount(680000L);
         order.setOrderStatus("FIRST_DEDUCT_PENDING");
-        order.setQwFirstDeductStatus("PENDING");
-        order.setQwFallbackDeductStatus("NONE");
-        order.setQwExerciseStatus("NONE");
+        order.setFirstDeductStatus("PENDING");
+        order.setFallbackDeductStatus("NONE");
+        order.setExerciseStatus("NONE");
         order.setRefundStatus("NONE");
         order.setGrantStatus("PENDING");
         order.setSyncStatus("SYNC_PENDING");

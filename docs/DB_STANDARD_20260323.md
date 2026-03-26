@@ -128,7 +128,7 @@
 | --- | --- | --- | --- | --- |
 | `id` | `bigint` | 否 | 是 | 自增主键 |
 | `member_id` | `varchar(64)` | 否 | 否 | 会员 ID |
-| `channel_code` | `varchar(64)` | 否 | 否 | 渠道编码 |
+| `source_channel_code` | `varchar(64)` | 否 | 否 | 来源渠道编码 |
 | `external_user_id` | `varchar(64)` | 否 | 否 | 渠道侧用户 ID |
 | `bind_status` | `varchar(32)` | 否 | 否 | 绑定状态 |
 | `created_ts` | `timestamp` | 否 | 否 | 创建时间 |
@@ -144,7 +144,7 @@
 
 - 用户静默注册成功时写入。
 - 同一 `channel_code + external_user_id` 只能绑定一次。
-- 创建权益订单时，会取该会员最近一条渠道绑定记录回填 `channel_code` 和 `external_user_id`。
+- 创建权益订单时，会取该会员最近一条渠道绑定记录回填 `source_channel_code` 和 `external_user_id`。
 
 ---
 
@@ -190,15 +190,15 @@
 | --- | --- | --- | --- | --- |
 | `benefit_order_no` | `varchar(64)` | 否 | 是 | 权益订单号 |
 | `member_id` | `varchar(64)` | 否 | 否 | 会员 ID |
-| `channel_code` | `varchar(64)` | 否 | 否 | 渠道编码 |
+| `source_channel_code` | `varchar(64)` | 否 | 否 | 来源渠道编码 |
 | `external_user_id` | `varchar(64)` | 否 | 否 | 外部用户 ID |
 | `product_code` | `varchar(64)` | 否 | 否 | 产品编码 |
 | `agreement_no` | `varchar(64)` | 是 | 否 | 协议号 |
 | `loan_amount` | `bigint` | 否 | 否 | 借款金额，单位分 |
 | `order_status` | `varchar(32)` | 否 | 否 | 订单主状态 |
-| `qw_first_deduct_status` | `varchar(32)` | 否 | 否 | 首扣状态 |
-| `qw_fallback_deduct_status` | `varchar(32)` | 否 | 否 | 兜底代扣状态 |
-| `qw_exercise_status` | `varchar(32)` | 否 | 否 | 行权状态 |
+| `first_deduct_status` | `varchar(32)` | 否 | 否 | 首扣状态 |
+| `fallback_deduct_status` | `varchar(32)` | 否 | 否 | 兜底代扣状态 |
+| `exercise_status` | `varchar(32)` | 否 | 否 | 行权状态 |
 | `refund_status` | `varchar(32)` | 否 | 否 | 退款状态 |
 | `grant_status` | `varchar(32)` | 否 | 否 | 放款状态 |
 | `loan_order_no` | `varchar(64)` | 是 | 否 | 下游借据号 |
@@ -212,9 +212,9 @@
 | 字段 | 典型值 |
 | --- | --- |
 | `order_status` | `FIRST_DEDUCT_PENDING`、`FIRST_DEDUCT_SUCCESS`、`FIRST_DEDUCT_FAIL`、`FALLBACK_DEDUCT_PENDING`、`FALLBACK_DEDUCT_SUCCESS`、`FALLBACK_DEDUCT_FAIL`、`EXERCISE_PENDING`、`EXERCISE_SUCCESS`、`EXERCISE_FAIL`、`REFUND_SUCCESS`、`REFUND_FAIL`、`SYNC_PENDING`、`SYNC_SUCCESS`、`SYNC_FAIL` |
-| `qw_first_deduct_status` | `NONE` / `PENDING` / `SUCCESS` / `FAIL` |
-| `qw_fallback_deduct_status` | `NONE` / `PENDING` / `SUCCESS` / `FAIL` |
-| `qw_exercise_status` | `NONE` / `SUCCESS` / `FAIL` |
+| `first_deduct_status` | `NONE` / `PENDING` / `SUCCESS` / `FAIL` |
+| `fallback_deduct_status` | `NONE` / `PENDING` / `SUCCESS` / `FAIL` |
+| `exercise_status` | `NONE` / `SUCCESS` / `FAIL` |
 | `refund_status` | `NONE` / `SUCCESS` / `FAIL` |
 | `grant_status` | `PENDING` / `SUCCESS` / `FAIL` |
 | `sync_status` | `SYNC_PENDING` / `SYNC_SUCCESS` / `SYNC_FAIL` |
@@ -231,9 +231,9 @@
 | 字段 | 默认写入值 |
 | --- | --- |
 | `order_status` | `FIRST_DEDUCT_PENDING` |
-| `qw_first_deduct_status` | `PENDING` |
-| `qw_fallback_deduct_status` | `NONE` |
-| `qw_exercise_status` | `NONE` |
+| `first_deduct_status` | `PENDING` |
+| `fallback_deduct_status` | `NONE` |
+| `exercise_status` | `NONE` |
 | `refund_status` | `NONE` |
 | `grant_status` | `PENDING` |
 | `sync_status` | `SYNC_PENDING` |
@@ -261,7 +261,7 @@
 | `payment_no` | `varchar(64)` | 否 | 是 | 支付流水号 |
 | `benefit_order_no` | `varchar(64)` | 否 | 否 | 权益订单号 |
 | `payment_type` | `varchar(32)` | 否 | 否 | 支付类型 |
-| `channel_name` | `varchar(64)` | 否 | 否 | 渠道名称 |
+| `provider_code` | `varchar(64)` | 否 | 否 | 执行方编码 |
 | `channel_trade_no` | `varchar(64)` | 是 | 否 | 渠道交易流水号 |
 | `amount` | `bigint` | 否 | 否 | 支付金额，单位分 |
 | `payment_status` | `varchar(32)` | 否 | 否 | 支付状态 |
@@ -275,7 +275,7 @@
 | 字段 | 典型值 |
 | --- | --- |
 | `payment_type` | `FIRST_DEDUCT` / `FALLBACK_DEDUCT` |
-| `channel_name` | `QW` |
+| `provider_code` | `QW` |
 | `payment_status` | `PENDING` / `SUCCESS` / `FAIL` |
 
 ### 写入与使用说明

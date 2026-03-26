@@ -37,7 +37,7 @@ class AuthControllerIntegrationTest {
     @Test
     void shouldCreateCookieAndRedirectForSsoCallback() throws Exception {
         when(techPlatformUserClient.getCurrentUser("tech-token")).thenReturn(
-                new TechPlatformUserProfileResponse("tech-user-sso-001", "13800138000", "张三", "310101199001011111")
+                new TechPlatformUserProfileResponse("tech-user-sso-001", "13800138000", "张三", "310101199001011111", "KJ")
         );
 
         mockMvc.perform(get("/api/auth/sso-callback")
@@ -71,7 +71,7 @@ class AuthControllerIntegrationTest {
     @Test
     void shouldRejectInvalidRedirectUrl() throws Exception {
         when(techPlatformUserClient.getCurrentUser("tech-token")).thenReturn(
-                new TechPlatformUserProfileResponse("tech-user-sso-002", "13800138001", "李四", "310101199001011112")
+                new TechPlatformUserProfileResponse("tech-user-sso-002", "13800138001", "李四", "310101199001011112", "KJ")
         );
 
         mockMvc.perform(get("/api/auth/sso-callback")

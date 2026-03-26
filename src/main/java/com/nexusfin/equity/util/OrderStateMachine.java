@@ -21,11 +21,11 @@ public final class OrderStateMachine {
         // 首扣结果直接决定订单走直连路径还是兜底路径，因此需要一次性更新订单与支付视图状态。
         if (success) {
             order.setOrderStatus(BenefitOrderStatusEnum.FIRST_DEDUCT_SUCCESS.name());
-            order.setQwFirstDeductStatus(PaymentStatusEnum.SUCCESS.name());
+            order.setFirstDeductStatus(PaymentStatusEnum.SUCCESS.name());
             order.setSyncStatus(BenefitOrderStatusEnum.SYNC_SUCCESS.name());
         } else {
             order.setOrderStatus(BenefitOrderStatusEnum.FIRST_DEDUCT_FAIL.name());
-            order.setQwFirstDeductStatus(PaymentStatusEnum.FAIL.name());
+            order.setFirstDeductStatus(PaymentStatusEnum.FAIL.name());
             order.setSyncStatus(BenefitOrderStatusEnum.SYNC_PENDING.name());
         }
     }
@@ -35,8 +35,8 @@ public final class OrderStateMachine {
         if (!BenefitOrderStatusEnum.FIRST_DEDUCT_FAIL.name().equals(order.getOrderStatus())) {
             throw new BizException("ILLEGAL_STATE", "Fallback deduct requires a first deduct failure");
         }
-        if (PaymentStatusEnum.PENDING.name().equals(order.getQwFallbackDeductStatus())
-                || PaymentStatusEnum.SUCCESS.name().equals(order.getQwFallbackDeductStatus())) {
+        if (PaymentStatusEnum.PENDING.name().equals(order.getFallbackDeductStatus())
+                || PaymentStatusEnum.SUCCESS.name().equals(order.getFallbackDeductStatus())) {
             throw new BizException("DUPLICATE_FALLBACK", "Fallback deduct already triggered");
         }
     }
@@ -44,10 +44,10 @@ public final class OrderStateMachine {
     public static void applyFallbackResult(BenefitOrder order, boolean success) {
         if (success) {
             order.setOrderStatus(BenefitOrderStatusEnum.FALLBACK_DEDUCT_SUCCESS.name());
-            order.setQwFallbackDeductStatus(PaymentStatusEnum.SUCCESS.name());
+            order.setFallbackDeductStatus(PaymentStatusEnum.SUCCESS.name());
         } else {
             order.setOrderStatus(BenefitOrderStatusEnum.FALLBACK_DEDUCT_FAIL.name());
-            order.setQwFallbackDeductStatus(PaymentStatusEnum.FAIL.name());
+            order.setFallbackDeductStatus(PaymentStatusEnum.FAIL.name());
         }
     }
 
@@ -61,7 +61,7 @@ public final class OrderStateMachine {
     }
 
     public static void applyExerciseResult(BenefitOrder order, boolean success) {
-        order.setQwExerciseStatus(success ? "SUCCESS" : "FAIL");
+        order.setExerciseStatus(success ? "SUCCESS" : "FAIL");
         order.setOrderStatus(success
                 ? BenefitOrderStatusEnum.EXERCISE_SUCCESS.name()
                 : BenefitOrderStatusEnum.EXERCISE_FAIL.name());

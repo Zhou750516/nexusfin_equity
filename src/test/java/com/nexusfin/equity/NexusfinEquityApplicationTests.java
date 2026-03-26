@@ -46,7 +46,7 @@ class NexusfinEquityApplicationTests {
     @Test
     void shouldCompleteQuickstartSmokeFlow() throws Exception {
         when(techPlatformUserClient.getCurrentUser("tech-token-quickstart")).thenReturn(
-                new TechPlatformUserProfileResponse("quickstart-user-001", "13800138000", "李四", "310101199001011111")
+                new TechPlatformUserProfileResponse("quickstart-user-001", "13800138000", "李四", "310101199001011111", "KJ")
         );
 
         MvcResult ssoResult = mockMvc.perform(get("/api/auth/sso-callback")
@@ -110,7 +110,9 @@ class NexusfinEquityApplicationTests {
         mockMvc.perform(get("/api/equity/exercise-url/{benefitOrderNo}", benefitOrderNo)
                         .cookie(authCookie))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.exerciseUrl").value("https://abs.example.com/exercise/" + benefitOrderNo));
+                .andExpect(jsonPath("$.data.exerciseUrl").value(org.hamcrest.Matchers.containsString("https://mock-qw.test/exercise")))
+                .andExpect(jsonPath("$.data.exerciseUrl").value(org.hamcrest.Matchers.containsString(benefitOrderNo)))
+                .andExpect(jsonPath("$.data.expireTime").isNotEmpty());
 
         assertThat(reconciliationService.queryOrderByBenefitOrderNo(benefitOrderNo)).isNotNull();
         assertThat(reconciliationService.queryOrdersByMemberId(memberId)).hasSize(1);

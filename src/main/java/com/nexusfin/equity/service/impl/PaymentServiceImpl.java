@@ -1,6 +1,7 @@
 package com.nexusfin.equity.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.nexusfin.equity.config.BusinessProperties;
 import com.nexusfin.equity.dto.request.DeductionCallbackRequest;
 import com.nexusfin.equity.dto.response.PaymentStatusResponse;
 import com.nexusfin.equity.entity.BenefitOrder;
@@ -26,17 +27,20 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRecordRepository paymentRecordRepository;
     private final DownstreamSyncService downstreamSyncService;
     private final IdempotencyService idempotencyService;
+    private final BusinessProperties businessProperties;
 
     public PaymentServiceImpl(
             BenefitOrderRepository benefitOrderRepository,
             PaymentRecordRepository paymentRecordRepository,
             DownstreamSyncService downstreamSyncService,
-            IdempotencyService idempotencyService
+            IdempotencyService idempotencyService,
+            BusinessProperties businessProperties
     ) {
         this.benefitOrderRepository = benefitOrderRepository;
         this.paymentRecordRepository = paymentRecordRepository;
         this.downstreamSyncService = downstreamSyncService;
         this.idempotencyService = idempotencyService;
+        this.businessProperties = businessProperties;
     }
 
     @Override
@@ -84,7 +88,7 @@ public class PaymentServiceImpl implements PaymentService {
         paymentRecord.setPaymentNo(RequestIdUtil.nextId("pay"));
         paymentRecord.setBenefitOrderNo(request.benefitOrderNo());
         paymentRecord.setPaymentType(paymentType.name());
-        paymentRecord.setChannelName("QW");
+        paymentRecord.setProviderCode(businessProperties.getDefaultProviderCode());
         paymentRecord.setChannelTradeNo(request.qwTradeNo());
         paymentRecord.setAmount(request.deductAmount());
         paymentRecord.setPaymentStatus(success ? PaymentStatusEnum.SUCCESS.name() : PaymentStatusEnum.FAIL.name());

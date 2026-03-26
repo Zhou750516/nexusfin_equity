@@ -1,5 +1,6 @@
 package com.nexusfin.equity.service;
 
+import com.nexusfin.equity.config.BusinessProperties;
 import com.nexusfin.equity.dto.request.DeductionCallbackRequest;
 import com.nexusfin.equity.dto.response.PaymentStatusResponse;
 import com.nexusfin.equity.entity.BenefitOrder;
@@ -11,7 +12,6 @@ import com.nexusfin.equity.service.impl.PaymentServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -37,8 +37,18 @@ class PaymentServiceTest {
     @Mock
     private IdempotencyService idempotencyService;
 
-    @InjectMocks
     private PaymentServiceImpl paymentService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        paymentService = new PaymentServiceImpl(
+                benefitOrderRepository,
+                paymentRecordRepository,
+                downstreamSyncService,
+                idempotencyService,
+                new BusinessProperties()
+        );
+    }
 
     @Test
     void shouldReturnExistingPaymentForDuplicateCallback() {

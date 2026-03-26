@@ -6,6 +6,7 @@ import com.nexusfin.equity.dto.response.BenefitOrderStatusResponse;
 import com.nexusfin.equity.dto.response.CreateBenefitOrderResponse;
 import com.nexusfin.equity.dto.response.ExerciseUrlResponse;
 import com.nexusfin.equity.dto.response.ProductPageResponse;
+import com.nexusfin.equity.config.QwProperties;
 import com.nexusfin.equity.entity.BenefitOrder;
 import com.nexusfin.equity.entity.BenefitProduct;
 import com.nexusfin.equity.entity.MemberChannel;
@@ -20,8 +21,14 @@ import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.AgreementService;
 import com.nexusfin.equity.service.BenefitOrderService;
 import com.nexusfin.equity.service.IdempotencyService;
+import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
+import com.nexusfin.equity.thirdparty.qw.QwExerciseUrlRequest;
+import com.nexusfin.equity.thirdparty.qw.QwExerciseUrlResponse;
+import com.nexusfin.equity.thirdparty.qw.QwMemberSyncRequest;
+import com.nexusfin.equity.thirdparty.qw.QwMemberSyncResponse;
 import com.nexusfin.equity.util.OrderStateMachine;
 import com.nexusfin.equity.util.RequestIdUtil;
+import com.nexusfin.equity.util.SensitiveDataCipher;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.slf4j.Logger;
@@ -40,6 +47,9 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
     private final MemberChannelRepository memberChannelRepository;
     private final AgreementService agreementService;
     private final IdempotencyService idempotencyService;
+    private final SensitiveDataCipher sensitiveDataCipher;
+    private final QwBenefitClient qwBenefitClient;
+    private final QwProperties qwProperties;
 
     public BenefitOrderServiceImpl(
             BenefitProductRepository benefitProductRepository,
@@ -47,7 +57,10 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
             MemberInfoRepository memberInfoRepository,
             MemberChannelRepository memberChannelRepository,
             AgreementService agreementService,
-            IdempotencyService idempotencyService
+            IdempotencyService idempotencyService,
+            SensitiveDataCipher sensitiveDataCipher,
+            QwBenefitClient qwBenefitClient,
+            QwProperties qwProperties
     ) {
         this.benefitProductRepository = benefitProductRepository;
         this.benefitOrderRepository = benefitOrderRepository;
@@ -55,6 +68,9 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         this.memberChannelRepository = memberChannelRepository;
         this.agreementService = agreementService;
         this.idempotencyService = idempotencyService;
+        this.sensitiveDataCipher = sensitiveDataCipher;
+        this.qwBenefitClient = qwBenefitClient;
+        this.qwProperties = qwProperties;
     }
 
     @Override
@@ -108,15 +124,15 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         BenefitOrder benefitOrder = new BenefitOrder();
         benefitOrder.setBenefitOrderNo(RequestIdUtil.nextId("ord"));
         benefitOrder.setMemberId(memberInfo.getMemberId());
-        benefitOrder.setChannelCode(link.getChannelCode());
+        benefitOrder.setSourceChannelCode(link.getChannelCode());
         benefitOrder.setExternalUserId(link.getExternalUserId());
         benefitOrder.setProductCode(product.getProductCode());
         benefitOrder.setAgreementNo(RequestIdUtil.nextId("agr"));
         benefitOrder.setLoanAmount(request.loanAmount());
         benefitOrder.setOrderStatus(BenefitOrderStatusEnum.FIRST_DEDUCT_PENDING.name());
-        benefitOrder.setQwFirstDeductStatus(PaymentStatusEnum.PENDING.name());
-        benefitOrder.setQwFallbackDeductStatus(PaymentStatusEnum.NONE.name());
-        benefitOrder.setQwExerciseStatus(PaymentStatusEnum.NONE.name());
+        benefitOrder.setFirstDeductStatus(PaymentStatusEnum.PENDING.name());
+        benefitOrder.setFallbackDeductStatus(PaymentStatusEnum.NONE.name());
+        benefitOrder.setExerciseStatus(PaymentStatusEnum.NONE.name());
         benefitOrder.setRefundStatus(PaymentStatusEnum.NONE.name());
         benefitOrder.setGrantStatus("PENDING");
         benefitOrder.setSyncStatus(BenefitOrderStatusEnum.SYNC_PENDING.name());
@@ -126,13 +142,17 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         benefitOrderRepository.insert(benefitOrder);
         // 创建订单后立即补齐协议任务与归档，确保后续支付和审计链路都有完整基础数据。
         agreementService.ensureAgreementArtifacts(benefitOrder);
+        QwMemberSyncResponse syncResponse = qwBenefitClient.syncMemberOrder(buildQwMemberSyncRequest(benefitOrder, product, memberInfo));
         idempotencyService.markProcessed(
                 request.requestId(),
                 "CREATE_ORDER",
                 benefitOrder.getBenefitOrderNo(),
                 benefitOrder.getOrderStatus()
         );
-        log.info("traceId={} bizOrderNo={} order created", com.nexusfin.equity.util.TraceIdUtil.getTraceId(), benefitOrder.getBenefitOrderNo());
+        log.info("traceId={} bizOrderNo={} order created and synced qwOrderNo={}",
+                com.nexusfin.equity.util.TraceIdUtil.getTraceId(),
+                benefitOrder.getBenefitOrderNo(),
+                syncResponse.orderNo());
         return buildCreateOrderResponse(benefitOrder);
     }
 
@@ -142,9 +162,9 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         return new BenefitOrderStatusResponse(
                 order.getBenefitOrderNo(),
                 order.getOrderStatus(),
-                order.getQwFirstDeductStatus(),
-                order.getQwFallbackDeductStatus(),
-                order.getQwExerciseStatus(),
+                order.getFirstDeductStatus(),
+                order.getFallbackDeductStatus(),
+                order.getExerciseStatus(),
                 order.getGrantStatus()
         );
     }
@@ -152,9 +172,13 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
     @Override
     public ExerciseUrlResponse getExerciseUrl(String benefitOrderNo) {
         BenefitOrder order = getOrder(benefitOrderNo);
+        QwExerciseUrlResponse response = qwBenefitClient.getExerciseUrl(new QwExerciseUrlRequest(
+                order.getExternalUserId(),
+                order.getBenefitOrderNo()
+        ));
         return new ExerciseUrlResponse(
-                "https://abs.example.com/exercise/" + order.getBenefitOrderNo(),
-                LocalDateTime.now().plusDays(1).toString()
+                response.redirectUrl(),
+                response.cardExpiryDate()
         );
     }
 
@@ -171,6 +195,30 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
                 order.getBenefitOrderNo(),
                 order.getOrderStatus(),
                 "/h5/equity/orders/" + order.getBenefitOrderNo()
+        );
+    }
+
+    private QwMemberSyncRequest buildQwMemberSyncRequest(BenefitOrder order, BenefitProduct product, MemberInfo memberInfo) {
+        String realName = sensitiveDataCipher.decrypt(memberInfo.getRealNameEncrypted());
+        String mobile = memberInfo.getMobileEncrypted() == null ? null : sensitiveDataCipher.decrypt(memberInfo.getMobileEncrypted());
+        String payProtocolNo = order.getAgreementNo() == null || order.getAgreementNo().isBlank()
+                ? qwProperties.getDefaultPayProtocolPrefix() + order.getBenefitOrderNo()
+                : order.getAgreementNo();
+        return new QwMemberSyncRequest(
+                order.getExternalUserId(),
+                order.getBenefitOrderNo(),
+                order.getLoanAmount(),
+                product.getProductCode(),
+                product.getProductName(),
+                mobile,
+                realName,
+                payProtocolNo,
+                null,
+                0,
+                null,
+                null,
+                null,
+                null
         );
     }
 }

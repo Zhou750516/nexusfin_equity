@@ -10,6 +10,37 @@ spring:
       schema-locations: classpath:db/schema-h2.sql
 
 nexusfin:
+  business:
+    default-provider-code: QW
+  third-party:
+    qw:
+      enabled: true
+      mode: MOCK
+      base-url: https://t-api.test.qweimobile.com
+      method-path: /api/abs/method
+      partner-no: test-partner
+      version: v1.0
+      sign-key: test-sign-key
+      connect-timeout-ms: 2000
+      read-timeout-ms: 3000
+      aes-key-base64: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+      aes-algorithm: AES/GCM/NoPadding
+      gcm-tag-bits: 128
+      iv-length-bytes: 12
+      default-pay-protocol-prefix: proto-
+      mock-exercise-base-url: https://mock-qw.test/exercise
+  crypto:
+    dek:
+      key-id: DEK_USER_PROFILE
+      key-version: 1
+      algorithm: AES/GCM/NoPadding
+      purpose: encrypt_user_sensitive_fields
+      status: ACTIVE
+      plaintext-key-base64: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+    inbound:
+      default-mode: PLAIN
+      channel-modes:
+        KJ: PLAIN
   signature:
     app-id: test-app
     secret: test-secret

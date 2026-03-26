@@ -3,6 +3,7 @@ package com.nexusfin.equity.service;
 import com.nexusfin.equity.dto.request.CreateBenefitOrderRequest;
 import com.nexusfin.equity.dto.response.CreateBenefitOrderResponse;
 import com.nexusfin.equity.dto.response.ProductPageResponse;
+import com.nexusfin.equity.config.QwProperties;
 import com.nexusfin.equity.entity.BenefitOrder;
 import com.nexusfin.equity.entity.BenefitProduct;
 import com.nexusfin.equity.entity.MemberChannel;
@@ -13,6 +14,10 @@ import com.nexusfin.equity.repository.BenefitProductRepository;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.impl.BenefitOrderServiceImpl;
+import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
+import com.nexusfin.equity.thirdparty.qw.QwExerciseUrlResponse;
+import com.nexusfin.equity.thirdparty.qw.QwMemberSyncResponse;
+import com.nexusfin.equity.util.SensitiveDataCipher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -47,6 +52,15 @@ class BenefitOrderServiceTest {
     @Mock
     private IdempotencyService idempotencyService;
 
+    @Mock
+    private SensitiveDataCipher sensitiveDataCipher;
+
+    @Mock
+    private QwBenefitClient qwBenefitClient;
+
+    @Mock
+    private QwProperties qwProperties;
+
     @InjectMocks
     private BenefitOrderServiceImpl benefitOrderService;
 
@@ -77,6 +91,8 @@ class BenefitOrderServiceTest {
         product.setStatus("ACTIVE");
         MemberInfo memberInfo = new MemberInfo();
         memberInfo.setMemberId("mem-2");
+        memberInfo.setMobileEncrypted("mobile-cipher");
+        memberInfo.setRealNameEncrypted("name-cipher");
         MemberChannel memberChannel = new MemberChannel();
         memberChannel.setChannelCode("KJ");
         memberChannel.setExternalUserId("user-2");
@@ -84,6 +100,12 @@ class BenefitOrderServiceTest {
         when(memberInfoRepository.selectById("mem-2")).thenReturn(memberInfo);
         when(memberChannelRepository.selectOne(any())).thenReturn(memberChannel);
         when(idempotencyService.isProcessed("req-order-1")).thenReturn(false);
+        when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
+        when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("张三");
+        when(qwBenefitClient.syncMemberOrder(any())).thenReturn(new QwMemberSyncResponse(
+                "qw-order-1", "card-1", "1710000000000", 0, "P-2", "权益产品", "independence",
+                "2026-03-26 12:00:00", "2027-03-26 12:00:00"
+        ));
 
         CreateBenefitOrderResponse response = benefitOrderService.createOrder(
                 "mem-2",
@@ -98,6 +120,7 @@ class BenefitOrderServiceTest {
         assertThat(captor.getValue().getProductCode()).isEqualTo("P-2");
         assertThat(captor.getValue().getMemberId()).isEqualTo("mem-2");
         assertThat(captor.getValue().getRequestId()).isEqualTo("req-order-1");
+        verify(qwBenefitClient).syncMemberOrder(any());
         verify(idempotencyService).markProcessed("req-order-1", "CREATE_ORDER", captor.getValue().getBenefitOrderNo(), "FIRST_DEDUCT_PENDING");
     }
 
@@ -131,5 +154,25 @@ class BenefitOrderServiceTest {
                 new CreateBenefitOrderRequest("req-order-3", "P-3", 680000L, true)))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("PRODUCT_NOT_FOUND");
+    }
+
+    @Test
+    void shouldGetExerciseUrlFromQwClient() {
+        BenefitOrder order = new BenefitOrder();
+        order.setBenefitOrderNo("ord-ex-1");
+        order.setExternalUserId("user-ex-1");
+        when(benefitOrderRepository.selectById("ord-ex-1")).thenReturn(order);
+        when(qwBenefitClient.getExerciseUrl(any())).thenReturn(new QwExerciseUrlResponse(
+                0,
+                "https://mock-qw.test/exercise?partnerOrderNo=ord-ex-1",
+                "token-1",
+                "2026-03-26 12:00:00",
+                "2027-03-26 12:00:00"
+        ));
+
+        com.nexusfin.equity.dto.response.ExerciseUrlResponse response = benefitOrderService.getExerciseUrl("ord-ex-1");
+
+        assertThat(response.exerciseUrl()).contains("partnerOrderNo=ord-ex-1");
+        assertThat(response.expireTime()).isEqualTo("2027-03-26 12:00:00");
     }
 }

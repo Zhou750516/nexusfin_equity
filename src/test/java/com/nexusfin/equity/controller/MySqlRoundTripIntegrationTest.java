@@ -18,6 +18,7 @@ import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
 import com.nexusfin.equity.util.JwtUtil;
+import com.nexusfin.equity.util.SensitiveDataCipher;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -85,6 +86,9 @@ class MySqlRoundTripIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private SensitiveDataCipher sensitiveDataCipher;
 
     @BeforeEach
     void setUp() {
@@ -159,11 +163,11 @@ class MySqlRoundTripIntegrationTest {
         memberInfo.setMemberId(memberId);
         memberInfo.setTechPlatformUserId(externalUserId);
         memberInfo.setExternalUserId(externalUserId);
-        memberInfo.setMobileEncrypted("enc-mobile-" + UUID.randomUUID());
+        memberInfo.setMobileEncrypted(sensitiveDataCipher.encrypt("13800138000"));
         memberInfo.setMobileHash("hash-mobile-" + UUID.randomUUID());
-        memberInfo.setIdCardEncrypted("enc-id-" + UUID.randomUUID());
+        memberInfo.setIdCardEncrypted(sensitiveDataCipher.encrypt("110101199003071234"));
         memberInfo.setIdCardHash("hash-id-" + UUID.randomUUID());
-        memberInfo.setRealNameEncrypted("enc-name-" + UUID.randomUUID());
+        memberInfo.setRealNameEncrypted(sensitiveDataCipher.encrypt("MySQL测试用户"));
         memberInfo.setMemberStatus("ACTIVE");
         memberInfo.setCreatedTs(LocalDateTime.now());
         memberInfo.setUpdatedTs(LocalDateTime.now());

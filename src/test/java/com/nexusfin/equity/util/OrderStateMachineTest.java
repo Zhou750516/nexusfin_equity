@@ -23,7 +23,7 @@ class OrderStateMachineTest {
         OrderStateMachine.applyFirstDeductResult(order, true);
 
         assertThat(order.getOrderStatus()).isEqualTo("FIRST_DEDUCT_SUCCESS");
-        assertThat(order.getQwFirstDeductStatus()).isEqualTo("SUCCESS");
+        assertThat(order.getFirstDeductStatus()).isEqualTo("SUCCESS");
         assertThat(order.getSyncStatus()).isEqualTo("SYNC_SUCCESS");
     }
 
@@ -31,7 +31,7 @@ class OrderStateMachineTest {
     void shouldRejectFallbackWhenOrderNotInFirstDeductFail() {
         BenefitOrder order = new BenefitOrder();
         order.setOrderStatus("FIRST_DEDUCT_PENDING");
-        order.setQwFallbackDeductStatus("NONE");
+        order.setFallbackDeductStatus("NONE");
 
         assertThatThrownBy(() -> OrderStateMachine.ensureCanTriggerFallback(order))
                 .isInstanceOf(BizException.class)
@@ -50,7 +50,7 @@ class OrderStateMachineTest {
 
         OrderStateMachine.applyExerciseResult(order, true);
         assertThat(order.getOrderStatus()).isEqualTo("EXERCISE_SUCCESS");
-        assertThat(order.getQwExerciseStatus()).isEqualTo("SUCCESS");
+        assertThat(order.getExerciseStatus()).isEqualTo("SUCCESS");
 
         OrderStateMachine.applyRefundResult(order, false);
         assertThat(order.getOrderStatus()).isEqualTo("REFUND_FAIL");

@@ -9,6 +9,8 @@ import com.nexusfin.equity.entity.NotificationReceiveLog;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.repository.NotificationReceiveLogRepository;
 import com.nexusfin.equity.service.impl.NotificationServiceImpl;
+import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
+import com.nexusfin.equity.thirdparty.qw.QwLendingNotifyResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -37,6 +39,9 @@ class NotificationServiceTest {
     @Mock
     private IdempotencyService idempotencyService;
 
+    @Mock
+    private QwBenefitClient qwBenefitClient;
+
     @InjectMocks
     private NotificationServiceImpl notificationService;
 
@@ -45,9 +50,11 @@ class NotificationServiceTest {
         BenefitOrder order = new BenefitOrder();
         order.setBenefitOrderNo("ord-1");
         order.setOrderStatus("FIRST_DEDUCT_FAIL");
+        order.setExternalUserId("user-1");
         when(idempotencyService.isProcessed("req-1")).thenReturn(false);
         when(benefitOrderRepository.selectById("ord-1")).thenReturn(order);
         when(notificationReceiveLogRepository.selectOne(any())).thenReturn(null);
+        when(qwBenefitClient.notifyLending(any())).thenReturn(new QwLendingNotifyResponse("qw-order-1"));
 
         notificationService.handleGrant(new GrantForwardCallbackRequest(
                 "req-1", "ord-1", "SUCCESS", 680000L, "loan-1", null, "2026-03-23T20:32:00", 1711197120L));
@@ -93,9 +100,11 @@ class NotificationServiceTest {
         BenefitOrder order = new BenefitOrder();
         order.setBenefitOrderNo("ord-5");
         order.setOrderStatus("FIRST_DEDUCT_SUCCESS");
+        order.setExternalUserId("user-5");
         when(idempotencyService.isProcessed("req-5")).thenReturn(false);
         when(benefitOrderRepository.selectById("ord-5")).thenReturn(order);
         when(notificationReceiveLogRepository.selectOne(any())).thenReturn(null);
+        when(qwBenefitClient.notifyLending(any())).thenReturn(new QwLendingNotifyResponse("qw-order-5"));
 
         notificationService.handleGrant(new GrantForwardCallbackRequest(
                 "req-5", "ord-5", "FAIL", 0L, "loan-5", "reason", "2026-03-23T20:34:00", 1711197240L));

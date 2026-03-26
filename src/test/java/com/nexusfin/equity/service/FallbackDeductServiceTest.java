@@ -1,5 +1,6 @@
 package com.nexusfin.equity.service;
 
+import com.nexusfin.equity.config.BusinessProperties;
 import com.nexusfin.equity.dto.request.GrantForwardCallbackRequest;
 import com.nexusfin.equity.dto.response.PaymentStatusResponse;
 import com.nexusfin.equity.entity.BenefitOrder;
@@ -10,7 +11,6 @@ import com.nexusfin.equity.service.impl.FallbackDeductServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -28,8 +28,16 @@ class FallbackDeductServiceTest {
     @Mock
     private BenefitOrderRepository benefitOrderRepository;
 
-    @InjectMocks
     private FallbackDeductServiceImpl fallbackDeductService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        fallbackDeductService = new FallbackDeductServiceImpl(
+                paymentRecordRepository,
+                benefitOrderRepository,
+                new BusinessProperties()
+        );
+    }
 
     @Test
     void shouldReturnExistingFallbackRecordWhenAlreadyTriggered() {
@@ -63,7 +71,7 @@ class FallbackDeductServiceTest {
         BenefitOrder order = new BenefitOrder();
         order.setBenefitOrderNo(benefitOrderNo);
         order.setOrderStatus("FIRST_DEDUCT_FAIL");
-        order.setQwFallbackDeductStatus("NONE");
+        order.setFallbackDeductStatus("NONE");
         return order;
     }
 

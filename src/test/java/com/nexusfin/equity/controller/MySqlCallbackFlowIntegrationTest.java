@@ -107,7 +107,7 @@ class MySqlCallbackFlowIntegrationTest {
         BenefitOrder fallbackOrder = benefitOrderRepository.selectById(order.getBenefitOrderNo());
         assertThat(fallbackOrder.getGrantStatus()).isEqualTo("SUCCESS");
         assertThat(fallbackOrder.getOrderStatus()).isEqualTo("FALLBACK_DEDUCT_PENDING");
-        assertThat(fallbackOrder.getQwFallbackDeductStatus()).isEqualTo("PENDING");
+        assertThat(fallbackOrder.getFallbackDeductStatus()).isEqualTo("PENDING");
 
         assertThat(paymentRecordRepository.selectCount(Wrappers.<PaymentRecord>lambdaQuery()
                 .eq(PaymentRecord::getBenefitOrderNo, order.getBenefitOrderNo()))).isEqualTo(2);
@@ -123,15 +123,15 @@ class MySqlCallbackFlowIntegrationTest {
         BenefitOrder order = new BenefitOrder();
         order.setBenefitOrderNo(benefitOrderNo);
         order.setMemberId("mem-" + externalUserId);
-        order.setChannelCode("KJ");
+        order.setSourceChannelCode("KJ");
         order.setExternalUserId(externalUserId);
         order.setProductCode("MYSQL-CALLBACK-PROD");
         order.setAgreementNo("agr-" + externalUserId);
         order.setLoanAmount(680000L);
         order.setOrderStatus("FIRST_DEDUCT_PENDING");
-        order.setQwFirstDeductStatus("PENDING");
-        order.setQwFallbackDeductStatus("NONE");
-        order.setQwExerciseStatus("NONE");
+        order.setFirstDeductStatus("PENDING");
+        order.setFallbackDeductStatus("NONE");
+        order.setExerciseStatus("NONE");
         order.setRefundStatus("NONE");
         order.setGrantStatus("PENDING");
         order.setSyncStatus("SYNC_PENDING");

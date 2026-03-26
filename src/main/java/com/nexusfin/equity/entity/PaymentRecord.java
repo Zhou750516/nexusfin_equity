@@ -11,7 +11,7 @@ public class PaymentRecord {
     private String paymentNo;
     private String benefitOrderNo;
     private String paymentType;
-    private String channelName;
+    private String providerCode;
     private String channelTradeNo;
     private Long amount;
     private String paymentStatus;
@@ -44,12 +44,12 @@ public class PaymentRecord {
         this.paymentType = paymentType;
     }
 
-    public String getChannelName() {
-        return channelName;
+    public String getProviderCode() {
+        return providerCode;
     }
 
-    public void setChannelName(String channelName) {
-        this.channelName = channelName;
+    public void setProviderCode(String providerCode) {
+        this.providerCode = providerCode;
     }
 
     public String getChannelTradeNo() {

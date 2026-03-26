@@ -1,6 +1,7 @@
 package com.nexusfin.equity.service;
 
 import com.nexusfin.equity.dto.request.CreateBenefitOrderRequest;
+import com.nexusfin.equity.config.QwProperties;
 import com.nexusfin.equity.entity.BenefitProduct;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
@@ -8,6 +9,8 @@ import com.nexusfin.equity.repository.BenefitProductRepository;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.impl.BenefitOrderServiceImpl;
+import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
+import com.nexusfin.equity.util.SensitiveDataCipher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -37,6 +40,15 @@ class BenefitOrderServiceAuthTest {
 
     @Mock
     private IdempotencyService idempotencyService;
+
+    @Mock
+    private SensitiveDataCipher sensitiveDataCipher;
+
+    @Mock
+    private QwBenefitClient qwBenefitClient;
+
+    @Mock
+    private QwProperties qwProperties;
 
     @InjectMocks
     private BenefitOrderServiceImpl benefitOrderService;

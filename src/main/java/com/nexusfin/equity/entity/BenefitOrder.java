@@ -10,15 +10,15 @@ public class BenefitOrder {
     @TableId
     private String benefitOrderNo;
     private String memberId;
-    private String channelCode;
+    private String sourceChannelCode;
     private String externalUserId;
     private String productCode;
     private String agreementNo;
     private Long loanAmount;
     private String orderStatus;
-    private String qwFirstDeductStatus;
-    private String qwFallbackDeductStatus;
-    private String qwExerciseStatus;
+    private String firstDeductStatus;
+    private String fallbackDeductStatus;
+    private String exerciseStatus;
     private String refundStatus;
     private String grantStatus;
     private String loanOrderNo;
@@ -43,12 +43,12 @@ public class BenefitOrder {
         this.memberId = memberId;
     }
 
-    public String getChannelCode() {
-        return channelCode;
+    public String getSourceChannelCode() {
+        return sourceChannelCode;
     }
 
-    public void setChannelCode(String channelCode) {
-        this.channelCode = channelCode;
+    public void setSourceChannelCode(String sourceChannelCode) {
+        this.sourceChannelCode = sourceChannelCode;
     }
 
     public String getExternalUserId() {
@@ -91,28 +91,28 @@ public class BenefitOrder {
         this.orderStatus = orderStatus;
     }
 
-    public String getQwFirstDeductStatus() {
-        return qwFirstDeductStatus;
+    public String getFirstDeductStatus() {
+        return firstDeductStatus;
     }
 
-    public void setQwFirstDeductStatus(String qwFirstDeductStatus) {
-        this.qwFirstDeductStatus = qwFirstDeductStatus;
+    public void setFirstDeductStatus(String firstDeductStatus) {
+        this.firstDeductStatus = firstDeductStatus;
     }
 
-    public String getQwFallbackDeductStatus() {
-        return qwFallbackDeductStatus;
+    public String getFallbackDeductStatus() {
+        return fallbackDeductStatus;
     }
 
-    public void setQwFallbackDeductStatus(String qwFallbackDeductStatus) {
-        this.qwFallbackDeductStatus = qwFallbackDeductStatus;
+    public void setFallbackDeductStatus(String fallbackDeductStatus) {
+        this.fallbackDeductStatus = fallbackDeductStatus;
     }
 
-    public String getQwExerciseStatus() {
-        return qwExerciseStatus;
+    public String getExerciseStatus() {
+        return exerciseStatus;
     }
 
-    public void setQwExerciseStatus(String qwExerciseStatus) {
-        this.qwExerciseStatus = qwExerciseStatus;
+    public void setExerciseStatus(String exerciseStatus) {
+        this.exerciseStatus = exerciseStatus;
     }
 
     public String getRefundStatus() {

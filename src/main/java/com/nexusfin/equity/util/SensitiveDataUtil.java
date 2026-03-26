@@ -2,15 +2,10 @@ package com.nexusfin.equity.util;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.Base64;
 
 public final class SensitiveDataUtil {
 
     private SensitiveDataUtil() {
-    }
-
-    public static String encrypt(String value) {
-        return Base64.getEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
     }
 
     public static String sha256(String value) {

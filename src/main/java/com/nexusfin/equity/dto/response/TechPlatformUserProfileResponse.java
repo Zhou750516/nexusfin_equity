@@ -4,6 +4,7 @@ public record TechPlatformUserProfileResponse(
         String userId,
         String phone,
         String realName,
-        String idCard
+        String idCard,
+        String channelCode
 ) {
 }
