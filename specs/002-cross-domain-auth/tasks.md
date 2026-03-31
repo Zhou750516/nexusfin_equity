@@ -24,10 +24,10 @@
 
 **Purpose**: Prepare auth-related dependencies, properties, and schema support shared by all stories.
 
-- [ ] T001 Update auth-related dependencies and build configuration for local JWT processing and HTTP client support in `pom.xml`
-- [ ] T002 [P] Add tech-platform SSO endpoint, JWT secret, cookie settings, and redirect whitelist properties in `src/main/resources/application.yml` and `src/test/resources/application.yml`
-- [ ] T003 [P] Extend member schema with `tech_platform_user_id` and related indexes in `src/main/resources/db/schema.sql` and `src/test/resources/db/schema-h2.sql`
-- [ ] T004 [P] Seed auth-related test data and environment defaults in `src/test/resources/db/test-data.sql` and `src/test/resources/application-mysql-it.yml`
+- [X] T001 Update auth-related dependencies and build configuration for local JWT processing and HTTP client support in `pom.xml`
+- [X] T002 [P] Add tech-platform SSO endpoint, JWT secret, cookie settings, and redirect whitelist properties in `src/main/resources/application.yml` and `src/test/resources/application.yml`
+- [X] T003 [P] Extend member schema with `tech_platform_user_id` and related indexes in `src/main/resources/db/schema.sql` and `src/test/resources/db/schema-h2.sql`
+- [X] T004 [P] Seed auth-related test data and environment defaults in `src/test/resources/db/test-data.sql` and `src/test/resources/application-mysql-it.yml`
 
 ---
 
@@ -37,11 +37,11 @@
 
 **⚠️ CRITICAL**: No user story work should begin until this phase is complete.
 
-- [ ] T005 Create shared auth utilities for JWT generation/parsing, cookie writing, and current-user context in `src/main/java/com/nexusfin/equity/util/JwtUtil.java`, `src/main/java/com/nexusfin/equity/util/CookieUtil.java`, and `src/main/java/com/nexusfin/equity/util/AuthContextUtil.java`
-- [ ] T006 [P] Add auth configuration and request filtering in `src/main/java/com/nexusfin/equity/config/AuthProperties.java`, `src/main/java/com/nexusfin/equity/config/JwtAuthenticationFilter.java`, and `src/main/java/com/nexusfin/equity/config/WebMvcConfig.java`
-- [ ] T007 [P] Extend member persistence for tech-platform identity lookup in `src/main/java/com/nexusfin/equity/entity/MemberInfo.java` and `src/main/java/com/nexusfin/equity/repository/MemberInfoRepository.java`
-- [ ] T008 Update auth-related exception mapping and unauthorized response handling in `src/main/java/com/nexusfin/equity/exception/BizException.java` and `src/main/java/com/nexusfin/equity/exception/GlobalExceptionHandler.java`
-- [ ] T009 [P] Add foundational unit tests for JWT parsing, cookie flags, and auth filter behavior in `src/test/java/com/nexusfin/equity/util/JwtUtilTest.java`, `src/test/java/com/nexusfin/equity/util/CookieUtilTest.java`, and `src/test/java/com/nexusfin/equity/config/JwtAuthenticationFilterTest.java`
+- [X] T005 Create shared auth utilities for JWT generation/parsing, cookie writing, and current-user context in `src/main/java/com/nexusfin/equity/util/JwtUtil.java`, `src/main/java/com/nexusfin/equity/util/CookieUtil.java`, and `src/main/java/com/nexusfin/equity/util/AuthContextUtil.java`
+- [X] T006 [P] Add auth configuration and request filtering in `src/main/java/com/nexusfin/equity/config/AuthProperties.java`, `src/main/java/com/nexusfin/equity/config/JwtAuthenticationFilter.java`, and `src/main/java/com/nexusfin/equity/config/WebMvcConfig.java`
+- [X] T007 [P] Extend member persistence for tech-platform identity lookup in `src/main/java/com/nexusfin/equity/entity/MemberInfo.java` and `src/main/java/com/nexusfin/equity/repository/MemberInfoRepository.java`
+- [X] T008 Update auth-related exception mapping and unauthorized response handling in `src/main/java/com/nexusfin/equity/exception/BizException.java` and `src/main/java/com/nexusfin/equity/exception/GlobalExceptionHandler.java`
+- [X] T009 [P] Add foundational unit tests for JWT parsing, cookie flags, and auth filter behavior in `src/test/java/com/nexusfin/equity/util/JwtUtilTest.java`, `src/test/java/com/nexusfin/equity/util/CookieUtilTest.java`, and `src/test/java/com/nexusfin/equity/config/JwtAuthenticationFilterTest.java`
 
 **Checkpoint**: Foundation is ready. User stories can now be implemented with shared session and auth enforcement rules in place.
 
@@ -55,15 +55,15 @@
 
 ### Tests for User Story 1
 
-- [ ] T010 [P] [US1] Add service tests for upstream token verification and JIT member provisioning in `src/test/java/com/nexusfin/equity/service/AuthServiceTest.java`
-- [ ] T011 [P] [US1] Add integration tests for `GET /api/auth/sso-callback` redirect, whitelist validation, and cookie issuance in `src/test/java/com/nexusfin/equity/controller/AuthControllerIntegrationTest.java`
+- [X] T010 [P] [US1] Add service tests for upstream token verification and JIT member provisioning in `src/test/java/com/nexusfin/equity/service/AuthServiceTest.java`
+- [X] T011 [P] [US1] Add integration tests for `GET /api/auth/sso-callback` redirect, whitelist validation, and cookie issuance in `src/test/java/com/nexusfin/equity/controller/AuthControllerIntegrationTest.java`
 
 ### Implementation for User Story 1
 
-- [ ] T012 [P] [US1] Create auth DTOs for upstream user profile and local current-user view in `src/main/java/com/nexusfin/equity/dto/response/TechPlatformUserProfileResponse.java` and `src/main/java/com/nexusfin/equity/dto/response/CurrentUserResponse.java`
-- [ ] T013 [P] [US1] Implement the tech-platform user verification client in `src/main/java/com/nexusfin/equity/service/TechPlatformUserClient.java` and `src/main/java/com/nexusfin/equity/service/impl/TechPlatformUserClientImpl.java`
-- [ ] T014 [US1] Implement SSO callback login orchestration and member JIT provisioning in `src/main/java/com/nexusfin/equity/service/AuthService.java` and `src/main/java/com/nexusfin/equity/service/impl/AuthServiceImpl.java`
-- [ ] T015 [US1] Implement the SSO callback redirect endpoint in `src/main/java/com/nexusfin/equity/controller/AuthController.java`
+- [X] T012 [P] [US1] Create auth DTOs for upstream user profile and local current-user view in `src/main/java/com/nexusfin/equity/dto/response/TechPlatformUserProfileResponse.java` and `src/main/java/com/nexusfin/equity/dto/response/CurrentUserResponse.java`
+- [X] T013 [P] [US1] Implement the tech-platform user verification client in `src/main/java/com/nexusfin/equity/service/TechPlatformUserClient.java` and `src/main/java/com/nexusfin/equity/service/impl/TechPlatformUserClientImpl.java`
+- [X] T014 [US1] Implement SSO callback login orchestration and member JIT provisioning in `src/main/java/com/nexusfin/equity/service/AuthService.java` and `src/main/java/com/nexusfin/equity/service/impl/AuthServiceImpl.java`
+- [X] T015 [US1] Implement the SSO callback redirect endpoint in `src/main/java/com/nexusfin/equity/controller/AuthController.java`
 
 **Checkpoint**: User Story 1 is complete when a browser-style redirect request can bootstrap an ABS-side logged-in session without calling `/api/users/register`.
 
@@ -77,15 +77,16 @@
 
 ### Tests for User Story 2
 
-- [ ] T016 [P] [US2] Add integration tests for `/api/users/me` and JWT-protected business endpoints in `src/test/java/com/nexusfin/equity/controller/AuthControllerIntegrationTest.java` and `src/test/java/com/nexusfin/equity/controller/BenefitOrderControllerIntegrationTest.java`
-- [ ] T017 [P] [US2] Add service tests for authenticated member resolution in product and order flows in `src/test/java/com/nexusfin/equity/service/BenefitOrderServiceAuthTest.java`
+- [X] T016 [P] [US2] Add integration tests for `/api/users/me` and JWT-protected business endpoints in `src/test/java/com/nexusfin/equity/controller/AuthControllerIntegrationTest.java` and `src/test/java/com/nexusfin/equity/controller/BenefitOrderControllerIntegrationTest.java`
+- [X] T017 [P] [US2] Add service tests for authenticated member resolution in product and order flows in `src/test/java/com/nexusfin/equity/service/BenefitOrderServiceAuthTest.java`
 
 ### Implementation for User Story 2
 
-- [ ] T018 [US2] Implement current-user lookup and `/api/users/me` response assembly in `src/main/java/com/nexusfin/equity/controller/AuthController.java` and `src/main/java/com/nexusfin/equity/service/impl/AuthServiceImpl.java`
-- [ ] T019 [US2] Refactor product and order APIs to derive the acting member from auth context instead of explicit `memberId` input in `src/main/java/com/nexusfin/equity/controller/BenefitOrderController.java`, `src/main/java/com/nexusfin/equity/service/BenefitOrderService.java`, `src/main/java/com/nexusfin/equity/service/impl/BenefitOrderServiceImpl.java`, and `src/main/java/com/nexusfin/equity/dto/request/CreateBenefitOrderRequest.java`
-- [ ] T020 [US2] Split auth boundaries so `/api/equity/**` and `/api/users/me` require local JWT while `/api/callbacks/**` keeps signature validation in `src/main/java/com/nexusfin/equity/config/JwtAuthenticationFilter.java`, `src/main/java/com/nexusfin/equity/config/SignatureInterceptor.java`, and `src/main/java/com/nexusfin/equity/config/WebMvcConfig.java`
-- [ ] T021 [US2] Add trace logging for authenticated member access and login-state checks in `src/main/java/com/nexusfin/equity/controller/AuthController.java` and `src/main/java/com/nexusfin/equity/controller/BenefitOrderController.java`
+- [X] T018 [US2] Implement current-user lookup and `/api/users/me` response assembly in `src/main/java/com/nexusfin/equity/controller/AuthController.java` and `src/main/java/com/nexusfin/equity/service/impl/AuthServiceImpl.java`
+- [X] T019 [US2] Refactor product and order APIs to derive the acting member from auth context instead of explicit `memberId` input in `src/main/java/com/nexusfin/equity/controller/BenefitOrderController.java`, `src/main/java/com/nexusfin/equity/service/BenefitOrderService.java`, `src/main/java/com/nexusfin/equity/service/impl/BenefitOrderServiceImpl.java`, and `src/main/java/com/nexusfin/equity/dto/request/CreateBenefitOrderRequest.java`
+- [X] T020 [US2] Split auth boundaries so `/api/equity/**` and `/api/users/me` require local JWT while `/api/callbacks/**` keeps signature validation in `src/main/java/com/nexusfin/equity/config/JwtAuthenticationFilter.java`, `src/main/java/com/nexusfin/equity/config/SignatureInterceptor.java`, and `src/main/java/com/nexusfin/equity/config/WebMvcConfig.java`
+- [X] T021 [US2] Add trace logging for authenticated member access and login-state checks in `src/main/java/com/nexusfin/equity/controller/AuthController.java` and `src/main/java/com/nexusfin/equity/controller/BenefitOrderController.java`
+  - Note: `AuthController` 已补齐 SSO 登录和 `/api/users/me` 日志；`BenefitOrderController` 已补齐产品页、下单、查单、行权链接访问日志，并新增集成测试覆盖日志输出。
 
 **Checkpoint**: User Story 2 is complete when front-end pages can distinguish logged-in versus guest access using `/api/users/me`, and order/product endpoints no longer rely on externally supplied member identifiers.
 
@@ -99,13 +100,15 @@
 
 ### Tests for User Story 3
 
-- [ ] T022 [P] [US3] Replace silent-registration regression coverage with auth-first onboarding tests in `src/test/java/com/nexusfin/equity/controller/UserRegistrationControllerIntegrationTest.java`, `src/test/java/com/nexusfin/equity/controller/AuthControllerIntegrationTest.java`, and `src/test/java/com/nexusfin/equity/NexusfinEquityApplicationTests.java`
+- [X] T022 [P] [US3] Replace silent-registration regression coverage with auth-first onboarding tests in `src/test/java/com/nexusfin/equity/controller/UserRegistrationControllerIntegrationTest.java`, `src/test/java/com/nexusfin/equity/controller/AuthControllerIntegrationTest.java`, and `src/test/java/com/nexusfin/equity/NexusfinEquityApplicationTests.java`
+  - Note: 旧的 `UserRegistrationControllerIntegrationTest` 随 `/api/users/register` 下线而移除，等价覆盖已由 `AuthControllerIntegrationTest` 与 `NexusfinEquityApplicationTests` 承接。
 
 ### Implementation for User Story 3
 
-- [ ] T023 [P] [US3] Remove obsolete registration controller, service, and DTO classes in `src/main/java/com/nexusfin/equity/controller/UserRegistrationController.java`, `src/main/java/com/nexusfin/equity/service/MemberOnboardingService.java`, `src/main/java/com/nexusfin/equity/service/impl/MemberOnboardingServiceImpl.java`, `src/main/java/com/nexusfin/equity/dto/request/RegisterUserRequest.java`, and `src/main/java/com/nexusfin/equity/dto/response/RegisterUserResponse.java`
-- [ ] T024 [US3] Update public API and callback documentation to reflect SSO callback, `/api/users/me`, and auth-first order entry in `docs/API_STANDARD_20260323.md`, `docs/接口业务处理逻辑_20260324.md`, and `docs/接口业务逻辑Review_20260324.md`
-- [ ] T025 [US3] Refresh baseline contract and smoke-flow artifacts for the new auth model in `specs/001-equity-service-baseline/contracts/abs-public-api.yaml`, `specs/001-equity-service-baseline/quickstart.md`, and `src/test/resources/db/test-data.sql`
+- [X] T023 [P] [US3] Remove obsolete registration controller, service, and DTO classes in `src/main/java/com/nexusfin/equity/controller/UserRegistrationController.java`, `src/main/java/com/nexusfin/equity/service/MemberOnboardingService.java`, `src/main/java/com/nexusfin/equity/service/impl/MemberOnboardingServiceImpl.java`, `src/main/java/com/nexusfin/equity/dto/request/RegisterUserRequest.java`, and `src/main/java/com/nexusfin/equity/dto/response/RegisterUserResponse.java`
+- [X] T024 [US3] Update public API and callback documentation to reflect SSO callback, `/api/users/me`, and auth-first order entry in `docs/API_STANDARD_20260323.md`, `docs/接口业务处理逻辑_20260324.md`, and `docs/接口业务逻辑Review_20260324.md`
+  - Note: 当前仓库实际落地的评审同步说明位于 `docs/接口业务逻辑Review_20260326_修改记录.md`，与任务编写时预期的 `_20260324.md` 文件名存在漂移，但文档内容已同步到 auth-first 模型。
+- [X] T025 [US3] Refresh baseline contract and smoke-flow artifacts for the new auth model in `specs/001-equity-service-baseline/contracts/abs-public-api.yaml`, `specs/001-equity-service-baseline/quickstart.md`, and `src/test/resources/db/test-data.sql`
 
 **Checkpoint**: User Story 3 is complete when the repository no longer presents silent registration as the standard entrypoint and all local documents match the new cross-domain auth design.
 
@@ -115,9 +118,10 @@
 
 **Purpose**: Finish security hardening, observability, and end-to-end verification across all stories.
 
-- [ ] T026 [P] Add timeout, retry, and failure-observability hardening for upstream user verification in `src/main/java/com/nexusfin/equity/service/impl/TechPlatformUserClientImpl.java` and `src/main/resources/application.yml`
-- [ ] T027 Add redirect whitelist, cookie `HttpOnly/Secure/SameSite`, and URL cleanup notes to delivery docs in `docs/NexusFin_跨域认证设计方案.md` and `docs/CODE_MODIFY_20260323.md`
-- [ ] T028 [P] Add end-to-end auth smoke coverage for SSO callback, `/api/users/me`, and protected order creation in `src/test/java/com/nexusfin/equity/NexusfinEquityApplicationTests.java`
+- [X] T026 [P] Add timeout, retry, and failure-observability hardening for upstream user verification in `src/main/java/com/nexusfin/equity/service/impl/TechPlatformUserClientImpl.java` and `src/main/resources/application.yml`
+  - Note: 已补齐 `retry-max-attempts` 配置、最小重试策略、成功/失败日志留痕，并新增 `TechPlatformUserClientImplTest` 覆盖重试成功与重试耗尽场景。
+- [X] T027 Add redirect whitelist, cookie `HttpOnly/Secure/SameSite`, and URL cleanup notes to delivery docs in `docs/NexusFin_跨域认证设计方案.md` and `docs/CODE_MODIFY_20260323.md`
+- [X] T028 [P] Add end-to-end auth smoke coverage for SSO callback, `/api/users/me`, and protected order creation in `src/test/java/com/nexusfin/equity/NexusfinEquityApplicationTests.java`
 - [X] T029 Run and record verification for `mvn test`, `mvn clean package -DskipTests`, and `mvn checkstyle:check` in `docs/CODE_MODIFY_20260323.md`
 
 ---

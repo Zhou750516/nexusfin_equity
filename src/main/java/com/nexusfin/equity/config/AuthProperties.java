@@ -11,6 +11,7 @@ public class AuthProperties {
     private String techPlatformUserMePath;
     private int connectTimeoutMs = 2000;
     private int readTimeoutMs = 3000;
+    private int retryMaxAttempts = 2;
     private String defaultChannelCode = "KJ";
     private String defaultRedirectUrl = "/equity/index";
     private List<String> redirectWhitelist = new ArrayList<>();
@@ -48,6 +49,14 @@ public class AuthProperties {
 
     public void setReadTimeoutMs(int readTimeoutMs) {
         this.readTimeoutMs = readTimeoutMs;
+    }
+
+    public int getRetryMaxAttempts() {
+        return retryMaxAttempts;
+    }
+
+    public void setRetryMaxAttempts(int retryMaxAttempts) {
+        this.retryMaxAttempts = retryMaxAttempts;
     }
 
     public String getDefaultChannelCode() {

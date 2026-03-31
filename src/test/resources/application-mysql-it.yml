@@ -9,6 +9,25 @@ spring:
       mode: never
 
 nexusfin:
+  third-party:
+    tech-platform:
+      enabled: true
+      mode: MOCK
+      base-url: https://tech-platform.test
+      channel-id: abs-test
+      version: 1.0.0
+      sign-secret: tech-platform-secret
+      sign-algorithm: HMAC_SHA256
+      aes-key-base64: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+      aes-algorithm: AES/ECB/PKCS5Padding
+      gcm-tag-bits: 128
+      iv-length-bytes: 12
+      connect-timeout-ms: 2000
+      read-timeout-ms: 3000
+      paths:
+        credit-status-notice: /guide/api/creditStatusNotice
+        loan-info-notice: /guide/api/loanInfoNotice
+        repay-info-notice: /guide/api/repayInfoNotice
   signature:
     app-id: test-app
     secret: test-secret
@@ -20,6 +39,7 @@ nexusfin:
     tech-platform-user-me-path: /api/users/me
     connect-timeout-ms: 2000
     read-timeout-ms: 3000
+    retry-max-attempts: 2
     default-channel-code: KJ
     default-redirect-url: /equity/index
     redirect-whitelist:

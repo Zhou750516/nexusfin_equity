@@ -17,6 +17,12 @@
 4. `/api/equity/**` 业务接口改为从本地登录态获取当前会员，不再接收显式 `memberId`
 5. 下线旧的 `/api/users/register` 静默注册入口
 
+交付说明补充：
+
+1. `redirect_url` 只允许命中白名单前缀，避免开放重定向
+2. 本地登录态通过 JWT Cookie 回写，Cookie 属性受配置控制，当前要求至少覆盖 `HttpOnly`、`Secure`、`SameSite`
+3. SSO 回调只消费上游 `token` 后再跳转，不把上游 token 继续透传到业务落地页，避免把认证信息留在前端跳转 URL 中
+
 涉及核心文件：
 
 - `src/main/java/com/nexusfin/equity/controller/AuthController.java`
@@ -50,6 +56,35 @@ mvn checkstyle:check
 
 1. 创建权益订单接口补齐请求级幂等能力
 2. 回调通知在“订单不存在/处理失败”场景下补齐审计状态
+
+## 1.3 2026-03-31 联调前开发收口补充
+
+本次补充聚焦昨天计划中仍未完全收口的两项任务：`T021` 与 `T026`。
+
+核心变化如下：
+
+1. 补齐 `BenefitOrderController` 的认证态访问日志：
+   - 产品页访问
+   - 查单
+   - 行权链接获取
+2. 保持日志口径统一输出 `traceId + bizOrderNo`，便于联调阶段串联用户访问和订单链路。
+3. 给 `TechPlatformUserClientImpl` 增加最小重试能力，避免上游用户校验接口的瞬时失败直接中断登录链路。
+4. 给上游用户校验增加成功 / 失败日志留痕，明确记录：
+   - `techPlatformPath`
+   - `attempt/maxAttempts`
+   - 上游返回失败或网络异常原因
+5. 新增 `retry-max-attempts` 配置项，并同步测试环境默认值。
+
+涉及核心文件：
+
+- `src/main/java/com/nexusfin/equity/controller/BenefitOrderController.java`
+- `src/main/java/com/nexusfin/equity/service/impl/TechPlatformUserClientImpl.java`
+- `src/main/java/com/nexusfin/equity/config/AuthProperties.java`
+- `src/main/resources/application.yml`
+- `src/test/resources/application.yml`
+- `src/test/resources/application-mysql-it.yml`
+- `src/test/java/com/nexusfin/equity/controller/BenefitOrderControllerIntegrationTest.java`
+- `src/test/java/com/nexusfin/equity/service/impl/TechPlatformUserClientImplTest.java`
 
 未修改的项，主要属于以下两类：
 
@@ -252,6 +287,22 @@ mvn -q checkstyle:check
 
 - 通过
 - 已在补充 MySQL 回归前置逻辑后再次确认通过
+
+### 4.4 2026-03-31 联调前收口验证
+
+已执行：
+
+```bash
+mvn -q -Dtest=BenefitOrderControllerIntegrationTest,TechPlatformUserClientImplTest test
+```
+
+结果：
+
+- 通过
+- 已确认产品页、查单、行权链接访问日志输出符合预期
+- 已确认上游用户校验在瞬时失败后会按配置执行重试
+
+后续全量验证见当天的执行记录与计划文档。
 
 ### 4.4 真实 MySQL 回归
 

@@ -23,6 +23,9 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -38,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ExtendWith(OutputCaptureExtension.class)
 class BenefitOrderControllerIntegrationTest {
 
     @Autowired
@@ -206,6 +210,33 @@ class BenefitOrderControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.exerciseUrl").value(org.hamcrest.Matchers.containsString("https://mock-qw.test/exercise")))
                 .andExpect(jsonPath("$.data.exerciseUrl").value(org.hamcrest.Matchers.containsString(order.getBenefitOrderNo())))
                 .andExpect(jsonPath("$.data.expireTime").isNotEmpty());
+    }
+
+    @Test
+    void shouldLogAuthenticatedAccessForProductOrderStatusAndExerciseUrl(CapturedOutput output) throws Exception {
+        BenefitProduct product = createProduct("P-005");
+        MemberInfo memberInfo = createMember("mem-005", "user-log-access");
+        createChannel(memberInfo.getMemberId(), "user-log-access");
+        BenefitOrder order = createOrder(memberInfo, product);
+
+        mockMvc.perform(get("/api/equity/products/{productCode}", product.getProductCode())
+                        .header("X-Trace-Id", "trace-log-001")
+                        .cookie(authCookie(memberInfo)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/equity/orders/{benefitOrderNo}", order.getBenefitOrderNo())
+                        .header("X-Trace-Id", "trace-log-001")
+                        .cookie(authCookie(memberInfo)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/equity/exercise-url/{benefitOrderNo}", order.getBenefitOrderNo())
+                        .header("X-Trace-Id", "trace-log-001")
+                        .cookie(authCookie(memberInfo)))
+                .andExpect(status().isOk());
+
+        assertThat(output).contains("traceId=trace-log-001 bizOrderNo=" + product.getProductCode() + " product page requested");
+        assertThat(output).contains("traceId=trace-log-001 bizOrderNo=" + order.getBenefitOrderNo() + " benefit order status requested");
+        assertThat(output).contains("traceId=trace-log-001 bizOrderNo=" + order.getBenefitOrderNo() + " exercise url requested");
     }
 
     private BenefitProduct createProduct(String productCode) {

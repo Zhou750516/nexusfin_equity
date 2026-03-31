@@ -8,6 +8,7 @@ import com.nexusfin.equity.dto.response.ProductPageResponse;
 import com.nexusfin.equity.dto.response.Result;
 import com.nexusfin.equity.service.BenefitOrderService;
 import com.nexusfin.equity.util.AuthContextUtil;
+import com.nexusfin.equity.util.TraceIdUtil;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +36,8 @@ public class BenefitOrderController {
     @GetMapping("/products/{productCode}")
     public Result<ProductPageResponse> getProductPage(@PathVariable String productCode) {
         String memberId = AuthContextUtil.getRequiredPrincipal().memberId();
+        log.info("traceId={} bizOrderNo={} product page requested by memberId={}",
+                TraceIdUtil.getTraceId(), productCode, memberId);
         return Result.success(benefitOrderService.getProductPage(productCode, memberId));
     }
 
@@ -44,17 +47,21 @@ public class BenefitOrderController {
         String memberId = AuthContextUtil.getRequiredPrincipal().memberId();
         CreateBenefitOrderResponse response = benefitOrderService.createOrder(memberId, request);
         log.info("traceId={} bizOrderNo={} benefit order created via controller",
-                com.nexusfin.equity.util.TraceIdUtil.getTraceId(), response.benefitOrderNo());
+                TraceIdUtil.getTraceId(), response.benefitOrderNo());
         return Result.success(response);
     }
 
     @GetMapping("/orders/{benefitOrderNo}")
     public Result<BenefitOrderStatusResponse> getOrderStatus(@PathVariable String benefitOrderNo) {
+        log.info("traceId={} bizOrderNo={} benefit order status requested",
+                TraceIdUtil.getTraceId(), benefitOrderNo);
         return Result.success(benefitOrderService.getOrderStatus(benefitOrderNo));
     }
 
     @GetMapping("/exercise-url/{benefitOrderNo}")
     public Result<ExerciseUrlResponse> getExerciseUrl(@PathVariable String benefitOrderNo) {
+        log.info("traceId={} bizOrderNo={} exercise url requested",
+                TraceIdUtil.getTraceId(), benefitOrderNo);
         return Result.success(benefitOrderService.getExerciseUrl(benefitOrderNo));
     }
 }

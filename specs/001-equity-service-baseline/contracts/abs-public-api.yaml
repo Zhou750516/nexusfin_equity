@@ -117,11 +117,11 @@ components:
           type: string
         orderStatus:
           type: string
-        qwFirstDeductStatus:
+        firstDeductStatus:
           type: string
-        qwFallbackDeductStatus:
+        fallbackDeductStatus:
           type: string
-        qwExerciseStatus:
+        exerciseStatus:
           type: string
         grantStatus:
           type: string
