@@ -63,6 +63,22 @@ nexusfin:
       iv-length-bytes: ${QW_IV_LENGTH_BYTES:12}
       default-pay-protocol-prefix: ${QW_DEFAULT_PAY_PROTOCOL_PREFIX:proto-}
       mock-exercise-base-url: ${QW_MOCK_EXERCISE_BASE_URL:https://mock-qw.local/exercise}
+      direct:
+        base-url: ${QW_DIRECT_BASE_URL:https://tlt-test.allinpay.com}
+        process-path: ${QW_DIRECT_PROCESS_PATH:/aipg/ProcessServlet}
+        merchant-id: ${QW_DIRECT_MERCHANT_ID:}
+        user-name: ${QW_DIRECT_USER_NAME:}
+        user-password: ${QW_DIRECT_USER_PASSWORD:}
+        channel-code: ${QW_DIRECT_CHANNEL_CODE:}
+        account-no: ${QW_DIRECT_ACCOUNT_NO:}
+        pkcs12-path: ${QW_DIRECT_PKCS12_PATH:}
+        pkcs12-password: ${QW_DIRECT_PKCS12_PASSWORD:}
+        verify-cert-path: ${QW_DIRECT_VERIFY_CERT_PATH:}
+        connect-timeout-ms: ${QW_DIRECT_CONNECT_TIMEOUT_MS:3000}
+        read-timeout-ms: ${QW_DIRECT_READ_TIMEOUT_MS:5000}
+        member-sync-service-code: ${QW_DIRECT_MEMBER_SYNC_SERVICE_CODE:}
+        exercise-url-service-code: ${QW_DIRECT_EXERCISE_URL_SERVICE_CODE:}
+        lending-notify-service-code: ${QW_DIRECT_LENDING_NOTIFY_SERVICE_CODE:}
   crypto:
     dek:
       key-id: ${NEXUSFIN_CRYPTO_DEK_KEY_ID:DEK_USER_PROFILE}
