@@ -189,6 +189,7 @@ nexusfin:
     excluded-path-prefixes:
       - /api/equity/health
       - /api/auth/sso-callback
+      - /api/auth/joint-login
       - /api/callbacks
     jwt:
       issuer: nexusfin-equity-test
