@@ -10,9 +10,88 @@ spring:
       schema-locations: classpath:db/schema-h2.sql
 
 nexusfin:
+  h5:
+    loan:
+      amount-range:
+        min: 100
+        max: 5000
+        step: 100
+        default-amount: 3000
+      term-options:
+        - label: 3期
+          value: 3
+      annual-rate: 0.18
+      lender: XX商业银行
+      receiving-account:
+        bank-name: 招商银行
+        last-four: "8648"
+        account-id: acc_001
+    benefits:
+      product-code: HUXUAN_CARD
+      activate:
+        default-loan-amount: 300000
+        supported-card-type: huixuan_card
+        success-message: 惠选卡开通成功
+      detail:
+        card-name: 惠选卡
+        price: 300
+        total-saving: 448
+        features:
+          - title: 先享后付，无压力消费
+            description: 支持多种消费场景，权益开通后可按规则使用。
+          - title: 费用预估¥100/月，共3期
+            description: 当前按 3 期固定展示，便于前端与后端先联通。
+          - title: 匹配优质权益，不成功不收费
+            description: 结合当前权益服务能力返回统一展示信息。
+        categories:
+          - name: 影音会员
+            icon: tv
+            benefits:
+              - discount: 5折
+                title: 每月4选1影视VIP会员
+                description: 腾讯视频、优酷、爱奇艺、芒果TV任选
+                validity: 有效期30天/次
+                original-price: 30
+                saving: 15
+          - name: 出行服务
+            icon: car
+            benefits:
+              - discount: 8折
+                title: 出行礼包
+                description: 覆盖打车和代驾等高频场景
+                validity: 有效期30天/次
+                original-price: 50
+                saving: 10
+        tips:
+          - 权益服务费基于惠聚会员服务收取，请以页面展示说明为准。
+          - 本费用为互联网增值服务费用，成功开通后不支持无理由撤销。
+          - 您充分知晓服务内容后再进行开通操作。
+        protocols:
+          - name: 用户服务协议
+            url: /protocols/user-service
+          - name: 隐私条款声明
+            url: /protocols/privacy
+          - name: 委托扣款协议
+            url: /protocols/debit
+          - name: 权益服务协议
+            url: /protocols/benefits
   business:
     default-provider-code: QW
   third-party:
+    yunka:
+      enabled: true
+      mode: MOCK
+      base-url: https://yunka.test
+      gateway-path: /api/gateway/proxy
+      connect-timeout-ms: 2000
+      read-timeout-ms: 3000
+      paths:
+        loan-calculate: /loan/trail
+        loan-query: /loan/query
+        loan-apply: /loan/apply
+        repay-trial: /repay/trial
+        repay-apply: /repay/apply
+        repay-query: /repay/query
     tech-platform:
       enabled: true
       mode: MOCK
@@ -36,16 +115,23 @@ nexusfin:
       mode: MOCK
       base-url: https://t-api.test.qweimobile.com
       method-path: /api/abs/method
-      partner-no: test-partner
+      partner-no: abs
       version: v1.0
       sign-key: test-sign-key
       connect-timeout-ms: 2000
       read-timeout-ms: 3000
+      aes-key: 0123456789abcdef
       aes-key-base64: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
-      aes-algorithm: AES/GCM/NoPadding
+      aes-key-encoding: RAW
+      aes-algorithm: AES/ECB/PKCS5Padding
+      ciphertext-encoding: HEX
       gcm-tag-bits: 128
       iv-length-bytes: 12
       default-pay-protocol-prefix: proto-
+      # 测试环境默认关闭；需要联调时按 profile 和开关显式打开。
+      member-sync-pay-protocol-no-override:
+      allow-member-sync-pay-protocol-no-override: false
+      member-sync-pay-protocol-no-override-allowed-profiles: test,mysql-it,local
       mock-exercise-base-url: https://mock-qw.test/exercise
       direct:
         base-url: https://tlt-test.allinpay.com
@@ -96,6 +182,9 @@ nexusfin:
       - /api/equity/products
       - /api/equity/orders
       - /api/equity/exercise-url
+      - /api/loan
+      - /api/benefits
+      - /api/repayment
       - /api/users/me
     excluded-path-prefixes:
       - /api/equity/health

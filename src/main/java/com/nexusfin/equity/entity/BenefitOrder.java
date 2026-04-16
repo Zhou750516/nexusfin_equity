@@ -24,6 +24,8 @@ public class BenefitOrder {
     private String loanOrderNo;
     private String syncStatus;
     private String requestId;
+    private String payProtocolNoSnapshot;
+    private String payProtocolSource;
     private LocalDateTime createdTs;
     private LocalDateTime updatedTs;
 
@@ -153,6 +155,22 @@ public class BenefitOrder {
 
     public void setRequestId(String requestId) {
         this.requestId = requestId;
+    }
+
+    public String getPayProtocolNoSnapshot() {
+        return payProtocolNoSnapshot;
+    }
+
+    public void setPayProtocolNoSnapshot(String payProtocolNoSnapshot) {
+        this.payProtocolNoSnapshot = payProtocolNoSnapshot;
+    }
+
+    public String getPayProtocolSource() {
+        return payProtocolSource;
+    }
+
+    public void setPayProtocolSource(String payProtocolSource) {
+        this.payProtocolSource = payProtocolSource;
     }
 
     public LocalDateTime getCreatedTs() {

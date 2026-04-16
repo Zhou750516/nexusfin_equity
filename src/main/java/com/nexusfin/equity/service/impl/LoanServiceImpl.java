@@ -1,0 +1,478 @@
+package com.nexusfin.equity.service.impl;
+
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.nexusfin.equity.config.H5BenefitsProperties;
+import com.nexusfin.equity.config.H5LoanProperties;
+import com.nexusfin.equity.config.YunkaProperties;
+import com.nexusfin.equity.dto.request.CreateBenefitOrderRequest;
+import com.nexusfin.equity.dto.request.LoanApplyRequest;
+import com.nexusfin.equity.dto.request.LoanCalculateRequest;
+import com.nexusfin.equity.dto.response.CreateBenefitOrderResponse;
+import com.nexusfin.equity.dto.response.LoanApprovalResultResponse;
+import com.nexusfin.equity.dto.response.LoanApprovalStatusResponse;
+import com.nexusfin.equity.dto.response.LoanApplyResponse;
+import com.nexusfin.equity.dto.response.LoanCalculateResponse;
+import com.nexusfin.equity.dto.response.LoanCalculatorConfigResponse;
+import com.nexusfin.equity.entity.LoanApplicationMapping;
+import com.nexusfin.equity.exception.BizException;
+import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
+import com.nexusfin.equity.service.BenefitOrderService;
+import com.nexusfin.equity.service.H5I18nService;
+import com.nexusfin.equity.service.LoanService;
+import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class LoanServiceImpl implements LoanService {
+
+    private static final BigDecimal CENTS_PER_YUAN = BigDecimal.valueOf(100L);
+    private static final String LOAN_STATUS_SUCCESS = "7003";
+    private static final String DEFAULT_CHANNEL_CODE = "KJ";
+
+    private final H5LoanProperties h5LoanProperties;
+    private final H5BenefitsProperties h5BenefitsProperties;
+    private final YunkaProperties yunkaProperties;
+    private final YunkaGatewayClient yunkaGatewayClient;
+    private final LoanApplicationMappingRepository loanApplicationMappingRepository;
+    private final BenefitOrderService benefitOrderService;
+    private final H5I18nService h5I18nService;
+
+    public LoanServiceImpl(
+            H5LoanProperties h5LoanProperties,
+            H5BenefitsProperties h5BenefitsProperties,
+            YunkaProperties yunkaProperties,
+            YunkaGatewayClient yunkaGatewayClient,
+            LoanApplicationMappingRepository loanApplicationMappingRepository,
+            BenefitOrderService benefitOrderService,
+            H5I18nService h5I18nService
+    ) {
+        this.h5LoanProperties = h5LoanProperties;
+        this.h5BenefitsProperties = h5BenefitsProperties;
+        this.yunkaProperties = yunkaProperties;
+        this.yunkaGatewayClient = yunkaGatewayClient;
+        this.loanApplicationMappingRepository = loanApplicationMappingRepository;
+        this.benefitOrderService = benefitOrderService;
+        this.h5I18nService = h5I18nService;
+    }
+
+    @Override
+    public LoanCalculatorConfigResponse getCalculatorConfig() {
+        H5LoanProperties.ReceivingAccount receivingAccount = h5LoanProperties.receivingAccount();
+        return new LoanCalculatorConfigResponse(
+                new LoanCalculatorConfigResponse.AmountRange(
+                        h5LoanProperties.amountRange().min(),
+                        h5LoanProperties.amountRange().max(),
+                        h5LoanProperties.amountRange().step(),
+                        h5LoanProperties.amountRange().defaultAmount()
+                ),
+                mapTermOptions(h5LoanProperties.termOptions()),
+                h5LoanProperties.annualRate(),
+                h5I18nService.text("loan.lender", h5LoanProperties.lender()),
+                new LoanCalculatorConfigResponse.ReceivingAccount(
+                        h5I18nService.text("loan.receivingAccount.bankName", receivingAccount.bankName()),
+                        receivingAccount.lastFour(),
+                        receivingAccount.accountId()
+                )
+        );
+    }
+
+    @Override
+    public LoanCalculateResponse calculate(String memberId, String uid, LoanCalculateRequest request) {
+        validateCalculateRequest(request);
+        String requestId = "LC-" + newCompactUuid();
+        YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = new YunkaGatewayClient.YunkaGatewayRequest(
+                requestId,
+                yunkaProperties.paths().loanCalculate(),
+                requestId,
+                new LoanTrailForwardData(uid, requestId, yuanToCent(request.amount()), request.term())
+        );
+        JsonNode data = requireSuccessfulYunkaData(yunkaGatewayClient.proxy(gatewayRequest));
+        long receiveAmount = data.path("receiveAmount").asLong(yuanToCent(request.amount()));
+        long repayAmount = data.path("repayAmount").asLong(receiveAmount);
+        return new LoanCalculateResponse(
+                centsToYuan(repayAmount - receiveAmount),
+                readAnnualRate(data),
+                mapRepaymentPlan(data.path("repayPlan"))
+        );
+    }
+
+    @Override
+    @Transactional
+    public LoanApplyResponse apply(String memberId, String uid, LoanApplyRequest request) {
+        validateApplyRequest(request);
+        String applicationId = "APP-" + newCompactUuid();
+        String loanId = "LN-" + newCompactUuid();
+        CreateBenefitOrderResponse benefitOrder = benefitOrderService.createOrder(
+                memberId,
+                new CreateBenefitOrderRequest(
+                        "loan-apply-" + applicationId,
+                        h5BenefitsProperties.productCode(),
+                        yuanToCent(request.amount()),
+                        Boolean.TRUE
+                )
+        );
+        YunkaGatewayClient.YunkaGatewayResponse response;
+        try {
+            response = yunkaGatewayClient.proxy(new YunkaGatewayClient.YunkaGatewayRequest(
+                    "LA-" + newCompactUuid(),
+                    yunkaProperties.paths().loanApply(),
+                    applicationId,
+                    new LoanApplyForwardData(
+                            uid,
+                            benefitOrder.benefitOrderNo(),
+                            applicationId,
+                            loanId,
+                            yuanToCent(request.amount()),
+                            request.term(),
+                            request.receivingAccountId()
+                    )
+            ));
+        } catch (RuntimeException exception) {
+            return buildLoanFailedResponse(applicationId, benefitOrder.benefitOrderNo(), exception.getMessage());
+        }
+        if (response == null || response.code() != 0) {
+            String message = response == null ? "Yunka gateway response is empty" : response.message();
+            return buildLoanFailedResponse(applicationId, benefitOrder.benefitOrderNo(), message);
+        }
+        String upstreamLoanId = readText(response.data(), "loanId", loanId);
+        saveApplicationMapping(memberId, uid, applicationId, benefitOrder.benefitOrderNo(), upstreamLoanId);
+        return new LoanApplyResponse(
+                applicationId,
+                "pending",
+                h5I18nService.text("loan.approval.arrivalTime", "30分钟"),
+                true,
+                benefitOrder.benefitOrderNo(),
+                readRemark(response.data(), "借款申请已提交，正在处理中")
+        );
+    }
+
+    @Override
+    public LoanApprovalStatusResponse getApprovalStatus(String memberId, String applicationId) {
+        LoanApplicationMapping mapping = findMapping(memberId, applicationId);
+        JsonNode data = queryLoan(mapping);
+        String h5Status = mapApprovalStatus(data.path("status").asText());
+        return new LoanApprovalStatusResponse(
+                applicationId,
+                h5Status,
+                buildApprovalStatusSteps(h5Status),
+                buildBenefitsCardPreview()
+        );
+    }
+
+    @Override
+    public LoanApprovalResultResponse getApprovalResult(String memberId, String applicationId) {
+        LoanApplicationMapping mapping = findMapping(memberId, applicationId);
+        JsonNode data = queryLoan(mapping);
+        boolean approved = LOAN_STATUS_SUCCESS.equals(data.path("status").asText());
+        return new LoanApprovalResultResponse(
+                applicationId,
+                approved ? "approved" : "rejected",
+                approved ? centsToYuan(data.path("loanAmount").asLong(0L)) : BigDecimal.ZERO,
+                approved ? h5I18nService.text("loan.approval.arrivalTime", "30分钟") : "--",
+                buildApprovalResultSteps(approved),
+                true,
+                resolveApprovalResultTip(data, approved),
+                approved ? mapping.getUpstreamQueryValue() : null
+        );
+    }
+
+    private List<LoanCalculatorConfigResponse.TermOption> mapTermOptions(List<H5LoanProperties.TermOption> termOptions) {
+        return termOptions.stream()
+                .map(termOption -> new LoanCalculatorConfigResponse.TermOption(
+                        h5I18nService.text("loan.term." + termOption.value(), termOption.label()),
+                        termOption.value()
+                ))
+                .toList();
+    }
+
+    private void validateCalculateRequest(LoanCalculateRequest request) {
+        validateAmountAndTerm(request.amount(), request.term());
+    }
+
+    private void validateApplyRequest(LoanApplyRequest request) {
+        validateAmountAndTerm(request.amount(), request.term());
+        String accountId = h5LoanProperties.receivingAccount().accountId();
+        if (!accountId.equals(request.receivingAccountId())) {
+            throw new BizException(400, "receiving account is unsupported");
+        }
+    }
+
+    private void validateAmountAndTerm(Long amount, Integer term) {
+        H5LoanProperties.AmountRange amountRange = h5LoanProperties.amountRange();
+        if (amount < amountRange.min() || amount > amountRange.max()) {
+            throw new BizException(400, "amount is out of range");
+        }
+        if ((amount - amountRange.min()) % amountRange.step() != 0) {
+            throw new BizException(400, "amount step is invalid");
+        }
+        boolean supportedTerm = h5LoanProperties.termOptions().stream()
+                .anyMatch(termOption -> termOption.value().equals(term));
+        if (!supportedTerm) {
+            throw new BizException(400, "term is unsupported");
+        }
+    }
+
+    private LoanApplyResponse buildLoanFailedResponse(String applicationId, String benefitOrderNo, String reason) {
+        String safeReason = reason == null || reason.isBlank() ? "Yunka gateway response is empty" : reason;
+        return new LoanApplyResponse(
+                null,
+                "loan_failed",
+                null,
+                true,
+                benefitOrderNo,
+                h5I18nService.text("loan.apply.failurePrefix", "权益购买成功，借款申请失败：") + safeReason
+        );
+    }
+
+    private void saveApplicationMapping(
+            String memberId,
+            String uid,
+            String applicationId,
+            String benefitOrderNo,
+            String loanId
+    ) {
+        LoanApplicationMapping mapping = new LoanApplicationMapping();
+        mapping.setApplicationId(applicationId);
+        mapping.setMemberId(memberId);
+        mapping.setBenefitOrderNo(benefitOrderNo);
+        mapping.setChannelCode(DEFAULT_CHANNEL_CODE);
+        mapping.setExternalUserId(uid);
+        mapping.setUpstreamQueryType("loanId");
+        mapping.setUpstreamQueryValue(loanId);
+        mapping.setMappingStatus("ACTIVE");
+        mapping.setCreatedTs(LocalDateTime.now());
+        mapping.setUpdatedTs(LocalDateTime.now());
+        loanApplicationMappingRepository.insert(mapping);
+    }
+
+    private LoanApplicationMapping findMapping(String memberId, String applicationId) {
+        LoanApplicationMapping mapping = loanApplicationMappingRepository.selectOne(
+                Wrappers.<LoanApplicationMapping>lambdaQuery()
+                        .eq(LoanApplicationMapping::getApplicationId, applicationId)
+                        .eq(LoanApplicationMapping::getMemberId, memberId)
+                        .eq(LoanApplicationMapping::getMappingStatus, "ACTIVE")
+                        .last("limit 1")
+        );
+        if (mapping == null) {
+            throw new BizException(404, "application mapping not found");
+        }
+        return mapping;
+    }
+
+    private JsonNode queryLoan(LoanApplicationMapping mapping) {
+        String requestId = "LQ-" + newCompactUuid();
+        YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = new YunkaGatewayClient.YunkaGatewayRequest(
+                requestId,
+                yunkaProperties.paths().loanQuery(),
+                mapping.getApplicationId(),
+                new LoanQueryForwardData(mapping.getExternalUserId(), mapping.getUpstreamQueryValue())
+        );
+        return requireSuccessfulYunkaData(yunkaGatewayClient.proxy(gatewayRequest));
+    }
+
+    private JsonNode requireSuccessfulYunkaData(YunkaGatewayClient.YunkaGatewayResponse response) {
+        if (response == null || response.code() != 0) {
+            String message = response == null ? "Yunka gateway response is empty" : response.message();
+            throw new BizException(502, message);
+        }
+        return response.data();
+    }
+
+    private List<LoanCalculateResponse.RepaymentPlanItem> mapRepaymentPlan(JsonNode repaymentPlan) {
+        if (!repaymentPlan.isArray()) {
+            return List.of();
+        }
+        return java.util.stream.StreamSupport.stream(repaymentPlan.spliterator(), false)
+                .map(item -> new LoanCalculateResponse.RepaymentPlanItem(
+                        item.path("period").asInt(),
+                        item.path("date").asText(),
+                        centsToYuan(item.path("principal").asLong()),
+                        centsToYuan(item.path("interest").asLong()),
+                        centsToYuan(item.path("total").asLong())
+                ))
+                .toList();
+    }
+
+    private LoanApprovalStatusResponse.BenefitsCardPreview buildBenefitsCardPreview() {
+        List<String> features = java.util.stream.IntStream.range(0, h5BenefitsProperties.detail().features().size())
+                .mapToObj(index -> {
+                    H5BenefitsProperties.Feature feature = h5BenefitsProperties.detail().features().get(index);
+                    return h5I18nService.text("benefits.feature." + index + ".title", feature.title());
+                })
+                .limit(3)
+                .toList();
+        return new LoanApprovalStatusResponse.BenefitsCardPreview(
+                true,
+                h5BenefitsProperties.detail().price(),
+                features
+        );
+    }
+
+    private List<LoanApprovalStatusResponse.ApprovalStep> buildApprovalStatusSteps(String status) {
+        if ("approved".equals(status)) {
+            return buildApprovalResultSteps(true);
+        }
+        if ("rejected".equals(status)) {
+            return buildApprovalResultSteps(false);
+        }
+        return List.of(
+                new LoanApprovalStatusResponse.ApprovalStep(
+                        h5I18nService.text("loan.approval.submit.name", "提交申请"),
+                        "completed",
+                        h5I18nService.text("loan.approval.submit.description", "申请已提交成功")
+                ),
+                new LoanApprovalStatusResponse.ApprovalStep(
+                        h5I18nService.text("loan.approval.reviewing.name", "审批中"),
+                        "in_progress",
+                        h5I18nService.text("loan.approval.reviewing.description", "正在进行资质审核...")
+                ),
+                new LoanApprovalStatusResponse.ApprovalStep(
+                        h5I18nService.text("loan.approval.waiting.name", "等待放款"),
+                        "pending",
+                        h5I18nService.text("loan.approval.waiting.description", "审批通过后即可放款")
+                )
+        );
+    }
+
+    private List<LoanApprovalStatusResponse.ApprovalStep> buildApprovalResultSteps(boolean approved) {
+        if (approved) {
+            return List.of(
+                    new LoanApprovalStatusResponse.ApprovalStep(
+                            h5I18nService.text("loan.approval.submit.name", "提交申请"),
+                            "completed",
+                            h5I18nService.text("loan.approval.submit.description", "申请已提交成功")
+                    ),
+                    new LoanApprovalStatusResponse.ApprovalStep(
+                            h5I18nService.text("loan.approval.approved.name", "审批完成"),
+                            "completed",
+                            h5I18nService.text("loan.approval.approved.description", "资质审核已通过")
+                    ),
+                    new LoanApprovalStatusResponse.ApprovalStep(
+                            h5I18nService.text("loan.approval.disburse.name", "准备放款"),
+                            "completed",
+                            h5I18nService.text("loan.approval.disburse.description", "资金将在30分钟内到账")
+                    )
+            );
+        }
+        return List.of(
+                new LoanApprovalStatusResponse.ApprovalStep(
+                        h5I18nService.text("loan.approval.submit.name", "提交申请"),
+                        "completed",
+                        h5I18nService.text("loan.approval.submit.description", "申请已提交成功")
+                ),
+                new LoanApprovalStatusResponse.ApprovalStep(
+                        h5I18nService.text("loan.approval.rejected.name", "审批完成"),
+                        "completed",
+                        h5I18nService.text("loan.approval.rejected.description", "暂未通过本次审核")
+                ),
+                new LoanApprovalStatusResponse.ApprovalStep(
+                        h5I18nService.text("loan.approval.rejected.disburse.name", "准备放款"),
+                        "pending",
+                        h5I18nService.text("loan.approval.rejected.disburse.description", "审核未通过，无法放款")
+                )
+        );
+    }
+
+    private String mapApprovalStatus(String upstreamStatus) {
+        return switch (upstreamStatus) {
+            case "7003" -> "approved";
+            case "7004", "7008", "7009" -> "rejected";
+            default -> "reviewing";
+        };
+    }
+
+    private String readAnnualRate(JsonNode data) {
+        JsonNode yearRate = data.path("yearRate");
+        if (yearRate.isTextual()) {
+            return yearRate.asText();
+        }
+        if (yearRate.isNumber()) {
+            return yearRate.decimalValue().setScale(1, RoundingMode.HALF_UP) + "%";
+        }
+        return h5LoanProperties.annualRate().multiply(BigDecimal.valueOf(100L))
+                .setScale(1, RoundingMode.HALF_UP) + "%";
+    }
+
+    private String readRemark(JsonNode data) {
+        return readRemark(data, "借款申请未通过，权益已购买成功。");
+    }
+
+    private String resolveApprovalResultTip(JsonNode data, boolean approved) {
+        String fallback = approved
+                ? h5I18nService.text("loan.approval.result.tip.approved", "审批通过，预计30分钟内到账")
+                : h5I18nService.text("loan.approval.tip.rejected", "借款申请未通过，权益已购买成功。");
+        String remark = readText(data, "remark", "");
+        if (remark.isBlank()) {
+            return fallback;
+        }
+        if (approved && isGenericApprovedRemark(remark)) {
+            return fallback;
+        }
+        return remark;
+    }
+
+    private boolean isGenericApprovedRemark(String remark) {
+        return "放款成功".equals(remark)
+                || "审批通过，预计30分钟内到账".equals(remark)
+                || "審批通過，預計30分鐘內到帳".equals(remark)
+                || "Approved. Funds are expected to arrive within 30 minutes.".equals(remark)
+                || "Đã phê duyệt, dự kiến tiền sẽ đến trong vòng 30 phút.".equals(remark);
+    }
+
+    private String readRemark(JsonNode data, String fallback) {
+        String remark = readText(data, "remark", fallback);
+        return remark.isBlank() ? fallback : remark;
+    }
+
+    private String readText(JsonNode data, String fieldName, String fallback) {
+        if (data == null || data.isNull()) {
+            return fallback;
+        }
+        String value = data.path(fieldName).asText();
+        return value.isBlank() ? fallback : value;
+    }
+
+    private static String newCompactUuid() {
+        return UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private static Long yuanToCent(Long yuanAmount) {
+        return Math.multiplyExact(yuanAmount, 100L);
+    }
+
+    private static BigDecimal centsToYuan(long cents) {
+        return BigDecimal.valueOf(cents).divide(CENTS_PER_YUAN, 2, RoundingMode.UNNECESSARY);
+    }
+
+    private record LoanTrailForwardData(
+            String uid,
+            String applyId,
+            Long loanAmount,
+            Integer loanPeriod
+    ) {
+    }
+
+    private record LoanApplyForwardData(
+            String uid,
+            String benefitOrderNo,
+            String applyId,
+            String loanId,
+            Long loanAmount,
+            Integer loanPeriod,
+            String bankCardNo
+    ) {
+    }
+
+    private record LoanQueryForwardData(
+            String uid,
+            String loanId
+    ) {
+    }
+}

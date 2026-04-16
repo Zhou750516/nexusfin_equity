@@ -49,8 +49,29 @@ create table if not exists benefit_order (
     loan_order_no varchar(64),
     sync_status varchar(32) not null,
     request_id varchar(64) not null,
+    pay_protocol_no_snapshot varchar(128),
+    pay_protocol_source varchar(32),
     created_ts timestamp not null,
     updated_ts timestamp not null
+);
+
+create table if not exists member_payment_protocol (
+    id bigint auto_increment primary key,
+    member_id varchar(64) not null,
+    external_user_id varchar(64) not null,
+    provider_code varchar(64) not null,
+    protocol_no varchar(128) not null,
+    protocol_status varchar(32) not null,
+    sign_request_no varchar(64),
+    channel_code varchar(64),
+    signed_ts timestamp,
+    expired_ts timestamp,
+    last_verified_ts timestamp,
+    created_ts timestamp not null,
+    updated_ts timestamp not null,
+    unique key uk_provider_protocol_no (provider_code, protocol_no),
+    key idx_member_provider_status (member_id, provider_code, protocol_status),
+    key idx_external_user_provider_status (external_user_id, provider_code, protocol_status)
 );
 
 create table if not exists payment_record (
@@ -104,4 +125,17 @@ create table if not exists idempotency_record (
     biz_key varchar(128) not null,
     response_body text,
     processed_ts timestamp not null
+);
+
+create table if not exists loan_application_mapping (
+    application_id varchar(64) primary key,
+    member_id varchar(64) not null,
+    benefit_order_no varchar(64),
+    channel_code varchar(64),
+    external_user_id varchar(64),
+    upstream_query_type varchar(32),
+    upstream_query_value varchar(128),
+    mapping_status varchar(32) not null,
+    created_ts timestamp not null,
+    updated_ts timestamp not null
 );

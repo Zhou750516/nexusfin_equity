@@ -1,0 +1,16 @@
+package com.nexusfin.equity.dto.response;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+public record LoanApprovalResultResponse(
+        String applicationId,
+        String status,
+        BigDecimal approvedAmount,
+        String estimatedArrivalTime,
+        List<LoanApprovalStatusResponse.ApprovalStep> steps,
+        boolean benefitsCardActivated,
+        String tip,
+        String loanId
+) {
+}

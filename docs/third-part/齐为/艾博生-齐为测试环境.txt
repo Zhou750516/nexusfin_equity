@@ -1,0 +1,19 @@
+ 
+     齐为-艾博生测试环境：
+     1、支付账户
+	齐为通联测试账号：200000000007804 
+	渠道编码 allinpay-1
+     2、测试地址
+	https://t-api.test.qweimobile.com/api/abs/method
+     3、method参数
+	会员同步接口 abs.push.order
+        	放款通知 abs.lending.notify
+        	联登接口 abs.token.get
+
+     4、partnerNo参数
+	abs
+     5、测试环境可购买的会员卡
+	productCode：abs001
+     6、密钥
+	md5密钥：h2Zh53keYy8eksijfj7HfPCncmEMCBXt
+	AES密钥：FbRW7iaiwcEKk2kY

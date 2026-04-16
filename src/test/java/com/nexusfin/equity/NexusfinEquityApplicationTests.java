@@ -3,9 +3,12 @@ package com.nexusfin.equity;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.dto.response.TechPlatformUserProfileResponse;
+import com.nexusfin.equity.entity.MemberPaymentProtocol;
+import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.service.ReconciliationService;
 import com.nexusfin.equity.service.TechPlatformUserClient;
 import com.nexusfin.equity.util.SignatureUtil;
+import java.time.LocalDateTime;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +43,9 @@ class NexusfinEquityApplicationTests {
     @Autowired
     private ReconciliationService reconciliationService;
 
+    @Autowired
+    private MemberPaymentProtocolRepository memberPaymentProtocolRepository;
+
     @MockBean
     private TechPlatformUserClient techPlatformUserClient;
 
@@ -66,6 +72,7 @@ class NexusfinEquityApplicationTests {
                 .andReturn();
         JsonNode currentUserJson = objectMapper.readTree(currentUserResult.getResponse().getContentAsString());
         String memberId = currentUserJson.path("data").path("memberId").asText();
+        createActiveProtocol(memberId, "quickstart-user-001");
 
         mockMvc.perform(get("/api/equity/products/{productCode}", "QS-PROD-001")
                         .cookie(authCookie))
@@ -141,6 +148,21 @@ class NexusfinEquityApplicationTests {
                   "agreementSigned": true
                 }
                 """;
+    }
+
+    private void createActiveProtocol(String memberId, String externalUserId) {
+        MemberPaymentProtocol protocol = new MemberPaymentProtocol();
+        protocol.setMemberId(memberId);
+        protocol.setExternalUserId(externalUserId);
+        protocol.setProviderCode("ALLINPAY");
+        protocol.setProtocolNo("AIP-TEST-" + memberId);
+        protocol.setProtocolStatus("ACTIVE");
+        protocol.setChannelCode("KJ");
+        protocol.setSignedTs(LocalDateTime.now());
+        protocol.setLastVerifiedTs(LocalDateTime.now());
+        protocol.setCreatedTs(LocalDateTime.now());
+        protocol.setUpdatedTs(LocalDateTime.now());
+        memberPaymentProtocolRepository.insert(protocol);
     }
 
     private String firstDeductRequest(String benefitOrderNo) {

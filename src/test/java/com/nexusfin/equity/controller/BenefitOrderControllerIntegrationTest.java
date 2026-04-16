@@ -7,6 +7,7 @@ import com.nexusfin.equity.entity.ContractArchive;
 import com.nexusfin.equity.entity.IdempotencyRecord;
 import com.nexusfin.equity.entity.MemberChannel;
 import com.nexusfin.equity.entity.MemberInfo;
+import com.nexusfin.equity.entity.MemberPaymentProtocol;
 import com.nexusfin.equity.entity.SignTask;
 import com.nexusfin.equity.enums.MemberStatusEnum;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
@@ -15,6 +16,7 @@ import com.nexusfin.equity.repository.ContractArchiveRepository;
 import com.nexusfin.equity.repository.IdempotencyRecordRepository;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
+import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
 import com.nexusfin.equity.util.JwtUtil;
 import com.nexusfin.equity.util.SensitiveDataCipher;
@@ -60,6 +62,9 @@ class BenefitOrderControllerIntegrationTest {
     private MemberChannelRepository memberChannelRepository;
 
     @Autowired
+    private MemberPaymentProtocolRepository memberPaymentProtocolRepository;
+
+    @Autowired
     private SignTaskRepository signTaskRepository;
 
     @Autowired
@@ -80,6 +85,7 @@ class BenefitOrderControllerIntegrationTest {
         signTaskRepository.delete(null);
         benefitOrderRepository.delete(null);
         idempotencyRecordRepository.delete(null);
+        memberPaymentProtocolRepository.delete(null);
         memberChannelRepository.delete(null);
         memberInfoRepository.delete(null);
         benefitProductRepository.delete(null);
@@ -105,6 +111,7 @@ class BenefitOrderControllerIntegrationTest {
         BenefitProduct product = createProduct("P-002");
         MemberInfo memberInfo = createMember("mem-002", "user-order");
         createChannel(memberInfo.getMemberId(), "user-order");
+        createActiveProtocol(memberInfo.getMemberId(), memberInfo.getExternalUserId());
 
         mockMvc.perform(post("/api/equity/orders")
                         .cookie(authCookie(memberInfo))
@@ -129,6 +136,8 @@ class BenefitOrderControllerIntegrationTest {
         assertThat(order).isNotNull();
         assertThat(order.getLoanAmount()).isEqualTo(800000L);
         assertThat(order.getOrderStatus()).isEqualTo("FIRST_DEDUCT_PENDING");
+        assertThat(order.getPayProtocolNoSnapshot()).isEqualTo("AIP-TEST-" + memberInfo.getMemberId());
+        assertThat(order.getPayProtocolSource()).isEqualTo("ALLINPAY");
 
         List<SignTask> signTasks = signTaskRepository.selectList(Wrappers.<SignTask>lambdaQuery()
                 .eq(SignTask::getBenefitOrderNo, order.getBenefitOrderNo()));
@@ -146,6 +155,7 @@ class BenefitOrderControllerIntegrationTest {
         BenefitProduct product = createProduct("P-002-D");
         MemberInfo memberInfo = createMember("mem-002-d", "user-order-duplicate");
         createChannel(memberInfo.getMemberId(), "user-order-duplicate");
+        createActiveProtocol(memberInfo.getMemberId(), memberInfo.getExternalUserId());
 
         String body = """
                 {
@@ -277,6 +287,21 @@ class BenefitOrderControllerIntegrationTest {
         memberChannel.setCreatedTs(LocalDateTime.now());
         memberChannel.setUpdatedTs(LocalDateTime.now());
         memberChannelRepository.insert(memberChannel);
+    }
+
+    private void createActiveProtocol(String memberId, String externalUserId) {
+        MemberPaymentProtocol protocol = new MemberPaymentProtocol();
+        protocol.setMemberId(memberId);
+        protocol.setExternalUserId(externalUserId);
+        protocol.setProviderCode("ALLINPAY");
+        protocol.setProtocolNo("AIP-TEST-" + memberId);
+        protocol.setProtocolStatus("ACTIVE");
+        protocol.setChannelCode("KJ");
+        protocol.setSignedTs(LocalDateTime.now());
+        protocol.setLastVerifiedTs(LocalDateTime.now());
+        protocol.setCreatedTs(LocalDateTime.now());
+        protocol.setUpdatedTs(LocalDateTime.now());
+        memberPaymentProtocolRepository.insert(protocol);
     }
 
     private BenefitOrder createOrder(MemberInfo memberInfo, BenefitProduct product) {

@@ -1,5 +1,6 @@
 package com.nexusfin.equity.config;
 
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "nexusfin.third-party.qw")
@@ -9,16 +10,22 @@ public class QwProperties {
     private Mode mode = Mode.MOCK;
     private String baseUrl = "https://t-api.test.qweimobile.com";
     private String methodPath = "/api/abs/method";
-    private String partnerNo = "abs-app";
+    private String partnerNo = "abs";
     private String version = "v1.0";
     private String signKey = "abs-secret-key";
     private int connectTimeoutMs = 2000;
     private int readTimeoutMs = 3000;
+    private String aesKey = "0123456789abcdef";
     private String aesKeyBase64 = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
-    private String aesAlgorithm = "AES/GCM/NoPadding";
+    private AesKeyEncoding aesKeyEncoding = AesKeyEncoding.RAW;
+    private String aesAlgorithm = "AES/ECB/PKCS5Padding";
+    private CiphertextEncoding ciphertextEncoding = CiphertextEncoding.HEX;
     private int gcmTagBits = 128;
     private int ivLengthBytes = 12;
     private String defaultPayProtocolPrefix = "proto-";
+    private String memberSyncPayProtocolNoOverride;
+    private boolean allowMemberSyncPayProtocolNoOverride;
+    private List<String> memberSyncPayProtocolNoOverrideAllowedProfiles = List.of("test", "mysql-it", "local");
     private String mockExerciseBaseUrl = "https://mock-qw.local/exercise";
     private final Direct direct = new Direct();
 
@@ -94,6 +101,14 @@ public class QwProperties {
         this.readTimeoutMs = readTimeoutMs;
     }
 
+    public String getAesKey() {
+        return aesKey;
+    }
+
+    public void setAesKey(String aesKey) {
+        this.aesKey = aesKey;
+    }
+
     public String getAesKeyBase64() {
         return aesKeyBase64;
     }
@@ -102,12 +117,28 @@ public class QwProperties {
         this.aesKeyBase64 = aesKeyBase64;
     }
 
+    public AesKeyEncoding getAesKeyEncoding() {
+        return aesKeyEncoding;
+    }
+
+    public void setAesKeyEncoding(AesKeyEncoding aesKeyEncoding) {
+        this.aesKeyEncoding = aesKeyEncoding;
+    }
+
     public String getAesAlgorithm() {
         return aesAlgorithm;
     }
 
     public void setAesAlgorithm(String aesAlgorithm) {
         this.aesAlgorithm = aesAlgorithm;
+    }
+
+    public CiphertextEncoding getCiphertextEncoding() {
+        return ciphertextEncoding;
+    }
+
+    public void setCiphertextEncoding(CiphertextEncoding ciphertextEncoding) {
+        this.ciphertextEncoding = ciphertextEncoding;
     }
 
     public int getGcmTagBits() {
@@ -134,6 +165,30 @@ public class QwProperties {
         this.defaultPayProtocolPrefix = defaultPayProtocolPrefix;
     }
 
+    public String getMemberSyncPayProtocolNoOverride() {
+        return memberSyncPayProtocolNoOverride;
+    }
+
+    public void setMemberSyncPayProtocolNoOverride(String memberSyncPayProtocolNoOverride) {
+        this.memberSyncPayProtocolNoOverride = memberSyncPayProtocolNoOverride;
+    }
+
+    public boolean isAllowMemberSyncPayProtocolNoOverride() {
+        return allowMemberSyncPayProtocolNoOverride;
+    }
+
+    public void setAllowMemberSyncPayProtocolNoOverride(boolean allowMemberSyncPayProtocolNoOverride) {
+        this.allowMemberSyncPayProtocolNoOverride = allowMemberSyncPayProtocolNoOverride;
+    }
+
+    public List<String> getMemberSyncPayProtocolNoOverrideAllowedProfiles() {
+        return memberSyncPayProtocolNoOverrideAllowedProfiles;
+    }
+
+    public void setMemberSyncPayProtocolNoOverrideAllowedProfiles(List<String> memberSyncPayProtocolNoOverrideAllowedProfiles) {
+        this.memberSyncPayProtocolNoOverrideAllowedProfiles = memberSyncPayProtocolNoOverrideAllowedProfiles;
+    }
+
     public String getMockExerciseBaseUrl() {
         return mockExerciseBaseUrl;
     }
@@ -151,6 +206,16 @@ public class QwProperties {
         HTTP,
         QWEIMOBILE_HTTP,
         ALLINPAY_DIRECT
+    }
+
+    public enum AesKeyEncoding {
+        RAW,
+        BASE64
+    }
+
+    public enum CiphertextEncoding {
+        BASE64,
+        HEX
     }
 
     public static class Direct {

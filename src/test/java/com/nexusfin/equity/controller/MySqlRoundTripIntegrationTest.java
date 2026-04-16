@@ -9,6 +9,7 @@ import com.nexusfin.equity.entity.ContractArchive;
 import com.nexusfin.equity.entity.IdempotencyRecord;
 import com.nexusfin.equity.entity.MemberChannel;
 import com.nexusfin.equity.entity.MemberInfo;
+import com.nexusfin.equity.entity.MemberPaymentProtocol;
 import com.nexusfin.equity.entity.SignTask;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.repository.BenefitProductRepository;
@@ -16,6 +17,7 @@ import com.nexusfin.equity.repository.ContractArchiveRepository;
 import com.nexusfin.equity.repository.IdempotencyRecordRepository;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
+import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
 import com.nexusfin.equity.util.JwtUtil;
 import com.nexusfin.equity.util.SensitiveDataCipher;
@@ -70,6 +72,9 @@ class MySqlRoundTripIntegrationTest {
     private MemberChannelRepository memberChannelRepository;
 
     @Autowired
+    private MemberPaymentProtocolRepository memberPaymentProtocolRepository;
+
+    @Autowired
     private SignTaskRepository signTaskRepository;
 
     @Autowired
@@ -93,6 +98,7 @@ class MySqlRoundTripIntegrationTest {
     @BeforeEach
     void setUp() {
         alignMemberInfoSchema();
+        alignBenefitOrderProtocolSchema();
         cleanupTestData();
     }
 
@@ -105,6 +111,7 @@ class MySqlRoundTripIntegrationTest {
         createProduct(productCode);
         MemberInfo memberInfo = createMember("mem-" + uniqueId, externalUserId);
         createChannel(memberInfo.getMemberId(), externalUserId);
+        createActiveProtocol(memberInfo.getMemberId(), externalUserId);
 
         MvcResult createOrderResult = mockMvc.perform(post("/api/equity/orders")
                         .cookie(authCookie(memberInfo))
@@ -208,9 +215,52 @@ class MySqlRoundTripIntegrationTest {
         });
     }
 
+    private void alignBenefitOrderProtocolSchema() {
+        jdbcTemplate.execute((Connection connection) -> {
+            DatabaseMetaData metaData = connection.getMetaData();
+            if (!hasTable(metaData, "member_payment_protocol")) {
+                jdbcTemplate.execute("""
+                        CREATE TABLE member_payment_protocol (
+                            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                            member_id VARCHAR(64) NOT NULL,
+                            external_user_id VARCHAR(64) NOT NULL,
+                            provider_code VARCHAR(64) NOT NULL,
+                            protocol_no VARCHAR(128) NOT NULL,
+                            protocol_status VARCHAR(32) NOT NULL,
+                            sign_request_no VARCHAR(64) NULL,
+                            channel_code VARCHAR(64) NULL,
+                            signed_ts TIMESTAMP NULL,
+                            expired_ts TIMESTAMP NULL,
+                            last_verified_ts TIMESTAMP NULL,
+                            created_ts TIMESTAMP NOT NULL,
+                            updated_ts TIMESTAMP NOT NULL
+                        )
+                        """);
+            }
+            if (!hasColumn(metaData, "benefit_order", "pay_protocol_no_snapshot")) {
+                jdbcTemplate.execute("ALTER TABLE benefit_order ADD COLUMN pay_protocol_no_snapshot VARCHAR(128) NULL");
+            }
+            if (!hasColumn(metaData, "benefit_order", "pay_protocol_source")) {
+                jdbcTemplate.execute("ALTER TABLE benefit_order ADD COLUMN pay_protocol_source VARCHAR(32) NULL");
+            }
+            if (!hasUniqueIndex(metaData, "member_payment_protocol", "protocol_no")) {
+                jdbcTemplate.execute(
+                        "CREATE UNIQUE INDEX uk_provider_protocol_no ON member_payment_protocol (provider_code, protocol_no)"
+                );
+            }
+            return null;
+        });
+    }
+
     private boolean hasColumn(DatabaseMetaData metaData, String tableName, String columnName) throws SQLException {
         try (ResultSet columns = metaData.getColumns(null, null, tableName, columnName)) {
             return columns.next();
+        }
+    }
+
+    private boolean hasTable(DatabaseMetaData metaData, String tableName) throws SQLException {
+        try (ResultSet tables = metaData.getTables(null, null, tableName, null)) {
+            return tables.next();
         }
     }
 
@@ -243,6 +293,8 @@ class MySqlRoundTripIntegrationTest {
 
         benefitOrderRepository.delete(Wrappers.<BenefitOrder>lambdaQuery()
                 .likeRight(BenefitOrder::getExternalUserId, EXTERNAL_USER_PREFIX));
+        memberPaymentProtocolRepository.delete(Wrappers.<MemberPaymentProtocol>lambdaQuery()
+                .likeRight(MemberPaymentProtocol::getExternalUserId, EXTERNAL_USER_PREFIX));
         memberChannelRepository.delete(Wrappers.<MemberChannel>lambdaQuery()
                 .likeRight(MemberChannel::getExternalUserId, EXTERNAL_USER_PREFIX));
         memberInfoRepository.delete(Wrappers.<MemberInfo>lambdaQuery()
@@ -251,5 +303,20 @@ class MySqlRoundTripIntegrationTest {
                 .likeRight(IdempotencyRecord::getRequestId, REQUEST_ID_PREFIX));
         benefitProductRepository.delete(Wrappers.<BenefitProduct>lambdaQuery()
                 .likeRight(BenefitProduct::getProductCode, PRODUCT_CODE_PREFIX));
+    }
+
+    private void createActiveProtocol(String memberId, String externalUserId) {
+        MemberPaymentProtocol protocol = new MemberPaymentProtocol();
+        protocol.setMemberId(memberId);
+        protocol.setExternalUserId(externalUserId);
+        protocol.setProviderCode("ALLINPAY");
+        protocol.setProtocolNo("AIP-MYSQL-" + memberId);
+        protocol.setProtocolStatus("ACTIVE");
+        protocol.setChannelCode("KJ");
+        protocol.setSignedTs(LocalDateTime.now());
+        protocol.setLastVerifiedTs(LocalDateTime.now());
+        protocol.setCreatedTs(LocalDateTime.now());
+        protocol.setUpdatedTs(LocalDateTime.now());
+        memberPaymentProtocolRepository.insert(protocol);
     }
 }

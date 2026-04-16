@@ -13,4 +13,10 @@ public interface MemberInfoRepository extends BaseMapper<MemberInfo> {
                 .eq(MemberInfo::getTechPlatformUserId, techPlatformUserId)
                 .last("limit 1"));
     }
+
+    default MemberInfo selectByExternalUserId(String externalUserId) {
+        return selectOne(Wrappers.<MemberInfo>lambdaQuery()
+                .eq(MemberInfo::getExternalUserId, externalUserId)
+                .last("limit 1"));
+    }
 }

@@ -6,7 +6,6 @@ import com.nexusfin.equity.dto.response.BenefitOrderStatusResponse;
 import com.nexusfin.equity.dto.response.CreateBenefitOrderResponse;
 import com.nexusfin.equity.dto.response.ExerciseUrlResponse;
 import com.nexusfin.equity.dto.response.ProductPageResponse;
-import com.nexusfin.equity.config.QwProperties;
 import com.nexusfin.equity.entity.BenefitOrder;
 import com.nexusfin.equity.entity.BenefitProduct;
 import com.nexusfin.equity.entity.MemberChannel;
@@ -21,6 +20,7 @@ import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.AgreementService;
 import com.nexusfin.equity.service.BenefitOrderService;
 import com.nexusfin.equity.service.IdempotencyService;
+import com.nexusfin.equity.service.PaymentProtocolService;
 import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
 import com.nexusfin.equity.thirdparty.qw.QwExerciseUrlRequest;
 import com.nexusfin.equity.thirdparty.qw.QwExerciseUrlResponse;
@@ -47,9 +47,9 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
     private final MemberChannelRepository memberChannelRepository;
     private final AgreementService agreementService;
     private final IdempotencyService idempotencyService;
+    private final PaymentProtocolService paymentProtocolService;
     private final SensitiveDataCipher sensitiveDataCipher;
     private final QwBenefitClient qwBenefitClient;
-    private final QwProperties qwProperties;
 
     public BenefitOrderServiceImpl(
             BenefitProductRepository benefitProductRepository,
@@ -58,9 +58,9 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
             MemberChannelRepository memberChannelRepository,
             AgreementService agreementService,
             IdempotencyService idempotencyService,
+            PaymentProtocolService paymentProtocolService,
             SensitiveDataCipher sensitiveDataCipher,
-            QwBenefitClient qwBenefitClient,
-            QwProperties qwProperties
+            QwBenefitClient qwBenefitClient
     ) {
         this.benefitProductRepository = benefitProductRepository;
         this.benefitOrderRepository = benefitOrderRepository;
@@ -68,9 +68,9 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         this.memberChannelRepository = memberChannelRepository;
         this.agreementService = agreementService;
         this.idempotencyService = idempotencyService;
+        this.paymentProtocolService = paymentProtocolService;
         this.sensitiveDataCipher = sensitiveDataCipher;
         this.qwBenefitClient = qwBenefitClient;
-        this.qwProperties = qwProperties;
     }
 
     @Override
@@ -137,6 +137,10 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         benefitOrder.setGrantStatus("PENDING");
         benefitOrder.setSyncStatus(BenefitOrderStatusEnum.SYNC_PENDING.name());
         benefitOrder.setRequestId(request.requestId());
+        PaymentProtocolService.ResolvedPaymentProtocol resolvedPaymentProtocol =
+                paymentProtocolService.resolveForBenefitOrder(benefitOrder);
+        benefitOrder.setPayProtocolNoSnapshot(resolvedPaymentProtocol.protocolNo());
+        benefitOrder.setPayProtocolSource(resolvedPaymentProtocol.source());
         benefitOrder.setCreatedTs(LocalDateTime.now());
         benefitOrder.setUpdatedTs(LocalDateTime.now());
         benefitOrderRepository.insert(benefitOrder);
@@ -201,9 +205,6 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
     private QwMemberSyncRequest buildQwMemberSyncRequest(BenefitOrder order, BenefitProduct product, MemberInfo memberInfo) {
         String realName = sensitiveDataCipher.decrypt(memberInfo.getRealNameEncrypted());
         String mobile = memberInfo.getMobileEncrypted() == null ? null : sensitiveDataCipher.decrypt(memberInfo.getMobileEncrypted());
-        String payProtocolNo = order.getAgreementNo() == null || order.getAgreementNo().isBlank()
-                ? qwProperties.getDefaultPayProtocolPrefix() + order.getBenefitOrderNo()
-                : order.getAgreementNo();
         return new QwMemberSyncRequest(
                 order.getExternalUserId(),
                 order.getBenefitOrderNo(),
@@ -212,7 +213,7 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
                 product.getProductName(),
                 mobile,
                 realName,
-                payProtocolNo,
+                order.getPayProtocolNoSnapshot(),
                 null,
                 0,
                 null,

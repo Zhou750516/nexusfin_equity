@@ -17,6 +17,7 @@ import com.nexusfin.equity.service.impl.BenefitOrderServiceImpl;
 import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
 import com.nexusfin.equity.thirdparty.qw.QwExerciseUrlResponse;
 import com.nexusfin.equity.thirdparty.qw.QwMemberSyncResponse;
+import com.nexusfin.equity.thirdparty.qw.QwMemberSyncRequest;
 import com.nexusfin.equity.util.SensitiveDataCipher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -61,6 +62,9 @@ class BenefitOrderServiceTest {
     @Mock
     private QwProperties qwProperties;
 
+    @Mock
+    private PaymentProtocolService paymentProtocolService;
+
     @InjectMocks
     private BenefitOrderServiceImpl benefitOrderService;
 
@@ -88,6 +92,7 @@ class BenefitOrderServiceTest {
     void shouldCreateOrderAndEnsureAgreementArtifacts() {
         BenefitProduct product = new BenefitProduct();
         product.setProductCode("P-2");
+        product.setProductName("权益产品");
         product.setStatus("ACTIVE");
         MemberInfo memberInfo = new MemberInfo();
         memberInfo.setMemberId("mem-2");
@@ -102,6 +107,8 @@ class BenefitOrderServiceTest {
         when(idempotencyService.isProcessed("req-order-1")).thenReturn(false);
         when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
         when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("张三");
+        when(paymentProtocolService.resolveForBenefitOrder(any(BenefitOrder.class)))
+                .thenReturn(new PaymentProtocolService.ResolvedPaymentProtocol("AIP-REAL-001", "ALLINPAY"));
         when(qwBenefitClient.syncMemberOrder(any())).thenReturn(new QwMemberSyncResponse(
                 "qw-order-1", "card-1", "1710000000000", 0, "P-2", "权益产品", "independence",
                 "2026-03-26 12:00:00", "2027-03-26 12:00:00"
@@ -113,15 +120,59 @@ class BenefitOrderServiceTest {
         );
 
         ArgumentCaptor<BenefitOrder> captor = ArgumentCaptor.forClass(BenefitOrder.class);
+        ArgumentCaptor<QwMemberSyncRequest> syncRequestCaptor = ArgumentCaptor.forClass(QwMemberSyncRequest.class);
         verify(benefitOrderRepository).insert(captor.capture());
         verify(agreementService).ensureAgreementArtifacts(captor.getValue());
+        verify(qwBenefitClient).syncMemberOrder(syncRequestCaptor.capture());
 
         assertThat(response.orderStatus()).isEqualTo("FIRST_DEDUCT_PENDING");
         assertThat(captor.getValue().getProductCode()).isEqualTo("P-2");
         assertThat(captor.getValue().getMemberId()).isEqualTo("mem-2");
         assertThat(captor.getValue().getRequestId()).isEqualTo("req-order-1");
-        verify(qwBenefitClient).syncMemberOrder(any());
+        assertThat(captor.getValue().getPayProtocolNoSnapshot()).isEqualTo("AIP-REAL-001");
+        assertThat(captor.getValue().getPayProtocolSource()).isEqualTo("ALLINPAY");
+        assertThat(syncRequestCaptor.getValue().payProtocolNo()).isEqualTo("AIP-REAL-001");
         verify(idempotencyService).markProcessed("req-order-1", "CREATE_ORDER", captor.getValue().getBenefitOrderNo(), "FIRST_DEDUCT_PENDING");
+    }
+
+    @Test
+    void shouldUseResolvedTestOverrideProtocolForQwSync() {
+        BenefitProduct product = new BenefitProduct();
+        product.setProductCode("P-2");
+        product.setProductName("权益产品");
+        product.setStatus("ACTIVE");
+        MemberInfo memberInfo = new MemberInfo();
+        memberInfo.setMemberId("mem-2");
+        memberInfo.setMobileEncrypted("mobile-cipher");
+        memberInfo.setRealNameEncrypted("name-cipher");
+        MemberChannel memberChannel = new MemberChannel();
+        memberChannel.setChannelCode("KJ");
+        memberChannel.setExternalUserId("user-2");
+        when(benefitProductRepository.selectById("P-2")).thenReturn(product);
+        when(memberInfoRepository.selectById("mem-2")).thenReturn(memberInfo);
+        when(memberChannelRepository.selectOne(any())).thenReturn(memberChannel);
+        when(idempotencyService.isProcessed("req-order-override")).thenReturn(false);
+        when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
+        when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("张三");
+        when(paymentProtocolService.resolveForBenefitOrder(any(BenefitOrder.class)))
+                .thenReturn(new PaymentProtocolService.ResolvedPaymentProtocol("AIP211926033187CF73483", "TEST_OVERRIDE"));
+        when(qwBenefitClient.syncMemberOrder(any())).thenReturn(new QwMemberSyncResponse(
+                "qw-order-1", "card-1", "1710000000000", 0, "P-2", "权益产品", "independence",
+                "2026-03-26 12:00:00", "2027-03-26 12:00:00"
+        ));
+
+        benefitOrderService.createOrder(
+                "mem-2",
+                new CreateBenefitOrderRequest("req-order-override", "P-2", 680000L, true)
+        );
+
+        ArgumentCaptor<BenefitOrder> orderCaptor = ArgumentCaptor.forClass(BenefitOrder.class);
+        ArgumentCaptor<QwMemberSyncRequest> requestCaptor = ArgumentCaptor.forClass(QwMemberSyncRequest.class);
+        verify(benefitOrderRepository).insert(orderCaptor.capture());
+        verify(qwBenefitClient).syncMemberOrder(requestCaptor.capture());
+        assertThat(orderCaptor.getValue().getPayProtocolNoSnapshot()).isEqualTo("AIP211926033187CF73483");
+        assertThat(orderCaptor.getValue().getPayProtocolSource()).isEqualTo("TEST_OVERRIDE");
+        assertThat(requestCaptor.getValue().payProtocolNo()).isEqualTo("AIP211926033187CF73483");
     }
 
     @Test

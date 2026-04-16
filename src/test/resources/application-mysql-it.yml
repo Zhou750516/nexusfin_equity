@@ -33,16 +33,23 @@ nexusfin:
       mode: MOCK
       base-url: https://t-api.test.qweimobile.com
       method-path: /api/abs/method
-      partner-no: test-partner
+      partner-no: abs
       version: v1.0
       sign-key: test-sign-key
       connect-timeout-ms: 2000
       read-timeout-ms: 3000
+      aes-key: 0123456789abcdef
       aes-key-base64: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
-      aes-algorithm: AES/GCM/NoPadding
+      aes-key-encoding: RAW
+      aes-algorithm: AES/ECB/PKCS5Padding
+      ciphertext-encoding: HEX
       gcm-tag-bits: 128
       iv-length-bytes: 12
       default-pay-protocol-prefix: proto-
+      # MySQL IT 默认走真实协议号种子，不使用 override。
+      member-sync-pay-protocol-no-override:
+      allow-member-sync-pay-protocol-no-override: false
+      member-sync-pay-protocol-no-override-allowed-profiles: test,mysql-it,local
       mock-exercise-base-url: https://mock-qw.test/exercise
       direct:
         base-url: https://tlt-test.allinpay.com
