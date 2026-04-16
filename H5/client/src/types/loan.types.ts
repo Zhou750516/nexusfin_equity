@@ -184,3 +184,21 @@ export interface LoginParams {
 export interface LoginResult {
   token: string;
 }
+
+export type JointLoginScene = "push" | "exercise" | "refund";
+
+export interface JointLoginParams {
+  token: string;
+  scene: JointLoginScene;
+  orderNo?: string;
+  benefitOrderNo?: string;
+  productCode?: string;
+}
+
+export interface JointLoginResult {
+  loginSuccess: boolean;
+  scene: string;
+  targetPage: "joint-dispatch" | "joint-refund-entry" | "joint-unsupported";
+  benefitOrderNo: string | null;
+  localUserReady: boolean;
+}

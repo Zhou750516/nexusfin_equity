@@ -187,3 +187,57 @@ export function getBenefitsTips(locale: Locale) {
 export function getRepaymentSuccessTips(locale: Locale) {
   return repaymentSuccessTips[locale];
 }
+
+const jointDispatchTips: Record<Locale, string[]> = {
+  "zh-CN": [
+    "当前已完成联合登录入口校验，后续可按场景继续分发到供应商页面。",
+    "如需正式跳转齐为供应商页面，仍需补齐真实跳转地址与参数口径。",
+    "当前页面先作为分发页占位，用于联调登录态与场景恢复。",
+  ],
+  "zh-TW": [
+    "目前已完成聯合登入入口校驗，後續可按場景繼續分發到供應商頁面。",
+    "如需正式跳轉齊為供應商頁面，仍需補齊真實跳轉地址與參數口徑。",
+    "目前頁面先作為分發頁佔位，用於聯調登入態與場景恢復。",
+  ],
+  "en-US": [
+    "Joint login entry validation has completed and this page now acts as the dispatch placeholder.",
+    "A real supplier redirect still requires the final QW target URL and parameter contract.",
+    "Use this page to verify login state and scene recovery during integration.",
+  ],
+  "vi-VN": [
+    "Bước kiểm tra đầu vào đăng nhập liên hợp đã hoàn tất và trang này đóng vai trò trang phân phát tạm thời.",
+    "Để chuyển hướng thực tới nhà cung cấp, vẫn cần URL và hợp đồng tham số cuối cùng từ QW.",
+    "Hãy dùng trang này để kiểm tra trạng thái đăng nhập và khôi phục ngữ cảnh khi liên kết thử nghiệm.",
+  ],
+};
+
+const jointRefundNotes: Record<Locale, string[]> = {
+  "zh-CN": [
+    "当前页面仅作为退款入口承接页，占位验证联合登录与场景识别。",
+    "退款申请、退款结果查询与退款进度展示，待外部文档明确后继续扩展。",
+    "如后续需支持正式退款流程，应补齐接口、状态流转和异常页设计。",
+  ],
+  "zh-TW": [
+    "目前頁面僅作為退款入口承接頁，用於驗證聯合登入與場景識別。",
+    "退款申請、退款結果查詢與退款進度展示，待外部文件明確後再繼續擴展。",
+    "如後續需支援正式退款流程，應補齊介面、狀態流轉與異常頁設計。",
+  ],
+  "en-US": [
+    "This page currently serves as the refund-entry placeholder for joint-login verification.",
+    "Refund application, result query, and progress display will be extended after the external contract is finalized.",
+    "A production refund flow will still need APIs, status transitions, and dedicated exception handling.",
+  ],
+  "vi-VN": [
+    "Trang này hiện chỉ đóng vai trò trang tiếp nhận đầu vào hoàn tiền để kiểm tra đăng nhập liên hợp.",
+    "Yêu cầu hoàn tiền, tra cứu kết quả và hiển thị tiến độ sẽ được mở rộng sau khi hợp đồng bên ngoài được chốt.",
+    "Quy trình hoàn tiền chính thức vẫn cần API, luồng trạng thái và thiết kế trang lỗi riêng.",
+  ],
+};
+
+export function getJointDispatchTips(locale: Locale) {
+  return jointDispatchTips[locale];
+}
+
+export function getJointRefundNotes(locale: Locale) {
+  return jointRefundNotes[locale];
+}

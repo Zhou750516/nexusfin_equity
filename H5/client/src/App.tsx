@@ -11,11 +11,17 @@ import ApprovalResultPage from "./pages/ApprovalResultPage";
 import BenefitsCardPage from "./pages/BenefitsCardPage";
 import CalculatorPage from "./pages/CalculatorPage";
 import ConfirmRepaymentPage from "./pages/ConfirmRepaymentPage";
+import JointDispatchPage from "./pages/JointDispatchPage";
+import JointEntryPage from "./pages/JointEntryPage";
+import JointRefundEntryPage from "./pages/JointRefundEntryPage";
 import RepaymentSuccessPage from "./pages/RepaymentSuccessPage";
 
 function Router() {
   return (
     <Switch>
+      <Route path={"/joint-entry"} component={JointEntryPage} />
+      <Route path={"/joint-dispatch"} component={JointDispatchPage} />
+      <Route path={"/joint-refund-entry"} component={JointRefundEntryPage} />
       <Route path={"/"} component={CalculatorPage} />
       <Route path={"/approval-pending"} component={ApprovalPendingPage} />
       <Route path={"/benefits-card"} component={BenefitsCardPage} />
