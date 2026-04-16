@@ -7,6 +7,7 @@ import com.nexusfin.equity.entity.MemberPaymentProtocol;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.service.ReconciliationService;
 import com.nexusfin.equity.service.TechPlatformUserClient;
+import com.nexusfin.equity.service.XiaohuaAuthClient;
 import com.nexusfin.equity.util.SignatureUtil;
 import java.time.LocalDateTime;
 import java.time.Instant;
@@ -48,6 +49,9 @@ class NexusfinEquityApplicationTests {
 
     @MockBean
     private TechPlatformUserClient techPlatformUserClient;
+
+    @MockBean
+    private XiaohuaAuthClient xiaohuaAuthClient;
 
     @Test
     void shouldCompleteQuickstartSmokeFlow() throws Exception {
@@ -125,6 +129,41 @@ class NexusfinEquityApplicationTests {
         assertThat(reconciliationService.queryOrdersByMemberId(memberId)).hasSize(1);
         assertThat(reconciliationService.queryByRequestId(grantRequestId)).hasSize(1);
         assertThat(reconciliationService.queryByBenefitOrderNo(benefitOrderNo)).hasSize(1);
+    }
+
+    @Test
+    void shouldCompleteJointLoginSmokeFlow() throws Exception {
+        when(xiaohuaAuthClient.exchange("joint-token-quickstart")).thenReturn(
+                new XiaohuaAuthClient.JointIdentity(
+                        "xh-quickstart-001",
+                        "13800138001",
+                        "王五",
+                        "310101199001011112",
+                        "KJ"
+                )
+        );
+
+        MvcResult loginResult = mockMvc.perform(post("/api/auth/joint-login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "token": "joint-token-quickstart",
+                                  "scene": "push",
+                                  "benefitOrderNo": "BEN-SMOKE-001"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.targetPage").value("joint-dispatch"))
+                .andReturn();
+
+        jakarta.servlet.http.Cookie authCookie = loginResult.getResponse().getCookie("NEXUSFIN_AUTH");
+        assertThat(authCookie).isNotNull();
+
+        mockMvc.perform(get("/api/users/me").cookie(authCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.techPlatformUserId").value("xh-quickstart-001"));
     }
 
     private HttpHeaders signatureHeaders(String nonce) {
