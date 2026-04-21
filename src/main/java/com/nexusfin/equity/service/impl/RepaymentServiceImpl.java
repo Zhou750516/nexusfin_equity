@@ -9,6 +9,7 @@ import com.nexusfin.equity.dto.response.RepaymentInfoResponse;
 import com.nexusfin.equity.dto.response.RepaymentResultResponse;
 import com.nexusfin.equity.dto.response.RepaymentSubmitResponse;
 import com.nexusfin.equity.exception.BizException;
+import com.nexusfin.equity.util.TraceIdUtil;
 import com.nexusfin.equity.service.H5I18nService;
 import com.nexusfin.equity.service.RepaymentService;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
@@ -16,11 +17,14 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class RepaymentServiceImpl implements RepaymentService {
 
+    private static final Logger log = LoggerFactory.getLogger(RepaymentServiceImpl.class);
     private static final BigDecimal CENTS_PER_YUAN = BigDecimal.valueOf(100L);
     private static final String DEFAULT_REPAY_TYPE = "EARLY";
 
@@ -50,7 +54,32 @@ public class RepaymentServiceImpl implements RepaymentService {
                 loanId,
                 new RepayTrialForwardData(uid, loanId, DEFAULT_REPAY_TYPE, List.of())
         );
-        JsonNode data = requireSuccessfulYunkaData(yunkaGatewayClient.proxy(gatewayRequest));
+        long startNanos = System.nanoTime();
+        log.info("traceId={} bizOrderNo={} requestId={} path={} repayment info yunka request begin",
+                TraceIdUtil.getTraceId(),
+                loanId,
+                requestId,
+                gatewayRequest.path());
+        JsonNode data;
+        try {
+            data = requireSuccessfulYunkaData(yunkaGatewayClient.proxy(gatewayRequest));
+        } catch (BizException exception) {
+            log.warn("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} errorNo={} errorMsg={}",
+                    TraceIdUtil.getTraceId(),
+                    loanId,
+                    requestId,
+                    gatewayRequest.path(),
+                    elapsedMs(startNanos),
+                    exception.getErrorNo(),
+                    exception.getErrorMsg());
+            throw exception;
+        }
+        log.info("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} repayment info yunka request success",
+                TraceIdUtil.getTraceId(),
+                loanId,
+                requestId,
+                gatewayRequest.path(),
+                elapsedMs(startNanos));
         return new RepaymentInfoResponse(
                 loanId,
                 centsToYuan(data.path("repayAmount").asLong()),
@@ -79,7 +108,32 @@ public class RepaymentServiceImpl implements RepaymentService {
                         yuanToCent(request.amount())
                 )
         );
-        JsonNode data = requireSuccessfulYunkaData(yunkaGatewayClient.proxy(gatewayRequest));
+        long startNanos = System.nanoTime();
+        log.info("traceId={} bizOrderNo={} requestId={} path={} repayment submit yunka request begin",
+                TraceIdUtil.getTraceId(),
+                request.loanId(),
+                requestId,
+                gatewayRequest.path());
+        JsonNode data;
+        try {
+            data = requireSuccessfulYunkaData(yunkaGatewayClient.proxy(gatewayRequest));
+        } catch (BizException exception) {
+            log.warn("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} errorNo={} errorMsg={}",
+                    TraceIdUtil.getTraceId(),
+                    request.loanId(),
+                    requestId,
+                    gatewayRequest.path(),
+                    elapsedMs(startNanos),
+                    exception.getErrorNo(),
+                    exception.getErrorMsg());
+            throw exception;
+        }
+        log.info("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} repayment submit yunka request success",
+                TraceIdUtil.getTraceId(),
+                request.loanId(),
+                requestId,
+                gatewayRequest.path(),
+                elapsedMs(startNanos));
         String swiftNumber = data.path("swiftNumber").asText();
         return new RepaymentSubmitResponse(
                 swiftNumber,
@@ -97,7 +151,32 @@ public class RepaymentServiceImpl implements RepaymentService {
                 repaymentId,
                 new RepayQueryForwardData(uid, repaymentId)
         );
-        JsonNode data = requireSuccessfulYunkaData(yunkaGatewayClient.proxy(gatewayRequest));
+        long startNanos = System.nanoTime();
+        log.info("traceId={} bizOrderNo={} requestId={} path={} repayment result yunka request begin",
+                TraceIdUtil.getTraceId(),
+                repaymentId,
+                requestId,
+                gatewayRequest.path());
+        JsonNode data;
+        try {
+            data = requireSuccessfulYunkaData(yunkaGatewayClient.proxy(gatewayRequest));
+        } catch (BizException exception) {
+            log.warn("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} errorNo={} errorMsg={}",
+                    TraceIdUtil.getTraceId(),
+                    repaymentId,
+                    requestId,
+                    gatewayRequest.path(),
+                    elapsedMs(startNanos),
+                    exception.getErrorNo(),
+                    exception.getErrorMsg());
+            throw exception;
+        }
+        log.info("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} repayment result yunka request success",
+                TraceIdUtil.getTraceId(),
+                repaymentId,
+                requestId,
+                gatewayRequest.path(),
+                elapsedMs(startNanos));
         return new RepaymentResultResponse(
                 repaymentId,
                 mapResultStatus(data.path("status").asText()),
@@ -171,6 +250,10 @@ public class RepaymentServiceImpl implements RepaymentService {
 
     private static BigDecimal centsToYuan(long cents) {
         return BigDecimal.valueOf(cents).divide(CENTS_PER_YUAN, 2, RoundingMode.UNNECESSARY);
+    }
+
+    private static long elapsedMs(long startNanos) {
+        return java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
     }
 
     private record RepayTrialForwardData(

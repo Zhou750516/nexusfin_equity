@@ -1,6 +1,7 @@
 package com.nexusfin.equity.service.impl;
 
 import com.nexusfin.equity.entity.BenefitStatusPushLog;
+import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.repository.BenefitStatusPushLogRepository;
 import com.nexusfin.equity.service.BenefitStatusPushService;
 import com.nexusfin.equity.service.TechPlatformBenefitStatusClient;
@@ -47,27 +48,41 @@ public class BenefitStatusPushServiceImpl implements BenefitStatusPushService {
         log.info("traceId={} bizOrderNo={} benefit status push requested eventType={}",
                 TraceIdUtil.getTraceId(), command.benefitOrderNo(), command.eventType());
 
-        techPlatformBenefitStatusClient.push(new TechPlatformBenefitStatusClient.BenefitStatusPushPayload(
-                eventId,
-                command.benefitOrderNo(),
-                command.eventType(),
-                command.statusAfter(),
-                command.externalUserId(),
-                command.statusBefore()
-        ));
+        try {
+            techPlatformBenefitStatusClient.push(new TechPlatformBenefitStatusClient.BenefitStatusPushPayload(
+                    eventId,
+                    command.benefitOrderNo(),
+                    command.eventType(),
+                    command.statusAfter(),
+                    command.externalUserId(),
+                    command.statusBefore()
+            ));
 
-        BenefitStatusPushLog successLog = new BenefitStatusPushLog();
-        successLog.setEventId(eventId);
-        successLog.setBenefitOrderNo(command.benefitOrderNo());
-        successLog.setEventType(command.eventType());
-        successLog.setStatusBefore(command.statusBefore());
-        successLog.setStatusAfter(command.statusAfter());
-        successLog.setPushStatus("SUCCESS");
-        successLog.setRetryCount(0);
-        successLog.setRequestPayload(command.eventType() + ":" + command.statusAfter());
-        successLog.setResponsePayload("accepted");
-        successLog.setCreatedTs(now);
-        successLog.setUpdatedTs(LocalDateTime.now());
-        benefitStatusPushLogRepository.updateById(successLog);
+            BenefitStatusPushLog successLog = buildUpdateLog(command, eventId, now);
+            successLog.setPushStatus("SUCCESS");
+            successLog.setResponsePayload("accepted");
+            successLog.setUpdatedTs(LocalDateTime.now());
+            benefitStatusPushLogRepository.updateById(successLog);
+        } catch (BizException exception) {
+            BenefitStatusPushLog failedLog = buildUpdateLog(command, eventId, now);
+            failedLog.setPushStatus("FAIL");
+            failedLog.setErrorMessage(exception.getMessage());
+            failedLog.setUpdatedTs(LocalDateTime.now());
+            benefitStatusPushLogRepository.updateById(failedLog);
+            throw exception;
+        }
+    }
+
+    private BenefitStatusPushLog buildUpdateLog(BenefitStatusPushCommand command, String eventId, LocalDateTime now) {
+        BenefitStatusPushLog pushLog = new BenefitStatusPushLog();
+        pushLog.setEventId(eventId);
+        pushLog.setBenefitOrderNo(command.benefitOrderNo());
+        pushLog.setEventType(command.eventType());
+        pushLog.setStatusBefore(command.statusBefore());
+        pushLog.setStatusAfter(command.statusAfter());
+        pushLog.setRetryCount(0);
+        pushLog.setRequestPayload(command.eventType() + ":" + command.statusAfter());
+        pushLog.setCreatedTs(now);
+        return pushLog;
     }
 }

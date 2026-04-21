@@ -8,7 +8,9 @@ import com.nexusfin.equity.entity.BenefitOrder;
 import com.nexusfin.equity.entity.BenefitProduct;
 import com.nexusfin.equity.entity.MemberChannel;
 import com.nexusfin.equity.entity.MemberInfo;
+import com.nexusfin.equity.enums.BenefitOrderStatusEnum;
 import com.nexusfin.equity.exception.BizException;
+import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.repository.BenefitProductRepository;
 import com.nexusfin.equity.repository.MemberChannelRepository;
@@ -31,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class BenefitOrderServiceTest {
@@ -64,6 +67,9 @@ class BenefitOrderServiceTest {
 
     @Mock
     private PaymentProtocolService paymentProtocolService;
+
+    @Mock
+    private AsyncCompensationEnqueueService asyncCompensationEnqueueService;
 
     @InjectMocks
     private BenefitOrderServiceImpl benefitOrderService;
@@ -196,6 +202,25 @@ class BenefitOrderServiceTest {
     }
 
     @Test
+    void shouldReplayExistingOrderWhenRequestIdExistsButIdempotencyRecordMissing() {
+        BenefitOrder existingOrder = new BenefitOrder();
+        existingOrder.setBenefitOrderNo("ord-timeout-existing");
+        existingOrder.setOrderStatus("FIRST_DEDUCT_PENDING");
+        existingOrder.setSyncStatus(BenefitOrderStatusEnum.SYNC_FAIL.name());
+        when(benefitOrderRepository.selectOne(any())).thenReturn(existingOrder);
+
+        CreateBenefitOrderResponse response = benefitOrderService.createOrder(
+                "mem-2",
+                new CreateBenefitOrderRequest("req-order-timeout-retry", "P-2", 680000L, true)
+        );
+
+        assertThat(response.benefitOrderNo()).isEqualTo("ord-timeout-existing");
+        assertThat(response.orderStatus()).isEqualTo("FIRST_DEDUCT_PENDING");
+        verify(benefitOrderRepository, never()).insert(any());
+        verify(qwBenefitClient, never()).syncMemberOrder(any());
+    }
+
+    @Test
     void shouldRejectOrderCreationWhenProductMissing() {
         when(benefitProductRepository.selectById("P-3")).thenReturn(null);
         when(idempotencyService.isProcessed("req-order-3")).thenReturn(false);
@@ -225,5 +250,38 @@ class BenefitOrderServiceTest {
 
         assertThat(response.exerciseUrl()).contains("partnerOrderNo=ord-ex-1");
         assertThat(response.expireTime()).isEqualTo("2027-03-26 12:00:00");
+    }
+
+    @Test
+    void shouldEnqueueCompensationWhenQwMemberSyncTimesOut() {
+        BenefitProduct product = new BenefitProduct();
+        product.setProductCode("P-4");
+        product.setProductName("权益产品");
+        product.setStatus("ACTIVE");
+        MemberInfo memberInfo = new MemberInfo();
+        memberInfo.setMemberId("mem-4");
+        memberInfo.setMobileEncrypted("mobile-cipher");
+        memberInfo.setRealNameEncrypted("name-cipher");
+        MemberChannel memberChannel = new MemberChannel();
+        memberChannel.setChannelCode("KJ");
+        memberChannel.setExternalUserId("user-4");
+        when(benefitProductRepository.selectById("P-4")).thenReturn(product);
+        when(memberInfoRepository.selectById("mem-4")).thenReturn(memberInfo);
+        when(memberChannelRepository.selectOne(any())).thenReturn(memberChannel);
+        when(idempotencyService.isProcessed("req-order-timeout")).thenReturn(false);
+        when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
+        when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("张三");
+        when(paymentProtocolService.resolveForBenefitOrder(any(BenefitOrder.class)))
+                .thenReturn(new PaymentProtocolService.ResolvedPaymentProtocol("AIP-REAL-004", "ALLINPAY"));
+        when(qwBenefitClient.syncMemberOrder(any()))
+                .thenThrow(new UpstreamTimeoutException("QW member sync timeout"));
+
+        assertThatThrownBy(() -> benefitOrderService.createOrder(
+                "mem-4",
+                new CreateBenefitOrderRequest("req-order-timeout", "P-4", 680000L, true)
+        )).isInstanceOf(BizException.class)
+                .hasMessageContaining("QW_SYNC_TIMEOUT");
+
+        verify(asyncCompensationEnqueueService).enqueue(any());
     }
 }

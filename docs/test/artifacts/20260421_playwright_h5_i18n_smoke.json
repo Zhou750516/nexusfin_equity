@@ -1,0 +1,154 @@
+{
+  "startedAt": "2026-04-21T13:08:49.699Z",
+  "autoDetection": [
+    {
+      "locale": "zh-CN",
+      "state": {
+        "selectValue": "zh-CN",
+        "htmlLang": "zh-CN",
+        "storedLocale": "zh-CN"
+      },
+      "checks": {
+        "hasLanguageLabel": true,
+        "hasLoanAmount": true,
+        "hasBorrowDuration": true,
+        "hasSubmit": true,
+        "selectValueMatches": true,
+        "htmlLangMatches": true,
+        "storedLocaleMatches": true
+      }
+    },
+    {
+      "locale": "zh-TW",
+      "state": {
+        "selectValue": "zh-TW",
+        "htmlLang": "zh-TW",
+        "storedLocale": "zh-TW"
+      },
+      "checks": {
+        "hasLanguageLabel": true,
+        "hasLoanAmount": true,
+        "hasBorrowDuration": true,
+        "hasSubmit": true,
+        "selectValueMatches": true,
+        "htmlLangMatches": true,
+        "storedLocaleMatches": true
+      }
+    },
+    {
+      "locale": "en-US",
+      "state": {
+        "selectValue": "en-US",
+        "htmlLang": "en-US",
+        "storedLocale": "en-US"
+      },
+      "checks": {
+        "hasLanguageLabel": true,
+        "hasLoanAmount": true,
+        "hasBorrowDuration": true,
+        "hasSubmit": true,
+        "selectValueMatches": true,
+        "htmlLangMatches": true,
+        "storedLocaleMatches": true
+      }
+    },
+    {
+      "locale": "vi-VN",
+      "state": {
+        "selectValue": "vi-VN",
+        "htmlLang": "vi-VN",
+        "storedLocale": "vi-VN"
+      },
+      "checks": {
+        "hasLanguageLabel": true,
+        "hasLoanAmount": true,
+        "hasBorrowDuration": true,
+        "hasSubmit": true,
+        "selectValueMatches": true,
+        "htmlLangMatches": true,
+        "storedLocaleMatches": true
+      }
+    }
+  ],
+  "manualSwitching": [
+    {
+      "locale": "zh-CN",
+      "state": {
+        "selectValue": "zh-CN",
+        "htmlLang": "zh-CN",
+        "storedLocale": "zh-CN"
+      },
+      "checks": {
+        "hasLanguageLabel": true,
+        "hasLoanAmount": true,
+        "hasBorrowDuration": true,
+        "hasSubmit": true,
+        "selectValueMatches": true,
+        "htmlLangMatches": true,
+        "storedLocaleMatches": true
+      }
+    },
+    {
+      "locale": "zh-TW",
+      "state": {
+        "selectValue": "zh-TW",
+        "htmlLang": "zh-TW",
+        "storedLocale": "zh-TW"
+      },
+      "checks": {
+        "hasLanguageLabel": true,
+        "hasLoanAmount": true,
+        "hasBorrowDuration": true,
+        "hasSubmit": true,
+        "selectValueMatches": true,
+        "htmlLangMatches": true,
+        "storedLocaleMatches": true
+      }
+    },
+    {
+      "locale": "en-US",
+      "state": {
+        "selectValue": "en-US",
+        "htmlLang": "en-US",
+        "storedLocale": "en-US"
+      },
+      "checks": {
+        "hasLanguageLabel": true,
+        "hasLoanAmount": true,
+        "hasBorrowDuration": true,
+        "hasSubmit": true,
+        "selectValueMatches": true,
+        "htmlLangMatches": true,
+        "storedLocaleMatches": true
+      }
+    },
+    {
+      "locale": "vi-VN",
+      "state": {
+        "selectValue": "vi-VN",
+        "htmlLang": "vi-VN",
+        "storedLocale": "vi-VN"
+      },
+      "checks": {
+        "hasLanguageLabel": true,
+        "hasLoanAmount": true,
+        "hasBorrowDuration": true,
+        "hasSubmit": true,
+        "selectValueMatches": true,
+        "htmlLangMatches": true,
+        "storedLocaleMatches": true
+      }
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "requestFailures": [],
+  "summary": {
+    "autoDetectionPass": true,
+    "manualSwitchingPass": true,
+    "consoleErrorCount": 0,
+    "pageErrorCount": 0,
+    "requestFailureCount": 0
+  },
+  "finishedAt": "2026-04-21T13:09:10.956Z"
+}

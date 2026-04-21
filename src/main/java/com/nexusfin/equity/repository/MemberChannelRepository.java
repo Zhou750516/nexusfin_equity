@@ -14,4 +14,11 @@ public interface MemberChannelRepository extends BaseMapper<MemberChannel> {
                 .eq(MemberChannel::getExternalUserId, externalUserId)
                 .last("limit 1"));
     }
+
+    default MemberChannel selectLatestByMemberId(String memberId) {
+        return selectOne(Wrappers.<MemberChannel>lambdaQuery()
+                .eq(MemberChannel::getMemberId, memberId)
+                .orderByDesc(MemberChannel::getUpdatedTs)
+                .last("limit 1"));
+    }
 }

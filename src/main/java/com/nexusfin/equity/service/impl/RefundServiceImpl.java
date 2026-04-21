@@ -6,6 +6,7 @@ import com.nexusfin.equity.dto.response.RefundResultResponse;
 import com.nexusfin.equity.entity.BenefitOrder;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
+import com.nexusfin.equity.service.RefundClient;
 import com.nexusfin.equity.service.RefundService;
 import org.springframework.stereotype.Service;
 
@@ -13,9 +14,11 @@ import org.springframework.stereotype.Service;
 public class RefundServiceImpl implements RefundService {
 
     private final BenefitOrderRepository benefitOrderRepository;
+    private final RefundClient refundClient;
 
-    public RefundServiceImpl(BenefitOrderRepository benefitOrderRepository) {
+    public RefundServiceImpl(BenefitOrderRepository benefitOrderRepository, RefundClient refundClient) {
         this.benefitOrderRepository = benefitOrderRepository;
+        this.refundClient = refundClient;
     }
 
     @Override
@@ -45,19 +48,14 @@ public class RefundServiceImpl implements RefundService {
         if (benefitOrder == null) {
             throw new BizException("BENEFIT_ORDER_NOT_FOUND", "Benefit order does not exist");
         }
-        return new RefundApplyResponse(
-                "REFUND-" + benefitOrder.getBenefitOrderNo(),
-                "processing",
-                "refund submitted"
-        );
+        return refundClient.apply(new RefundClient.RefundApplyCommand(
+                benefitOrder.getBenefitOrderNo(),
+                reason
+        ));
     }
 
     @Override
     public RefundResultResponse getResult(String refundId) {
-        return new RefundResultResponse(
-                refundId,
-                "processing",
-                "refund still processing"
-        );
+        return refundClient.getResult(refundId);
     }
 }

@@ -10,6 +10,7 @@ import com.nexusfin.equity.entity.MemberChannel;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.entity.MemberPaymentProtocol;
 import com.nexusfin.equity.enums.MemberStatusEnum;
+import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.repository.BenefitProductRepository;
 import com.nexusfin.equity.repository.ContractArchiveRepository;
@@ -19,6 +20,7 @@ import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
+import com.nexusfin.equity.service.AsyncCompensationEnqueueService;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import com.nexusfin.equity.util.JwtUtil;
 import com.nexusfin.equity.util.SensitiveDataCipher;
@@ -27,11 +29,14 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -44,6 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ExtendWith(OutputCaptureExtension.class)
 class Phase9TaskGroupEIntegrationTest {
 
     @Autowired
@@ -88,6 +94,9 @@ class Phase9TaskGroupEIntegrationTest {
     @MockBean
     private YunkaGatewayClient yunkaGatewayClient;
 
+    @MockBean
+    private AsyncCompensationEnqueueService asyncCompensationEnqueueService;
+
     @BeforeEach
     void setUp() {
         contractArchiveRepository.delete(null);
@@ -102,7 +111,7 @@ class Phase9TaskGroupEIntegrationTest {
     }
 
     @Test
-    void shouldCreateBenefitsThenForwardLoanApplyAndSaveApplicationMapping() throws Exception {
+    void shouldCreateBenefitsThenForwardLoanApplyAndSaveApplicationMapping(CapturedOutput output) throws Exception {
         MemberInfo memberInfo = createReadyMember("mem-loan-apply", "user-loan-apply");
         createProduct("HUXUAN_CARD");
         JsonNode yunkaData = objectMapper.readTree("""
@@ -160,6 +169,10 @@ class Phase9TaskGroupEIntegrationTest {
         assertThat(data.get("loanAmount").asLong()).isEqualTo(300000L);
         assertThat(data.get("loanPeriod").asInt()).isEqualTo(3);
         assertThat(data.get("bankCardNo").asText()).isEqualTo("acc_001");
+        assertThat(output).contains("loan apply yunka request begin");
+        assertThat(output).contains("loan apply yunka request success");
+        assertThat(output).contains("path=/loan/apply");
+        assertThat(output).contains("bizOrderNo=");
     }
 
     @Test
@@ -192,6 +205,39 @@ class Phase9TaskGroupEIntegrationTest {
                 .last("limit 1"));
         assertThat(benefitOrder).isNotNull();
         assertThat(loanApplicationMappingRepository.selectCount(null)).isZero();
+    }
+
+    @Test
+    void shouldReturnPendingWhenLoanApplyTimesOut() throws Exception {
+        MemberInfo memberInfo = createReadyMember("mem-loan-timeout", "user-loan-timeout");
+        createProduct("HUXUAN_CARD");
+        when(yunkaGatewayClient.proxy(any()))
+                .thenThrow(new UpstreamTimeoutException("Yunka loan apply timeout"));
+
+        mockMvc.perform(post("/api/loan/apply")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": 3000,
+                                  "term": 3,
+                                  "receivingAccountId": "acc_001",
+                                  "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.applicationId").isNotEmpty())
+                .andExpect(jsonPath("$.data.status").value("pending"))
+                .andExpect(jsonPath("$.data.benefitsActivated").value(true))
+                .andExpect(jsonPath("$.data.message").value("借款申请已提交，正在审核中"));
+
+        LoanApplicationMapping mapping = loanApplicationMappingRepository.selectOne(
+                Wrappers.<LoanApplicationMapping>lambdaQuery()
+                        .eq(LoanApplicationMapping::getMemberId, memberInfo.getMemberId())
+                        .last("limit 1"));
+        assertThat(mapping).isNotNull();
+        assertThat(mapping.getMappingStatus()).isEqualTo("PENDING_REVIEW");
     }
 
     private BenefitProduct createProduct(String productCode) {

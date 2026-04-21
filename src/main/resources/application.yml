@@ -23,9 +23,33 @@ mybatis-plus:
 
 logging:
   level:
-    com.nexusfin.equity: INFO
+    root: ${LOG_LEVEL_ROOT:INFO}
+    com.nexusfin.equity: ${LOG_LEVEL_APP:INFO}
+    com.nexusfin.equity.thirdparty.yunka: ${LOG_LEVEL_YUNKA:INFO}
+    com.nexusfin.equity.thirdparty.qw: ${LOG_LEVEL_QW:INFO}
+    com.nexusfin.equity.thirdparty.techplatform: ${LOG_LEVEL_TECH_PLATFORM:INFO}
 
 nexusfin:
+  async-compensation:
+    enabled: ${ASYNC_COMPENSATION_ENABLED:false}
+    worker-enabled: ${ASYNC_COMPENSATION_WORKER_ENABLED:false}
+    supervisor-enabled: ${ASYNC_COMPENSATION_SUPERVISOR_ENABLED:false}
+    worker-poll-interval-ms: ${ASYNC_COMPENSATION_WORKER_POLL_INTERVAL_MS:3000}
+    supervisor-interval-ms: ${ASYNC_COMPENSATION_SUPERVISOR_INTERVAL_MS:15000}
+    worker-id: ${ASYNC_COMPENSATION_WORKER_ID:}
+    owned-partitions: ${ASYNC_COMPENSATION_OWNED_PARTITIONS:}
+    partition-count: ${ASYNC_COMPENSATION_PARTITION_COUNT:8}
+    max-retry-count: ${ASYNC_COMPENSATION_MAX_RETRY_COUNT:5}
+    lease-seconds: ${ASYNC_COMPENSATION_LEASE_SECONDS:60}
+    retry-initial-delay-seconds: ${ASYNC_COMPENSATION_RETRY_INITIAL_DELAY_SECONDS:60}
+    retry-max-delay-seconds: ${ASYNC_COMPENSATION_RETRY_MAX_DELAY_SECONDS:900}
+    worker-heartbeat-timeout-seconds: ${ASYNC_COMPENSATION_WORKER_HEARTBEAT_TIMEOUT_SECONDS:120}
+    # 示例：
+    # enabled: true
+    # worker-enabled: true
+    # supervisor-enabled: true
+    # worker-id: worker-a
+    # owned-partitions: 0,1,2,3
   h5:
     loan:
       amount-range:
@@ -199,6 +223,7 @@ nexusfin:
       - /api/equity/products
       - /api/equity/orders
       - /api/equity/exercise-url
+      - /api/bank-card
       - /api/loan
       - /api/benefits
       - /api/repayment

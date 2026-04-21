@@ -10,6 +10,20 @@ spring:
       schema-locations: classpath:db/schema-h2.sql
 
 nexusfin:
+  async-compensation:
+    enabled: false
+    worker-enabled: false
+    supervisor-enabled: false
+    worker-poll-interval-ms: 3000
+    supervisor-interval-ms: 15000
+    worker-id:
+    owned-partitions:
+    partition-count: 8
+    max-retry-count: 5
+    lease-seconds: 60
+    retry-initial-delay-seconds: 60
+    retry-max-delay-seconds: 900
+    worker-heartbeat-timeout-seconds: 120
   h5:
     loan:
       amount-range:
@@ -182,6 +196,7 @@ nexusfin:
       - /api/equity/products
       - /api/equity/orders
       - /api/equity/exercise-url
+      - /api/bank-card
       - /api/loan
       - /api/benefits
       - /api/repayment

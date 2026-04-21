@@ -1,0 +1,255 @@
+{
+  "startedAt": "2026-04-21T13:01:00.326Z",
+  "checkpoints": [
+    {
+      "name": "sso-login-finished",
+      "ts": "2026-04-21T13:01:02.423Z",
+      "url": "http://127.0.0.1:8080/equity/index",
+      "cookies": [
+        {
+          "name": "NEXUSFIN_AUTH",
+          "value": "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJuZXh1c2Zpbi1lcXVpdHkiLCJzdWIiOiJtZW00ZGY3YWZlM2MzYzU0ZGQ2YThlNTY0OTdiNjhhZDgyNyIsIm1lbWJlcklkIjoibWVtNGRmN2FmZTNjM2M1NGRkNmE4ZTU2NDk3YjY4YWQ4MjciLCJ0ZWNoUGxhdGZvcm1Vc2VySWQiOiJ0ZWNoLXVzZXItbG9jYWwtMDAxIiwiaWF0IjoxNzc2Nzc2NDYwLCJleHAiOjE3NzY3ODM2NjB9.2sQ8ilJ8V0tl8LFzRO3w9f3fdd-VQPAYprie6ivMhqE",
+          "domain": "127.0.0.1",
+          "path": "/",
+          "expires": 1776783660.886718,
+          "httpOnly": true,
+          "secure": false,
+          "sameSite": "Lax"
+        }
+      ]
+    },
+    {
+      "name": "home-loaded",
+      "ts": "2026-04-21T13:01:05.593Z",
+      "url": "http://127.0.0.1:3000/",
+      "bodyPreview": "语言\n简中\n繁中\nEN\nVI\n返回\n\n借款金额\n\n¥\n3,000\n修改金额\n¥100 - ¥5,000\n借多久\n3期\n怎么还\n总息费\n¥55.50\n首期还款\n\n5/21\n\n¥1,018.50\n\n展开\n收款账户\n招商银行 8648\n放款资方\nXX商业银行\n综合年化利率\n18.0%\n\n除借款利息外，无其他任何费用\n\n我已阅读并同意《用户协议》、《借款协议》、《隐私声明》等相关条款\n\n确认借款"
+    },
+    {
+      "name": "api-calculator-config",
+      "ts": "2026-04-21T13:01:05.623Z",
+      "ok": true,
+      "status": 200,
+      "data": {
+        "code": 0,
+        "message": "OK",
+        "data": {
+          "amountRange": {
+            "default": 3000,
+            "min": 100,
+            "max": 5000,
+            "step": 100
+          },
+          "termOptions": [
+            {
+              "label": "3期",
+              "value": 3
+            }
+          ],
+          "annualRate": 0.18,
+          "lender": "XX商业银行",
+          "receivingAccount": {
+            "bankName": "招商银行",
+            "lastFour": "8648",
+            "accountId": "acc_001"
+          }
+        }
+      }
+    },
+    {
+      "name": "api-loan-calculate",
+      "ts": "2026-04-21T13:01:05.646Z",
+      "ok": true,
+      "status": 200,
+      "data": {
+        "code": 0,
+        "message": "OK",
+        "data": {
+          "totalFee": 55.5,
+          "annualRate": "18.0%",
+          "repaymentPlan": [
+            {
+              "period": 1,
+              "date": "2026-05-21",
+              "principal": 1000,
+              "interest": 18.5,
+              "total": 1018.5
+            },
+            {
+              "period": 2,
+              "date": "2026-06-21",
+              "principal": 1000,
+              "interest": 18.5,
+              "total": 1018.5
+            },
+            {
+              "period": 3,
+              "date": "2026-07-21",
+              "principal": 1000,
+              "interest": 18.5,
+              "total": 1018.5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "api-loan-apply",
+      "ts": "2026-04-21T13:01:05.807Z",
+      "ok": true,
+      "status": 200,
+      "data": {
+        "code": 0,
+        "message": "OK",
+        "data": {
+          "applicationId": "APP-0035f85668fe4b4e86c2a35746643635",
+          "status": "pending",
+          "estimatedTime": "30分钟",
+          "benefitsActivated": true,
+          "benefitOrderNo": "ord1460d44172094e6abbf86f57ea425d0b",
+          "message": "借款申请已提交，正在处理中"
+        }
+      }
+    },
+    {
+      "name": "approval-pending-loaded",
+      "ts": "2026-04-21T13:01:08.988Z",
+      "url": "http://127.0.0.1:3000/approval-result?applicationId=APP-0035f85668fe4b4e86c2a35746643635",
+      "bodyPreview": "语言\n简中\n繁中\nEN\nVI\n审批通过\n借款金额\n¥3,000\n\n30分钟\n\n提交申请\n已完成\n\n申请已提交成功\n\n审批完成\n已完成\n\n资质审核已通过\n\n准备放款\n已完成\n\n资金将在30分钟内到账\n\n温馨提示\n\n审批通过，预计30分钟内到账\n\n立即生效权益"
+    },
+    {
+      "name": "benefits-card-loaded",
+      "ts": "2026-04-21T13:01:11.138Z",
+      "url": "http://127.0.0.1:3000/benefits-card?applicationId=APP-0035f85668fe4b4e86c2a35746643635",
+      "bodyPreview": "语言\n简中\n繁中\nEN\nVI\n服务详情\n惠选卡\n精选权益\n\n精选热门权益 · 享超值立减\n\n服务现价\n\n¥300\n立即开通\n享千元权益\n服务特色\n\n先享后付，无压力消费\n\n支持多种消费场景，权益开通后可按规则使用。\n\n费用预估¥100/月，共3期\n\n当前按 3 期固定展示，便于前端与后端先联通。\n\n匹配优质权益，不成功不收费\n\n结合当前权益服务能力返回统一展示信息。\n\n专属权益\n立省\n¥448\n影音会员\n出行服务\n5折\n\n每月4选1影视VIP会员\n\n¥30\n¥15\n\n腾讯视频、优酷、爱奇艺、芒果TV任选\n\n有效期30天/次\n\n温馨提示\n•\n\n权益服务费基于惠聚会员服务收取，请以页面展示说明为准"
+    },
+    {
+      "name": "api-approval-result",
+      "ts": "2026-04-21T13:01:11.158Z",
+      "ok": true,
+      "status": 200,
+      "data": {
+        "code": 0,
+        "message": "OK",
+        "data": {
+          "applicationId": "APP-0035f85668fe4b4e86c2a35746643635",
+          "status": "approved",
+          "approvedAmount": 3000,
+          "estimatedArrivalTime": "30分钟",
+          "steps": [
+            {
+              "name": "提交申请",
+              "status": "completed",
+              "description": "申请已提交成功"
+            },
+            {
+              "name": "审批完成",
+              "status": "completed",
+              "description": "资质审核已通过"
+            },
+            {
+              "name": "准备放款",
+              "status": "completed",
+              "description": "资金将在30分钟内到账"
+            }
+          ],
+          "benefitsCardActivated": true,
+          "tip": "审批通过，预计30分钟内到账",
+          "loanId": "LN-f5b89e1650b94d239ca26a2b7cbf0fbb"
+        }
+      }
+    },
+    {
+      "name": "approval-result-loaded",
+      "ts": "2026-04-21T13:01:13.260Z",
+      "url": "http://127.0.0.1:3000/approval-result?applicationId=APP-0035f85668fe4b4e86c2a35746643635",
+      "bodyPreview": "语言\n简中\n繁中\nEN\nVI\n审批通过\n借款金额\n¥3,000\n\n30分钟\n\n提交申请\n已完成\n\n申请已提交成功\n\n审批完成\n已完成\n\n资质审核已通过\n\n准备放款\n已完成\n\n资金将在30分钟内到账\n\n温馨提示\n\n审批通过，预计30分钟内到账\n\n立即生效权益"
+    },
+    {
+      "name": "confirm-repayment-loaded",
+      "ts": "2026-04-21T13:01:15.360Z",
+      "url": "http://127.0.0.1:3000/confirm-repayment?loanId=LN-f5b89e1650b94d239ca26a2b7cbf0fbb",
+      "bodyPreview": "语言\n简中\n繁中\nEN\nVI\n确认还款\n\n还款金额\n\n¥\n1,018.50\n还款方式\n提前还款\n\n招商银行 8648\n\n还款银行卡\n\n温馨提示\n\n还款后将立即生效，剩余期数对应的利息将不再收取。请确认银行卡余额充足。\n\n确认支付 ¥1,018.50"
+    },
+    {
+      "name": "repayment-submit-clicked",
+      "ts": "2026-04-21T13:01:18.460Z",
+      "url": "http://127.0.0.1:3000/repayment-success?repaymentId=RP-20260421-0001",
+      "bodyPreview": "语言\n简中\n繁中\nEN\nVI\n还款成功\n还款金额\n¥1,018.50\n还款详情\n\n还款时间\n\n2026/4/21 16:50\n\n还款银行卡\n\n招商银行 8648\n\n节省利息\n\n¥0\n\n温馨提示\n•\n\n还款金额已从您的银行卡扣除，请注意查收银行通知\n\n•\n\n提前还款后，您的信用额度将即时恢复\n\n•\n\n如需查看还款记录，可前往\"我的\"-\"账单明细\"\n\n•\n\n若有任何疑问，请联系客服：400-888-8888\n\n返回首页"
+    }
+  ],
+  "apiResponses": [
+    {
+      "url": "http://127.0.0.1:8080/api/auth/sso-callback?token=mock-tech-token",
+      "status": 302,
+      "method": "GET",
+      "bodyPreview": "<unavailable>"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/loan/calculator-config",
+      "status": 200,
+      "method": "GET",
+      "bodyPreview": "{\"code\":0,\"message\":\"OK\",\"data\":{\"amountRange\":{\"default\":3000,\"min\":100,\"max\":5000,\"step\":100},\"termOptions\":[{\"label\":\"3期\",\"value\":3}],\"annualRate\":0.18,\"lender\":\"XX商业银行\",\"receivingAccount\":{\"bankName\":\"招商银行\",\"lastFour\":\"8648\",\"accountId\":\"acc_001\"}}}"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/loan/calculate",
+      "status": 200,
+      "method": "POST",
+      "bodyPreview": "{\"code\":0,\"message\":\"OK\",\"data\":{\"totalFee\":55.50,\"annualRate\":\"18.0%\",\"repaymentPlan\":[{\"period\":1,\"date\":\"2026-05-21\",\"principal\":1000.00,\"interest\":18.50,\"total\":1018.50},{\"period\":2,\"date\":\"2026-06-21\",\"principal\":1000.00,\"interest\":18.50,\"total\":1018.50},{\"period\":3,\"date\":\"2026-07-21\",\"principal\":1000.00,\"interest\":18.50,\"total\":1018.50}]}}"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/loan/approval-status/APP-0035f85668fe4b4e86c2a35746643635",
+      "status": 200,
+      "method": "GET",
+      "bodyPreview": "{\"code\":0,\"message\":\"OK\",\"data\":{\"applicationId\":\"APP-0035f85668fe4b4e86c2a35746643635\",\"status\":\"approved\",\"steps\":[{\"name\":\"提交申请\",\"status\":\"completed\",\"description\":\"申请已提交成功\"},{\"name\":\"审批完成\",\"status\":\"completed\",\"description\":\"资质审核已通过\"},{\"name\":\"准备放款\",\"status\":\"completed\",\"description\":\"资金将在30分钟内到账\"}],\"benefitsCard\":{\"available\":true,\"price\":300,\"features\":[\"先享后付，无压力消费\",\"费用预估¥100/月，共3期\",\"匹配优质权益，不成功不收费\"]}}}"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/loan/approval-result/APP-0035f85668fe4b4e86c2a35746643635",
+      "status": 200,
+      "method": "GET",
+      "bodyPreview": "{\"code\":0,\"message\":\"OK\",\"data\":{\"applicationId\":\"APP-0035f85668fe4b4e86c2a35746643635\",\"status\":\"approved\",\"approvedAmount\":3000.00,\"estimatedArrivalTime\":\"30分钟\",\"steps\":[{\"name\":\"提交申请\",\"status\":\"completed\",\"description\":\"申请已提交成功\"},{\"name\":\"审批完成\",\"status\":\"completed\",\"description\":\"资质审核已通过\"},{\"name\":\"准备放款\",\"status\":\"completed\",\"description\":\"资金将在30分钟内到账\"}],\"benefitsCardActivated\":true,\"tip\":\"审批通过，预计30分钟内到账\",\"loanId\":\"LN-f5b89e1650b94d239ca26a2b7cbf0fbb\"}}"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/benefits/card-detail",
+      "status": 200,
+      "method": "GET",
+      "bodyPreview": "{\"code\":0,\"message\":\"OK\",\"data\":{\"cardName\":\"惠选卡\",\"price\":300,\"totalSaving\":448,\"features\":[{\"title\":\"先享后付，无压力消费\",\"description\":\"支持多种消费场景，权益开通后可按规则使用。\"},{\"title\":\"费用预估¥100/月，共3期\",\"description\":\"当前按 3 期固定展示，便于前端与后端先联通。\"},{\"title\":\"匹配优质权益，不成功不收费\",\"description\":\"结合当前权益服务能力返回统一展示信息。\"}],\"categories\":[{\"name\":\"影音会员\",\"icon\":\"tv\",\"benefits\":[{\"discount\":\"5折\",\"title\":\"每月4选1影视VIP会员\",\"description\":\"腾讯视频、优酷、爱奇艺、芒果TV任选\",\"validity\":\"有效期30天/次\",\"originalPrice\":30,\"saving\":15}]},{\"name\":\"出行服务\",\"icon\":\"car\",\"bene"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/loan/approval-result/APP-0035f85668fe4b4e86c2a35746643635",
+      "status": 200,
+      "method": "GET",
+      "bodyPreview": "{\"code\":0,\"message\":\"OK\",\"data\":{\"applicationId\":\"APP-0035f85668fe4b4e86c2a35746643635\",\"status\":\"approved\",\"approvedAmount\":3000.00,\"estimatedArrivalTime\":\"30分钟\",\"steps\":[{\"name\":\"提交申请\",\"status\":\"completed\",\"description\":\"申请已提交成功\"},{\"name\":\"审批完成\",\"status\":\"completed\",\"description\":\"资质审核已通过\"},{\"name\":\"准备放款\",\"status\":\"completed\",\"description\":\"资金将在30分钟内到账\"}],\"benefitsCardActivated\":true,\"tip\":\"审批通过，预计30分钟内到账\",\"loanId\":\"LN-f5b89e1650b94d239ca26a2b7cbf0fbb\"}}"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/repayment/info/LN-f5b89e1650b94d239ca26a2b7cbf0fbb",
+      "status": 200,
+      "method": "GET",
+      "bodyPreview": "{\"code\":0,\"message\":\"OK\",\"data\":{\"loanId\":\"LN-f5b89e1650b94d239ca26a2b7cbf0fbb\",\"repaymentAmount\":1018.50,\"repaymentType\":\"提前还款\",\"bankCard\":{\"bankName\":\"招商银行\",\"lastFour\":\"8648\",\"accountId\":\"acc_001\"},\"tip\":\"还款后将立即生效，剩余期数对应的利息将不再收取。请确认银行卡余额充足。\"}}"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/repayment/submit",
+      "status": 200,
+      "method": "POST",
+      "bodyPreview": "{\"code\":0,\"message\":\"OK\",\"data\":{\"repaymentId\":\"RP-20260421-0001\",\"status\":\"processing\",\"message\":\"还款请求已提交，正在处理中\"}}"
+    },
+    {
+      "url": "http://127.0.0.1:3000/api/repayment/result/RP-20260421-0001",
+      "status": 200,
+      "method": "GET",
+      "bodyPreview": "{\"code\":0,\"message\":\"OK\",\"data\":{\"repaymentId\":\"RP-20260421-0001\",\"status\":\"success\",\"amount\":1018.50,\"repaymentTime\":\"2026-04-21 16:50:00\",\"bankCard\":{\"bankName\":\"招商银行\",\"lastFour\":\"8648\",\"accountId\":\"acc_001\"},\"interestSaved\":0.00,\"tips\":[\"还款金额已从您的银行卡扣除，请注意查收银行通知\",\"提前还款后，您的信用额度将即时恢复\",\"如需查看还款记录，可前往\\\"我的\\\"-\\\"账单明细\\\"\",\"若有任何疑问，请联系客服：400-888-8888\"]}}"
+    }
+  ],
+  "requestFailures": [],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "summary": {
+    "applicationId": "APP-0035f85668fe4b4e86c2a35746643635",
+    "loanId": "LN-f5b89e1650b94d239ca26a2b7cbf0fbb",
+    "finalUrl": "http://127.0.0.1:3000/repayment-success?repaymentId=RP-20260421-0001",
+    "consoleErrorCount": 0,
+    "pageErrorCount": 0,
+    "requestFailureCount": 0,
+    "apiCount": 10
+  },
+  "finishedAt": "2026-04-21T13:01:18.460Z"
+}

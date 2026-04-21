@@ -12,12 +12,15 @@ import com.nexusfin.equity.entity.MemberChannel;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.enums.BenefitOrderStatusEnum;
 import com.nexusfin.equity.enums.PaymentStatusEnum;
+import com.nexusfin.equity.exception.BenefitPurchaseSyncTimeoutCompensationException;
 import com.nexusfin.equity.exception.BizException;
+import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.repository.BenefitProductRepository;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.AgreementService;
+import com.nexusfin.equity.service.AsyncCompensationEnqueueService;
 import com.nexusfin.equity.service.BenefitOrderService;
 import com.nexusfin.equity.service.IdempotencyService;
 import com.nexusfin.equity.service.PaymentProtocolService;
@@ -50,6 +53,7 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
     private final PaymentProtocolService paymentProtocolService;
     private final SensitiveDataCipher sensitiveDataCipher;
     private final QwBenefitClient qwBenefitClient;
+    private final AsyncCompensationEnqueueService asyncCompensationEnqueueService;
 
     public BenefitOrderServiceImpl(
             BenefitProductRepository benefitProductRepository,
@@ -60,7 +64,8 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
             IdempotencyService idempotencyService,
             PaymentProtocolService paymentProtocolService,
             SensitiveDataCipher sensitiveDataCipher,
-            QwBenefitClient qwBenefitClient
+            QwBenefitClient qwBenefitClient,
+            AsyncCompensationEnqueueService asyncCompensationEnqueueService
     ) {
         this.benefitProductRepository = benefitProductRepository;
         this.benefitOrderRepository = benefitOrderRepository;
@@ -71,6 +76,7 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         this.paymentProtocolService = paymentProtocolService;
         this.sensitiveDataCipher = sensitiveDataCipher;
         this.qwBenefitClient = qwBenefitClient;
+        this.asyncCompensationEnqueueService = asyncCompensationEnqueueService;
     }
 
     @Override
@@ -94,8 +100,14 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = BenefitPurchaseSyncTimeoutCompensationException.class)
     public CreateBenefitOrderResponse createOrder(String memberId, CreateBenefitOrderRequest request) {
+        BenefitOrder requestReplayOrder = benefitOrderRepository.selectOne(Wrappers.<BenefitOrder>lambdaQuery()
+                .eq(BenefitOrder::getRequestId, request.requestId())
+                .last("limit 1"));
+        if (requestReplayOrder != null) {
+            return buildCreateOrderResponse(requestReplayOrder);
+        }
         if (idempotencyService.isProcessed(request.requestId())) {
             String benefitOrderNo = idempotencyService.getByRequestId(request.requestId()).getBizKey();
             BenefitOrder existingOrder = benefitOrderRepository.selectById(benefitOrderNo);
@@ -146,7 +158,35 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         benefitOrderRepository.insert(benefitOrder);
         // 创建订单后立即补齐协议任务与归档，确保后续支付和审计链路都有完整基础数据。
         agreementService.ensureAgreementArtifacts(benefitOrder);
-        QwMemberSyncResponse syncResponse = qwBenefitClient.syncMemberOrder(buildQwMemberSyncRequest(benefitOrder, product, memberInfo));
+        QwMemberSyncResponse syncResponse;
+        try {
+            syncResponse = qwBenefitClient.syncMemberOrder(buildQwMemberSyncRequest(benefitOrder, product, memberInfo));
+            benefitOrder.setSyncStatus(BenefitOrderStatusEnum.SYNC_SUCCESS.name());
+            benefitOrder.setUpdatedTs(LocalDateTime.now());
+            benefitOrderRepository.updateById(benefitOrder);
+        } catch (UpstreamTimeoutException exception) {
+            benefitOrder.setSyncStatus(BenefitOrderStatusEnum.SYNC_FAIL.name());
+            benefitOrder.setUpdatedTs(LocalDateTime.now());
+            benefitOrderRepository.updateById(benefitOrder);
+            asyncCompensationEnqueueService.enqueue(new AsyncCompensationEnqueueService.EnqueueCommand(
+                    "QW_BENEFIT_PURCHASE_RETRY",
+                    "BENEFIT_PURCHASE:" + benefitOrder.getBenefitOrderNo(),
+                    benefitOrder.getBenefitOrderNo(),
+                    "QW",
+                    "/api/abs/method",
+                    "POST",
+                    null,
+                    """
+                    {"externalUserId":"%s","benefitOrderNo":"%s","productCode":"%s","loanAmount":%d}
+                    """.formatted(
+                            benefitOrder.getExternalUserId(),
+                            benefitOrder.getBenefitOrderNo(),
+                            product.getProductCode(),
+                            benefitOrder.getLoanAmount()
+                    ).replace("\n", "").trim()
+            ));
+            throw new BenefitPurchaseSyncTimeoutCompensationException("QW_SYNC_TIMEOUT:" + exception.getMessage());
+        }
         idempotencyService.markProcessed(
                 request.requestId(),
                 "CREATE_ORDER",

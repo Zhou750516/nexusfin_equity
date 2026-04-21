@@ -7,4 +7,10 @@ public interface QwBenefitClient {
     QwExerciseUrlResponse getExerciseUrl(QwExerciseUrlRequest request);
 
     QwLendingNotifyResponse notifyLending(QwLendingNotifyRequest request);
+
+    QwSignStatusResponse querySignStatus(QwSignStatusRequest request);
+
+    QwSignApplyResponse applySign(QwSignApplyRequest request);
+
+    QwSignConfirmResponse confirmSign(QwSignConfirmRequest request);
 }

@@ -116,6 +116,21 @@ public class AllinpayDirectQwBenefitClient implements QwBenefitClient {
         return execute(invocation, QwLendingNotifyResponse.class);
     }
 
+    @Override
+    public QwSignStatusResponse querySignStatus(QwSignStatusRequest request) {
+        throw new BizException("ALLINPAY_DIRECT_UNSUPPORTED", "Allinpay direct mode does not support sign status query");
+    }
+
+    @Override
+    public QwSignApplyResponse applySign(QwSignApplyRequest request) {
+        throw new BizException("ALLINPAY_DIRECT_UNSUPPORTED", "Allinpay direct mode does not support sign apply");
+    }
+
+    @Override
+    public QwSignConfirmResponse confirmSign(QwSignConfirmRequest request) {
+        throw new BizException("ALLINPAY_DIRECT_UNSUPPORTED", "Allinpay direct mode does not support sign confirm");
+    }
+
     private void ensureReady(String action, String serviceCode) {
         if (!properties.isEnabled()) {
             throw new BizException("QW_DISABLED", "QW integration is disabled");

@@ -41,6 +41,24 @@
 - [x] 明确退款页正式承接边界
 - [x] 明确状态回推后端能力拆分
 - [x] 至少沉淀一块到“可拆任务”层级
+- [x] 补退款外部适配占位层（`RefundClient` / `SkeletonRefundClient`）
+- [x] 完成退款聚焦验证（`RefundServiceTest`、`RefundControllerIntegrationTest`）
+- [x] 补状态回推失败留痕（`FAIL` / `errorMessage`）
+- [x] 补状态回推配置占位客户端（`MOCK` / `HTTP` / `enabled`）
+- [x] 完成状态回推聚焦验证（`BenefitStatusPushServiceTest`、`SkeletonTechPlatformBenefitStatusClientTest`）
+
+## P0：异步消息补偿机制
+
+- [x] 输出 `docs/plan/20260417_异步消息补偿机制方案与实施计划.md`
+- [x] 确认采用方案 A（同步承接 + 异步补偿）
+- [x] 明确前端“已提交 / 审核中”承接口径
+- [x] 落地异步补偿任务持久化模型
+- [x] 落地 `enqueue` / `worker` / `supervisor` 基础能力
+- [x] 落地权益购买补偿执行器
+- [x] 落地用信提交补偿执行器
+- [x] 补幂等控制、重复入队保护、执行前状态检查
+- [x] 补 MySQL 集成测试 `MySqlAsyncCompensationIntegrationTest`
+- [x] 完成 MySQL 回归（含 `MySqlRoundTripIntegrationTest`、`MySqlCallbackFlowIntegrationTest`、`MySqlAsyncCompensationIntegrationTest`）
 
 ## P1：齐为绑卡新增接口
 
@@ -57,10 +75,11 @@
 ## 收尾检查
 
 - [x] 更新当天计划执行结果
-- [ ] 如有新增结论，补日报 / decision-review
-- [ ] 确认外部待确认项与本侧可推进项分开记录
+- [x] 如有新增结论，补日报 / decision-review
+- [x] 确认外部待确认项与本侧可推进项分开记录
 
 ## 提前沉淀
 
 - [x] 输出 `docs/plan/20260418_分发页退款页状态回推实施计划.md`
 - [x] 输出三份联调检查清单
+- [x] 补充异步补偿阶段性日报、决策总结与 Decision Review

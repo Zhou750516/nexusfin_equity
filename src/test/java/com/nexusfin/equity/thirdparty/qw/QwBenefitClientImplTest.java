@@ -48,6 +48,55 @@ class QwBenefitClientImplTest {
         assertThat(response.token()).isEqualTo("token-1");
     }
 
+    @Test
+    void shouldReturnSignedMockStatusForSignQuery() {
+        QwProperties properties = qwProperties();
+        properties.setMode(QwProperties.Mode.MOCK);
+        QwBenefitClientImpl client = new QwBenefitClientImpl(properties, objectMapper);
+
+        QwSignStatusResponse response = client.querySignStatus(new QwSignStatusRequest(
+                "13800138000",
+                "测试用户",
+                "6222020202020208"
+        ));
+
+        assertThat(response.status()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldReturnMockApplyRequestNoForSignApply() {
+        QwProperties properties = qwProperties();
+        properties.setMode(QwProperties.Mode.MOCK);
+        QwBenefitClientImpl client = new QwBenefitClientImpl(properties, objectMapper);
+
+        QwSignApplyResponse response = client.applySign(new QwSignApplyRequest(
+                "13800138000",
+                "测试用户",
+                "6222020202021234",
+                "110101199003071234"
+        ));
+
+        assertThat(response.requestNo()).isEqualTo("mock-sign-apply-1234");
+    }
+
+    @Test
+    void shouldReturnActiveMockResultForSignConfirm() {
+        QwProperties properties = qwProperties();
+        properties.setMode(QwProperties.Mode.MOCK);
+        QwBenefitClientImpl client = new QwBenefitClientImpl(properties, objectMapper);
+
+        QwSignConfirmResponse response = client.confirmSign(new QwSignConfirmRequest(
+                "13800138000",
+                "测试用户",
+                "6222020202025678",
+                "110101199003071234",
+                "123456"
+        ));
+
+        assertThat(response.requestNo()).isEqualTo("mock-sign-confirm-5678");
+        assertThat(response.protocolStatus()).isEqualTo("ACTIVE");
+    }
+
     private QwProperties qwProperties() {
         QwProperties properties = new QwProperties();
         properties.setEnabled(true);

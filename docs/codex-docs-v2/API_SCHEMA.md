@@ -34,6 +34,20 @@ HTTP 状态码:
   500 → 服务器内部错误
 ```
 
+## 补充接口：H5 绑卡页接口
+
+> 绑卡页当前尚未进入 H5 页面开发，但后端已预留接口。详细接入说明见：
+> `docs/plan/20260421_H5绑卡页接入后端接口说明.md`
+> 当前已实现后端使用 `NEXUSFIN_AUTH` Cookie 识别登录态，H5 不需要自行拼接齐为四要素。
+
+| H5 场景 | 方法 | 接口 | 说明 |
+|---|---|---|---|
+| 查询银行卡是否已签约 | `GET` | `/api/bank-card/sign-status` | 传 `accountNo` |
+| 申请绑卡短信 | `POST` | `/api/bank-card/sign-apply` | 传 `accountNo` |
+| 确认绑卡签约 | `POST` | `/api/bank-card/sign-confirm` | 传 `accountNo`、`verificationCode` |
+
+---
+
 **Java 统一响应封装建议：**
 
 ```java

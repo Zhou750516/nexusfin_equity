@@ -37,6 +37,21 @@ public class RoutingQwBenefitClient implements QwBenefitClient {
         return currentDelegate().notifyLending(request);
     }
 
+    @Override
+    public QwSignStatusResponse querySignStatus(QwSignStatusRequest request) {
+        return qweimobileClient.querySignStatus(request);
+    }
+
+    @Override
+    public QwSignApplyResponse applySign(QwSignApplyRequest request) {
+        return qweimobileClient.applySign(request);
+    }
+
+    @Override
+    public QwSignConfirmResponse confirmSign(QwSignConfirmRequest request) {
+        return qweimobileClient.confirmSign(request);
+    }
+
     private QwBenefitClient currentDelegate() {
         return switch (properties.getMode()) {
             case ALLINPAY_DIRECT -> allinpayDirectClient;

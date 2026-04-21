@@ -2,9 +2,11 @@ package com.nexusfin.equity.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.dto.response.Result;
+import com.nexusfin.equity.exception.ErrorCodes;
 import com.nexusfin.equity.util.AuthContextUtil;
 import com.nexusfin.equity.util.AuthPrincipal;
 import com.nexusfin.equity.util.JwtUtil;
+import com.nexusfin.equity.util.TraceIdUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
@@ -12,11 +14,15 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import org.springframework.http.MediaType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     private final AuthProperties authProperties;
     private final JwtUtil jwtUtil;
@@ -45,7 +51,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         String token = resolveToken(request);
         if (token == null) {
-            writeUnauthorized(response, "Missing auth cookie");
+            writeUnauthorized(request, response, "Missing auth cookie");
             return;
         }
         try {
@@ -53,7 +59,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             AuthContextUtil.bind(principal);
             filterChain.doFilter(request, response);
         } catch (IllegalArgumentException exception) {
-            writeUnauthorized(response, "Invalid auth cookie");
+            writeUnauthorized(request, response, "Invalid auth cookie");
         } finally {
             AuthContextUtil.clear();
         }
@@ -82,7 +88,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return null;
     }
 
-    private void writeUnauthorized(HttpServletResponse response, String message) throws IOException {
+    private void writeUnauthorized(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            String message
+    ) throws IOException {
+        log.warn("traceId={} bizOrderNo={} method={} path={} errorNo={} errorMsg={}",
+                TraceIdUtil.getTraceId(),
+                "UNAUTHORIZED",
+                request.getMethod(),
+                request.getRequestURI(),
+                ErrorCodes.UNAUTHORIZED,
+                message);
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(response.getWriter(), Result.failure(401, message));

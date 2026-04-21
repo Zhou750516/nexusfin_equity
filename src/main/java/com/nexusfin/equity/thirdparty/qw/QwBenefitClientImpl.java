@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.config.QwProperties;
 import com.nexusfin.equity.exception.BizException;
+import com.nexusfin.equity.exception.UpstreamTimeoutException;
+import com.nexusfin.equity.util.UpstreamTimeoutDetector;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -68,6 +70,33 @@ public class QwBenefitClientImpl implements QwBenefitClient {
         return invoke("abs.lending.notify", request, QwLendingNotifyResponse.class);
     }
 
+    @Override
+    public QwSignStatusResponse querySignStatus(QwSignStatusRequest request) {
+        ensureEnabled();
+        if (qwProperties.getMode() == QwProperties.Mode.MOCK) {
+            return mockSignStatus(request);
+        }
+        return invoke("abs.sign.query", request, QwSignStatusResponse.class);
+    }
+
+    @Override
+    public QwSignApplyResponse applySign(QwSignApplyRequest request) {
+        ensureEnabled();
+        if (qwProperties.getMode() == QwProperties.Mode.MOCK) {
+            return mockSignApply(request);
+        }
+        return invoke("abs.sign.apply", request, QwSignApplyResponse.class);
+    }
+
+    @Override
+    public QwSignConfirmResponse confirmSign(QwSignConfirmRequest request) {
+        ensureEnabled();
+        if (qwProperties.getMode() == QwProperties.Mode.MOCK) {
+            return mockSignConfirm(request);
+        }
+        return invoke("abs.sign.confirm", request, QwSignConfirmResponse.class);
+    }
+
     private <T> T invoke(String method, Object businessRequest, Class<T> responseType) {
         long timestamp = System.currentTimeMillis();
         QwEnvelopeRequest request = new QwEnvelopeRequest(
@@ -92,6 +121,9 @@ public class QwBenefitClientImpl implements QwBenefitClient {
                     .body(String.class);
             return parseResponse(rawResponse, responseType);
         } catch (RestClientException exception) {
+            if (UpstreamTimeoutDetector.isTimeout(exception)) {
+                throw new UpstreamTimeoutException("QW upstream timeout", exception);
+            }
             throw new BizException("QW_UPSTREAM_FAILED", "Failed to call QW upstream service");
         }
     }
@@ -271,6 +303,28 @@ public class QwBenefitClientImpl implements QwBenefitClient {
 
     private QwLendingNotifyResponse mockLendingNotify(QwLendingNotifyRequest request) {
         return new QwLendingNotifyResponse("qw-order-" + request.partnerOrderNo());
+    }
+
+    private QwSignStatusResponse mockSignStatus(QwSignStatusRequest request) {
+        return new QwSignStatusResponse(request.accountNo() != null && request.accountNo().endsWith("8") ? 1 : 0);
+    }
+
+    private QwSignApplyResponse mockSignApply(QwSignApplyRequest request) {
+        return new QwSignApplyResponse("mock-sign-apply-" + lastFour(request.accountNo()));
+    }
+
+    private QwSignConfirmResponse mockSignConfirm(QwSignConfirmRequest request) {
+        return new QwSignConfirmResponse(
+                "mock-sign-confirm-" + lastFour(request.accountNo()),
+                "ACTIVE"
+        );
+    }
+
+    private String lastFour(String accountNo) {
+        if (accountNo == null || accountNo.length() <= 4) {
+            return accountNo == null ? "0000" : accountNo;
+        }
+        return accountNo.substring(accountNo.length() - 4);
     }
 
     private record QwEnvelopeRequest(

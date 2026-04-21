@@ -20,11 +20,14 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -39,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ExtendWith(OutputCaptureExtension.class)
 class Phase9TaskGroupDIntegrationTest {
 
     @Autowired
@@ -93,7 +97,7 @@ class Phase9TaskGroupDIntegrationTest {
     }
 
     @Test
-    void shouldForwardRepaymentInfoToYunkaRepayTrial() throws Exception {
+    void shouldForwardRepaymentInfoToYunkaRepayTrial(CapturedOutput output) throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-info", "user-repay-info");
         JsonNode yunkaData = objectMapper.readTree("""
                 {
@@ -125,6 +129,10 @@ class Phase9TaskGroupDIntegrationTest {
         assertThat(data.get("uid").asText()).isEqualTo("user-repay-info");
         assertThat(data.get("loanId").asText()).isEqualTo("LOAN202604130001");
         assertThat(data.get("repayType").asText()).isEqualTo("EARLY");
+        assertThat(output).contains("repayment info yunka request begin");
+        assertThat(output).contains("repayment info yunka request success");
+        assertThat(output).contains("path=/repay/trial");
+        assertThat(output).contains("bizOrderNo=LOAN202604130001");
     }
 
     @Test
