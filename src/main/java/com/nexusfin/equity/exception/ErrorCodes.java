@@ -13,6 +13,7 @@ public final class ErrorCodes {
     public static final String YUNKA_UPSTREAM_FAILED = "YUNKA_UPSTREAM_FAILED";
     public static final String YUNKA_RESPONSE_EMPTY = "YUNKA_RESPONSE_EMPTY";
     public static final String YUNKA_UPSTREAM_REJECTED = "YUNKA_UPSTREAM_REJECTED";
+    public static final String ASYNC_COMPENSATION_DUPLICATED = "ASYNC_COMPENSATION_DUPLICATED";
 
     private ErrorCodes() {
     }

@@ -15,6 +15,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -23,7 +25,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class AsyncCompensationWorkerServiceTest {
 
     @Mock
@@ -49,7 +51,7 @@ class AsyncCompensationWorkerServiceTest {
     }
 
     @Test
-    void shouldClaimTaskExecuteAndMarkSuccess() {
+    void shouldLogTraceableFieldsWhenTaskSucceeded(CapturedOutput output) {
         AsyncCompensationWorkerService service = buildService();
         AsyncCompensationTask task = buildTask("task-success", "INIT", 0, 5);
         when(taskRepository.selectOne(any())).thenReturn(task);
@@ -79,10 +81,20 @@ class AsyncCompensationWorkerServiceTest {
         assertThat(attemptCaptor.getValue().getAttemptNo()).isEqualTo(1);
         assertThat(attemptCaptor.getValue().getResultStatus()).isEqualTo("SUCCESS");
         assertThat(attemptCaptor.getValue().getResponsePayload()).contains("SUCCESS");
+        assertThat(output)
+                .contains("traceId=")
+                .contains("bizOrderNo=APP-task-success")
+                .contains("taskId=task-success")
+                .contains("taskType=YUNKA_LOAN_APPLY_RETRY")
+                .contains("partitionNo=3")
+                .contains("workerId=worker-3")
+                .contains("requestPath=/api/gateway/proxy")
+                .contains("async compensation task claimed")
+                .contains("async compensation task succeeded");
     }
 
     @Test
-    void shouldMarkRetryWaitWhenExecutionFailsBeforeMaxRetry() {
+    void shouldLogTraceableFieldsWhenTaskFailsBeforeMaxRetry(CapturedOutput output) {
         AsyncCompensationWorkerService service = buildService();
         AsyncCompensationTask task = buildTask("task-retry", "INIT", 0, 2);
         when(taskRepository.selectOne(any())).thenReturn(task);
@@ -107,6 +119,18 @@ class AsyncCompensationWorkerServiceTest {
         assertThat(attemptCaptor.getValue().getAttemptNo()).isEqualTo(1);
         assertThat(attemptCaptor.getValue().getResultStatus()).isEqualTo("FAILED");
         assertThat(attemptCaptor.getValue().getErrorMessage()).contains("gateway unavailable");
+        assertThat(output)
+                .contains("traceId=")
+                .contains("bizOrderNo=APP-task-retry")
+                .contains("taskId=task-retry")
+                .contains("taskType=YUNKA_LOAN_APPLY_RETRY")
+                .contains("partitionNo=3")
+                .contains("workerId=worker-5")
+                .contains("requestPath=/api/gateway/proxy")
+                .contains("errorNo=YUNKA_RETRY_FAILED")
+                .contains("errorMsg=gateway unavailable")
+                .contains("dead=false")
+                .contains("async compensation task failed");
     }
 
     @Test
@@ -136,7 +160,7 @@ class AsyncCompensationWorkerServiceTest {
     }
 
     @Test
-    void shouldMarkDeadWhenRetryCountReachesLimit() {
+    void shouldLogTraceableFieldsWhenTaskReachesDead(CapturedOutput output) {
         AsyncCompensationWorkerService service = buildService();
         AsyncCompensationTask task = buildTask("task-dead", "RETRY_WAIT", 1, 2);
         when(taskRepository.selectOne(any())).thenReturn(task);
@@ -154,6 +178,18 @@ class AsyncCompensationWorkerServiceTest {
         assertThat(deadUpdate.getNextRetryTs()).isNull();
         assertThat(deadUpdate.getLeaseOwner()).isNull();
         assertThat(deadUpdate.getLastErrorMessage()).contains("upstream still failing");
+        assertThat(output)
+                .contains("traceId=")
+                .contains("bizOrderNo=APP-task-dead")
+                .contains("taskId=task-dead")
+                .contains("taskType=YUNKA_LOAN_APPLY_RETRY")
+                .contains("partitionNo=3")
+                .contains("workerId=worker-6")
+                .contains("requestPath=/api/gateway/proxy")
+                .contains("errorNo=IllegalStateException")
+                .contains("errorMsg=upstream still failing")
+                .contains("dead=true")
+                .contains("async compensation task failed");
     }
 
     private AsyncCompensationWorkerService buildService() {

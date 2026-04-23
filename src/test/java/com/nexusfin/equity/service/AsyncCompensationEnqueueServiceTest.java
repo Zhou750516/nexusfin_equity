@@ -10,6 +10,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.DuplicateKeyException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,14 +20,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class AsyncCompensationEnqueueServiceTest {
 
     @Mock
     private AsyncCompensationTaskRepository taskRepository;
 
     @Test
-    void shouldPersistTaskWithStablePartitionAndInitStatus() {
+    void shouldLogTraceableFieldsWhenTaskEnqueued(CapturedOutput output) {
         AsyncCompensationProperties properties = new AsyncCompensationProperties();
         properties.setPartitionCount(8);
         properties.setMaxRetryCount(5);
@@ -53,10 +55,19 @@ class AsyncCompensationEnqueueServiceTest {
         assertThat(captor.getValue().getMaxRetryCount()).isEqualTo(5);
         assertThat(captor.getValue().getPartitionNo()).isBetween(0, 7);
         assertThat(captor.getValue().getBizKey()).isEqualTo("LOAN_APPLY:APP-20260418-001");
+        assertThat(output)
+                .contains("traceId=")
+                .contains("bizOrderNo=APP-20260418-001")
+                .contains("taskId=")
+                .contains("taskType=YUNKA_LOAN_APPLY_RETRY")
+                .contains("bizKey=LOAN_APPLY:APP-20260418-001")
+                .contains("targetCode=YUNKA")
+                .contains("requestPath=/api/gateway/proxy")
+                .contains("async compensation task enqueued");
     }
 
     @Test
-    void shouldIgnoreDuplicateTaskInsert() {
+    void shouldLogTraceableFieldsWhenDuplicateTaskIgnored(CapturedOutput output) {
         AsyncCompensationProperties properties = new AsyncCompensationProperties();
         properties.setPartitionCount(8);
         properties.setMaxRetryCount(5);
@@ -79,5 +90,15 @@ class AsyncCompensationEnqueueServiceTest {
         ))).doesNotThrowAnyException();
 
         verify(taskRepository).insert(any());
+        assertThat(output)
+                .contains("traceId=")
+                .contains("bizOrderNo=APP-20260418-duplicate")
+                .contains("taskType=YUNKA_LOAN_APPLY_RETRY")
+                .contains("bizKey=LOAN_APPLY:APP-20260418-duplicate")
+                .contains("targetCode=YUNKA")
+                .contains("requestPath=/api/gateway/proxy")
+                .contains("errorNo=ASYNC_COMPENSATION_DUPLICATED")
+                .contains("errorMsg=Async compensation task duplicated")
+                .contains("async compensation task duplicated, ignored");
     }
 }

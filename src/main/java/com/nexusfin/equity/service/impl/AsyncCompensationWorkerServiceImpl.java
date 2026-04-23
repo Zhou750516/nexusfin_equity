@@ -63,6 +63,15 @@ public class AsyncCompensationWorkerServiceImpl implements AsyncCompensationWork
         LocalDateTime leaseExpireTs = now.plusSeconds(properties.getLeaseSeconds());
         taskRepository.updateById(buildProcessingUpdate(task.getTaskId(), workerId, leaseExpireTs, now));
         lifecycleListener.onTaskClaimed(task.getTaskId());
+        log.info("traceId={} bizOrderNo={} taskId={} taskType={} partitionNo={} workerId={} requestPath={} "
+                        + "async compensation task claimed",
+                TraceIdUtil.getTraceId(),
+                task.getBizOrderNo(),
+                task.getTaskId(),
+                task.getTaskType(),
+                task.getPartitionNo(),
+                workerId,
+                task.getRequestPath());
 
         int attemptNo = task.getRetryCount() + 1;
         LocalDateTime startedTs = LocalDateTime.now();
@@ -72,8 +81,15 @@ public class AsyncCompensationWorkerServiceImpl implements AsyncCompensationWork
             taskRepository.updateById(buildSuccessUpdate(task.getTaskId(), result.responsePayload(), finishedTs));
             attemptRepository.insert(buildAttempt(task, workerId, attemptNo, result.responsePayload(),
                     "SUCCESS", null, null, startedTs, finishedTs));
-            log.info("traceId={} bizOrderNo={} async compensation succeeded taskType={} workerId={}",
-                    TraceIdUtil.getTraceId(), task.getBizOrderNo(), task.getTaskType(), workerId);
+            log.info("traceId={} bizOrderNo={} taskId={} taskType={} partitionNo={} workerId={} requestPath={} "
+                            + "async compensation task succeeded",
+                    TraceIdUtil.getTraceId(),
+                    task.getBizOrderNo(),
+                    task.getTaskId(),
+                    task.getTaskType(),
+                    task.getPartitionNo(),
+                    workerId,
+                    task.getRequestPath());
             return WorkerProcessResult.handled(task.getTaskId());
         } catch (RuntimeException exception) {
             LocalDateTime finishedTs = LocalDateTime.now();
@@ -81,9 +97,8 @@ public class AsyncCompensationWorkerServiceImpl implements AsyncCompensationWork
             boolean dead = nextRetryCount >= task.getMaxRetryCount();
             taskRepository.updateById(buildFailureUpdate(task.getTaskId(), nextRetryCount, dead, finishedTs, exception));
             attemptRepository.insert(buildAttempt(task, workerId, attemptNo, null,
-                    "FAILED", resolveErrorCode(exception), exception.getMessage(), startedTs, finishedTs));
-            log.warn("traceId={} bizOrderNo={} async compensation failed taskType={} workerId={} dead={} error={}",
-                    TraceIdUtil.getTraceId(), task.getBizOrderNo(), task.getTaskType(), workerId, dead, exception.getMessage());
+                    "FAILED", resolveErrorNo(exception), resolveErrorMsg(exception), startedTs, finishedTs));
+            logFailure(task, workerId, dead, exception);
             return WorkerProcessResult.handled(task.getTaskId());
         }
     }
@@ -132,8 +147,8 @@ public class AsyncCompensationWorkerServiceImpl implements AsyncCompensationWork
         update.setNextRetryTs(dead ? null : now.plusSeconds(properties.nextRetryDelaySeconds(retryCount)));
         update.setLeaseOwner(null);
         update.setLeaseExpireTs(null);
-        update.setLastErrorCode(resolveErrorCode(exception));
-        update.setLastErrorMessage(exception.getMessage());
+        update.setLastErrorCode(resolveErrorNo(exception));
+        update.setLastErrorMessage(resolveErrorMsg(exception));
         update.setUpdatedTs(now);
         return update;
     }
@@ -166,10 +181,48 @@ public class AsyncCompensationWorkerServiceImpl implements AsyncCompensationWork
         return attempt;
     }
 
-    private String resolveErrorCode(RuntimeException exception) {
+    private void logFailure(AsyncCompensationTask task, String workerId, boolean dead, RuntimeException exception) {
+        if (dead) {
+            log.error("traceId={} bizOrderNo={} taskId={} taskType={} partitionNo={} workerId={} requestPath={} "
+                            + "errorNo={} errorMsg={} dead={} async compensation task failed",
+                    TraceIdUtil.getTraceId(),
+                    task.getBizOrderNo(),
+                    task.getTaskId(),
+                    task.getTaskType(),
+                    task.getPartitionNo(),
+                    workerId,
+                    task.getRequestPath(),
+                    resolveErrorNo(exception),
+                    resolveErrorMsg(exception),
+                    true);
+            return;
+        }
+        log.warn("traceId={} bizOrderNo={} taskId={} taskType={} partitionNo={} workerId={} requestPath={} "
+                        + "errorNo={} errorMsg={} dead={} async compensation task failed",
+                TraceIdUtil.getTraceId(),
+                task.getBizOrderNo(),
+                task.getTaskId(),
+                task.getTaskType(),
+                task.getPartitionNo(),
+                workerId,
+                task.getRequestPath(),
+                resolveErrorNo(exception),
+                resolveErrorMsg(exception),
+                false);
+    }
+
+    private String resolveErrorNo(RuntimeException exception) {
         if (exception instanceof BizException bizException) {
-            return String.valueOf(bizException.getCode());
+            return bizException.getErrorNo();
         }
         return exception.getClass().getSimpleName();
+    }
+
+    private String resolveErrorMsg(RuntimeException exception) {
+        if (exception instanceof BizException bizException) {
+            return bizException.getErrorMsg();
+        }
+        String message = exception.getMessage();
+        return message == null || message.isBlank() ? exception.getClass().getSimpleName() : message;
     }
 }
