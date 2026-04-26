@@ -1,6 +1,7 @@
 package com.nexusfin.equity.controller;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.nexusfin.equity.entity.AsyncCompensationTask;
 import com.nexusfin.equity.entity.BenefitOrder;
 import com.nexusfin.equity.entity.BenefitProduct;
 import com.nexusfin.equity.entity.ContractArchive;
@@ -10,6 +11,8 @@ import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.entity.MemberPaymentProtocol;
 import com.nexusfin.equity.entity.SignTask;
 import com.nexusfin.equity.enums.MemberStatusEnum;
+import com.nexusfin.equity.exception.UpstreamTimeoutException;
+import com.nexusfin.equity.repository.AsyncCompensationTaskRepository;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.repository.BenefitProductRepository;
 import com.nexusfin.equity.repository.ContractArchiveRepository;
@@ -18,6 +21,8 @@ import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
+import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
+import com.nexusfin.equity.util.AsyncCompensationPartitioner;
 import com.nexusfin.equity.util.JwtUtil;
 import com.nexusfin.equity.util.SensitiveDataCipher;
 import java.time.LocalDateTime;
@@ -31,11 +36,14 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -74,15 +82,25 @@ class BenefitOrderControllerIntegrationTest {
     private IdempotencyRecordRepository idempotencyRecordRepository;
 
     @Autowired
+    private AsyncCompensationTaskRepository asyncCompensationTaskRepository;
+
+    @Autowired
+    private AsyncCompensationPartitioner asyncCompensationPartitioner;
+
+    @Autowired
     private JwtUtil jwtUtil;
 
     @Autowired
     private SensitiveDataCipher sensitiveDataCipher;
 
+    @SpyBean
+    private QwBenefitClient qwBenefitClient;
+
     @BeforeEach
     void setUp() {
         contractArchiveRepository.delete(null);
         signTaskRepository.delete(null);
+        asyncCompensationTaskRepository.delete(null);
         benefitOrderRepository.delete(null);
         idempotencyRecordRepository.delete(null);
         memberPaymentProtocolRepository.delete(null);
@@ -249,6 +267,105 @@ class BenefitOrderControllerIntegrationTest {
         assertThat(output).contains("traceId=trace-log-001 bizOrderNo=" + order.getBenefitOrderNo() + " exercise url requested");
     }
 
+    @Test
+    void shouldEnqueueAsyncCompensationWhenQwSyncFails() throws Exception {
+        BenefitProduct product = createProduct("P-006");
+        MemberInfo memberInfo = createReadyMember("mem-006", "user-compensation-enqueue");
+        doThrow(new UpstreamTimeoutException("QW member sync timeout"))
+                .when(qwBenefitClient)
+                .syncMemberOrder(any());
+
+        mockMvc.perform(post("/api/equity/orders")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "requestId": "req-order-compensation-001",
+                                  "productCode": "%s",
+                                  "loanAmount": 800000,
+                                  "agreementSigned": true
+                                }
+                                """.formatted(product.getProductCode())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(-1))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("QW_SYNC_TIMEOUT")));
+
+        BenefitOrder order = benefitOrderRepository.selectOne(Wrappers.<BenefitOrder>lambdaQuery()
+                .eq(BenefitOrder::getRequestId, "req-order-compensation-001")
+                .last("limit 1"));
+        assertThat(order).isNotNull();
+
+        AsyncCompensationTask task = asyncCompensationTaskRepository.selectOne(Wrappers.<AsyncCompensationTask>lambdaQuery()
+                .eq(AsyncCompensationTask::getTaskType, "QW_BENEFIT_PURCHASE_RETRY")
+                .eq(AsyncCompensationTask::getBizOrderNo, order.getBenefitOrderNo())
+                .last("limit 1"));
+        assertThat(task).isNotNull();
+        assertThat(task.getBizKey()).isEqualTo("BENEFIT_PURCHASE:" + order.getBenefitOrderNo());
+        assertThat(task.getTaskStatus()).isEqualTo("INIT");
+        assertThat(task.getPartitionNo()).isEqualTo(asyncCompensationPartitioner.partitionOf(task.getBizKey()));
+    }
+
+    @Test
+    void shouldUpdateBenefitOrderSyncStatusWhenSyncFails() throws Exception {
+        BenefitProduct product = createProduct("P-007");
+        MemberInfo memberInfo = createReadyMember("mem-007", "user-compensation-status");
+        doThrow(new UpstreamTimeoutException("QW member sync timeout"))
+                .when(qwBenefitClient)
+                .syncMemberOrder(any());
+
+        mockMvc.perform(post("/api/equity/orders")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "requestId": "req-order-compensation-002",
+                                  "productCode": "%s",
+                                  "loanAmount": 800000,
+                                  "agreementSigned": true
+                                }
+                                """.formatted(product.getProductCode())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(-1));
+
+        BenefitOrder order = benefitOrderRepository.selectOne(Wrappers.<BenefitOrder>lambdaQuery()
+                .eq(BenefitOrder::getRequestId, "req-order-compensation-002")
+                .last("limit 1"));
+        assertThat(order).isNotNull();
+        assertThat(order.getSyncStatus()).isEqualTo("SYNC_FAIL");
+    }
+
+    @Test
+    void shouldReturnFailureCodeToControllerEvenWhenCompensationEnqueued() throws Exception {
+        BenefitProduct product = createProduct("P-008");
+        MemberInfo memberInfo = createReadyMember("mem-008", "user-compensation-response");
+        doThrow(new UpstreamTimeoutException("QW member sync timeout"))
+                .when(qwBenefitClient)
+                .syncMemberOrder(any());
+
+        mockMvc.perform(post("/api/equity/orders")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "requestId": "req-order-compensation-003",
+                                  "productCode": "%s",
+                                  "loanAmount": 800000,
+                                  "agreementSigned": true
+                                }
+                                """.formatted(product.getProductCode())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(-1))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("QW_SYNC_TIMEOUT")));
+
+        BenefitOrder order = benefitOrderRepository.selectOne(Wrappers.<BenefitOrder>lambdaQuery()
+                .eq(BenefitOrder::getRequestId, "req-order-compensation-003")
+                .last("limit 1"));
+        assertThat(order).isNotNull();
+        assertThat(asyncCompensationTaskRepository.selectCount(Wrappers.<AsyncCompensationTask>lambdaQuery()
+                .eq(AsyncCompensationTask::getBizOrderNo, order.getBenefitOrderNo())
+                .eq(AsyncCompensationTask::getTaskType, "QW_BENEFIT_PURCHASE_RETRY"))).isEqualTo(1);
+    }
+
     private BenefitProduct createProduct(String productCode) {
         BenefitProduct product = new BenefitProduct();
         product.setProductCode(productCode);
@@ -302,6 +419,13 @@ class BenefitOrderControllerIntegrationTest {
         protocol.setCreatedTs(LocalDateTime.now());
         protocol.setUpdatedTs(LocalDateTime.now());
         memberPaymentProtocolRepository.insert(protocol);
+    }
+
+    private MemberInfo createReadyMember(String memberId, String externalUserId) {
+        MemberInfo memberInfo = createMember(memberId, externalUserId);
+        createChannel(memberId, externalUserId);
+        createActiveProtocol(memberId, externalUserId);
+        return memberInfo;
     }
 
     private BenefitOrder createOrder(MemberInfo memberInfo, BenefitProduct product) {
