@@ -1,7 +1,7 @@
 package com.nexusfin.equity.service;
 
 import com.nexusfin.equity.config.BusinessProperties;
-import com.nexusfin.equity.dto.request.GrantForwardCallbackRequest;
+import com.nexusfin.equity.dto.request.LoanResultCallbackRequest;
 import com.nexusfin.equity.dto.response.PaymentStatusResponse;
 import com.nexusfin.equity.entity.BenefitOrder;
 import com.nexusfin.equity.entity.PaymentRecord;
@@ -75,7 +75,10 @@ class FallbackDeductServiceTest {
         return order;
     }
 
-    private GrantForwardCallbackRequest request(String requestId) {
-        return new GrantForwardCallbackRequest(requestId, "ord", "SUCCESS", 680000L, "loan-1", null, "2026-03-23T20:31:00", 1711197060L);
+    private LoanResultCallbackRequest request(String requestId) {
+        return new LoanResultCallbackRequest(
+                requestId, "user-1", null, "ord", "ord", "loan-1",
+                7001, null, 680000L, 710000L, 1711197060L, null, null, null
+        );
     }
 }

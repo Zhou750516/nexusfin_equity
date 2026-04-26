@@ -132,6 +132,15 @@ nexusfin:
         repay-trial: ${YUNKA_REPAY_TRIAL_PATH:/repay/trial}
         repay-apply: ${YUNKA_REPAY_APPLY_PATH:/repay/apply}
         repay-query: ${YUNKA_REPAY_QUERY_PATH:/repay/query}
+        protocol-query: ${YUNKA_PROTOCOL_QUERY_PATH:/protocol/queryProtocolAggregationLink}
+        user-token: ${YUNKA_USER_TOKEN_PATH:/user/token}
+        user-query: ${YUNKA_USER_QUERY_PATH:/user/query}
+        loan-repay-plan: ${YUNKA_LOAN_REPAY_PLAN_PATH:/loan/repayPlan}
+        card-sms-send: ${YUNKA_CARD_SMS_SEND_PATH:/card/smsSend}
+        card-sms-confirm: ${YUNKA_CARD_SMS_CONFIRM_PATH:/card/smsConfirm}
+        card-user-cards: ${YUNKA_CARD_USER_CARDS_PATH:/card/userCards}
+        credit-image-query: ${YUNKA_CREDIT_IMAGE_QUERY_PATH:/credit/image/query}
+        benefit-sync: ${YUNKA_BENEFIT_SYNC_PATH:/benefit/sync}
     tech-platform:
       enabled: ${TECH_PLATFORM_API_ENABLED:true}
       mode: ${TECH_PLATFORM_API_MODE:MOCK}

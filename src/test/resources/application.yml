@@ -106,6 +106,15 @@ nexusfin:
         repay-trial: /repay/trial
         repay-apply: /repay/apply
         repay-query: /repay/query
+        protocol-query: /protocol/queryProtocolAggregationLink
+        user-token: /user/token
+        user-query: /user/query
+        loan-repay-plan: /loan/repayPlan
+        card-sms-send: /card/smsSend
+        card-sms-confirm: /card/smsConfirm
+        card-user-cards: /card/userCards
+        credit-image-query: /credit/image/query
+        benefit-sync: /benefit/sync
     tech-platform:
       enabled: true
       mode: MOCK

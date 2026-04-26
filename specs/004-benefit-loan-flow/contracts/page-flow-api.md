@@ -1,50 +1,110 @@
 # Contract Notes: Page Flow APIs
 
-本文件记录 `004-benefit-loan-flow` 的页面 API 范围边界。
+本文件记录 `004-benefit-loan-flow` 当前 **H5 对艾博生后端** 的页面接口口径，以及已落地的字段边界。
 
 ## Current Status
 
-基于 `2026-04-10` 技术方案调整，所有用户可见 H5 页面统一由艾博生提供；云卡不再承接用户页面，只承担 gateway 服务。
+当前实现不是“新增一套页面 API”，而是在既有 H5 接口形状上，逐步对齐“小花 `4.22` + 艾博生 -> 云卡 -> 小花”的最新边界。
 
-当前实现切片**仍没有新增页面 HTTP API**，但页面职责边界已更新。
+已落地原则：
 
-原因：
+- H5 仍只调用艾博生后端接口
+- Controller 统一返回 `Result<T>`
+- 页面接口保持当前 versionless path，不额外引入 `/v1`
+- 页面层不直接感知云卡 / 小花的原始报文
 
-- 需要先统一页面归属与外部调用边界，再恢复页面 API 实现。
-- 当前后端优先固化“艾博生 -> 云卡 gateway”契约，而不是继续沿旧边界实现页面接口。
+## Implemented Page APIs
 
-## Planned Page APIs
+### 权益页
 
-后续计划中的页面 API 包括：
+| Endpoint | Method | Purpose | Current Notes |
+| --- | --- | --- | --- |
+| `/api/benefits/card-detail` | `GET` | 查询权益卡详情 | 返回本地展示配置 + 动态协议列表 + 用户绑卡摘要 + `protocolReady` |
+| `/api/benefits/activate` | `POST` | 开通权益 | 校验卡类型、协议 readiness，并在成功后触发权益订单同步 |
 
-- 艾博生权益页：
-  - `/api/equity/info`
-  - `/api/equity/rules`
-  - `/api/users/payment-card`
-- 艾博生借款确认/状态：
-  - `/api/loan/trial`
-  - `/api/loan/status`
-  - `/api/users/receiving-card`
-- 艾博生还款：
-  - `/api/repayment/trial`
-  - 还款确认接口
+`/api/benefits/card-detail` 当前已聚合：
 
-## Gateway Boundary
+- 本地权益文案与价格配置
+- `protocol/queryProtocolAggregationLink` 动态协议
+- `card/userCards` 用户绑卡列表
+- 后端协议 readiness 判断结果
 
-页面层不直接调用科技平台；后续服务端统一通过云卡 gateway 获取：
+### 借款页
 
-- 联合登录用户校验
-- 授信 / 审批结果
-- 借款试算 / 确认 / 放款结果
-- 已绑卡列表 / 还款试算 / 还款结果
+| Endpoint | Method | Purpose | Current Notes |
+| --- | --- | --- | --- |
+| `/api/loan/calculator-config` | `GET` | 获取试算配置 | 保持 H5 当前试算页所需配置形状 |
+| `/api/loan/calculate` | `POST` | 借款试算 | 通过 Yunka 调用借款试算并回填 H5 结果 |
+| `/api/loan/apply` | `POST` | 提交借款申请 | 保持现有 H5 入口，已扩展 richer Xiaohua fields |
+| `/api/loan/approval-status/{applicationId}` | `GET` | 查询审批中页状态 | 映射 Yunka / Xiaohua 状态为 H5 页面阶段 |
+| `/api/loan/approval-result/{applicationId}` | `GET` | 查询审批结果页 | 已按 `7001/7002/7003` 重新映射，并在成功时可补 repayment plan |
 
-对应业务接口文档见：
+`/api/loan/apply` 当前已支持的扩展字段包括：
 
-- `docs/third-part/云卡/20260410_艾博生调用云卡接口文档.md`
+- `loanReason`
+- `bankCardNum`
+- `basicInfo`
+- `idInfo`
+- `contactInfo`
+- `supplementInfo`
+- `optionInfo`
+- `imageInfo`
+- `platformBenefitOrderNo`
 
-## Contract Rules
+### 还款页
 
-- 统一使用 `Result<T>`
-- 保持 versionless path
-- 写接口使用 `@Valid`
-- 内部金额字段优先 `Long` 分；外部第三方契约字段按提供方文档保留原始单位
+| Endpoint | Method | Purpose | Current Notes |
+| --- | --- | --- | --- |
+| `/api/repayment/info/{loanId}` | `GET` | 查询还款信息 | 返回应还金额、绑卡信息、短信确认所需上下文 |
+| `/api/repayment/sms-send` | `POST` | 发送短信验证码 | 对接 `card/smsSend` |
+| `/api/repayment/sms-confirm` | `POST` | 确认短信验证码 | 对接 `card/smsConfirm` |
+| `/api/repayment/submit` | `POST` | 发起主动还款 | 保持 H5 还款确认入口 |
+| `/api/repayment/result/{repaymentId}` | `GET` | 查询还款结果 | 对齐 `swiftNumber`、卡上下文、pending/success/failure 语义 |
+
+## H5-Facing Mapping Rules
+
+### 借款状态映射
+
+当前后端已按小花 `4.22` 语义对齐：
+
+| Upstream Status | Meaning | H5 Interpretation |
+| --- | --- | --- |
+| `7001` | 放款成功 | success / approved |
+| `7002` | 放款中 | processing |
+| `7003` | 放款失败 | failure / rejected |
+
+### 还款状态映射
+
+当前后端对 H5 暴露统一语义：
+
+- `pending`
+- `success`
+- `failure`
+
+其中会兼容 Yunka / Xiaohua 不同返回字段名和状态码口径。
+
+## Callback Entry APIs
+
+虽然以下接口不是 H5 页面入口，但与页面最终状态闭环直接相关：
+
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/api/callbacks/grant/forward` | `POST` | 接收 Yunka 转发的小花放款结果通知 |
+| `/api/callbacks/repayment/forward` | `POST` | 接收 Yunka 转发的小花还款结果通知 |
+
+回调处理要求：
+
+- 保持幂等
+- 关键日志打印 `traceId + bizOrderNo + requestId`
+- 不把 Yunka 原始 envelope 直接泄漏给 H5
+
+## Boundary Notes
+
+当前有意 **未** 在本轮中直接改造以下高返工项：
+
+- `/api/loan/apply` 重排为“云卡先建放款订单”的最终主链
+- 云卡状态机真实接口定稿前的状态流硬编码
+- 法大大真实签章接入
+- H5 自动埋点全量代码改造
+
+这些内容以 `docs/plan/20260426_*.md` 方案文档继续承接。

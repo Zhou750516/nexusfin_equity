@@ -13,20 +13,21 @@ import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
+import com.nexusfin.equity.support.AbstractYunkaXiaohuaIT;
+import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanItem;
+import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanResponse;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import com.nexusfin.equity.util.JwtUtil;
 import com.nexusfin.equity.util.SensitiveDataCipher;
 import jakarta.servlet.http.Cookie;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
@@ -34,16 +35,15 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
-@AutoConfigureMockMvc
 @ExtendWith(OutputCaptureExtension.class)
-class Phase9TaskGroupCIntegrationTest {
+class Phase9TaskGroupCIntegrationTest extends AbstractYunkaXiaohuaIT {
 
     @Autowired
     private MockMvc mockMvc;
@@ -80,9 +80,6 @@ class Phase9TaskGroupCIntegrationTest {
 
     @Autowired
     private SensitiveDataCipher sensitiveDataCipher;
-
-    @MockBean
-    private YunkaGatewayClient yunkaGatewayClient;
 
     @BeforeEach
     void setUp() {
@@ -188,7 +185,7 @@ class Phase9TaskGroupCIntegrationTest {
         createApplicationMapping(memberInfo, "APP202604130002", "LOAN202604130002");
         JsonNode yunkaData = objectMapper.readTree("""
                 {
-                  "status": "7003",
+                  "status": "7001",
                   "loanAmount": 300000,
                   "repayAmount": 313500,
                   "loanDate": "2026-04-13T10:00:00+08:00",
@@ -197,6 +194,10 @@ class Phase9TaskGroupCIntegrationTest {
                 """);
         when(yunkaGatewayClient.proxy(any()))
                 .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", yunkaData));
+        when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("APP202604130002"), any()))
+                .thenReturn(new LoanRepayPlanResponse(List.of(
+                        new LoanRepayPlanItem(1, "2026-05-07", 100000L, 4500L, 104500L)
+                )));
 
         mockMvc.perform(get("/api/loan/approval-result/APP202604130002")
                         .cookie(authCookie(memberInfo)))
@@ -206,6 +207,7 @@ class Phase9TaskGroupCIntegrationTest {
                 .andExpect(jsonPath("$.data.status").value("approved"))
                 .andExpect(jsonPath("$.data.approvedAmount").value(3000))
                 .andExpect(jsonPath("$.data.benefitsCardActivated").value(true))
+                .andExpect(jsonPath("$.data.repaymentPlan[0].repaymentAmount").value(1045))
                 .andExpect(jsonPath("$.data.loanId").value("LOAN202604130002"));
     }
 
@@ -215,7 +217,7 @@ class Phase9TaskGroupCIntegrationTest {
         createApplicationMapping(memberInfo, "APP202604130003", "LOAN202604130003");
         JsonNode yunkaData = objectMapper.readTree("""
                 {
-                  "status": "7003",
+                  "status": "7001",
                   "loanAmount": 300000,
                   "repayAmount": 313500,
                   "loanDate": "2026-04-13T10:00:00+08:00",

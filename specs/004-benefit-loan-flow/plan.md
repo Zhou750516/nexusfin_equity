@@ -1,41 +1,60 @@
 # Implementation Plan: 惠选卡权益与借款流程 V1 页面交互理解
 
-**Branch**: `004-benefit-loan-flow` | **Date**: 2026-03-30 | **Spec**: [/Users/lixiaokun/Projects/nexusFin/nexusfin-equity/specs/004-benefit-loan-flow/spec.md](/Users/lixiaokun/Projects/nexusFin/nexusfin-equity/specs/004-benefit-loan-flow/spec.md)
+**Branch**: `004-benefit-loan-flow` | **Date**: 2026-04-24 | **Spec**: `/Users/lixiaokun/Projects/nexusFin/nexusfin-equity/specs/004-benefit-loan-flow/spec.md`
 **Input**: Feature specification from `/specs/004-benefit-loan-flow/spec.md`
 
 ## Summary
 
-本轮实现先遵循“abs-h5 + yunka-gateway-first”策略：所有 H5 页面统一由艾博生承载，艾博生服务端不再直接对接科技平台，而是先定义并落稳“艾博生 -> 云卡 gateway”这一层统一契约，为后续借款状态同步、还款结果同步和页面编排提供稳定底座。
+当前代码已经完成艾博生 H5 面向权益、借款、还款三条主线的第一版接口落地，核心入口已经存在：
 
-当前切片聚焦：
+- `GET /api/benefits/card-detail`
+- `POST /api/benefits/activate`
+- `GET /api/loan/calculator-config`
+- `POST /api/loan/calculate`
+- `POST /api/loan/apply`
+- `GET /api/loan/approval-status/{applicationId}`
+- `GET /api/loan/approval-result/{applicationId}`
+- `GET /api/repayment/info/{loanId}`
+- `POST /api/repayment/submit`
+- `GET /api/repayment/result/{repaymentId}`
 
-- 固化“艾博生提供全部 H5，云卡仅做 gateway”的系统边界
-- 产出艾博生调用云卡 gateway 的接口契约文档
-- 调整页面 API 规划，使借款确认与审核页面均归属艾博生
-- 在恢复代码实现前，以新网关边界为准重排后续实现顺序
-- 明确实施顺序为：先完成艾博生 H5 页面与艾博生后端接口联通，再推进艾博生 -> 云卡 -> 科技平台链路开发与联调
+但这批实现仍主要是“H5 主链先跑通”的第一版，还没有完全对齐 `科技平台-小花接口文档-艾博生4.22` 与 `2026-04-23` 会议结论。
+
+本轮计划的目标不是再按旧假设继续补 direct tech-platform 能力，而是统一按以下边界收口：
+
+1. **艾博生通过云卡调用小花**
+2. **小花通过云卡回调艾博生**
+3. **借款主链要兼容新方案：艾博生先调用云卡建放款订单，权益成功后再由云卡触发小花放款**
+
+因此，本轮后续工作的核心是：
+
+- 复盘当前代码已实现基线
+- 找出相对小花 `4.22` 文档未实现或对齐错误的部分
+- 建立共享的“小花经云卡” typed DTO + facade
+- 重排权益、借款、还款、回调四条线的交付顺序
+- 将过时的 `T013-T033` 替换为面向当前代码现实的任务清单
 
 ## Technical Context
 
 **Language/Version**: Java 17  
-**Primary Dependencies**: Spring Boot 3.2.12, Spring Validation, Jackson, 文档先行的云卡 gateway 契约  
-**Storage**: MySQL 8.0 / H2（本轮以文档与边界重排为主，不新增持久化）  
-**Testing**: 文档评审、一致性检查；恢复代码实现后再补自动化测试  
+**Primary Dependencies**: Spring Boot 3.2.12, Spring Validation, Jackson, MyBatis-Plus, 当前 Yunka gateway 调用层  
+**Storage**: MySQL 8.0 / H2（本轮优先做接口对齐与服务编排，不以新增表为前置）  
+**Testing**: JUnit 5, Spring Boot integration tests, 文档一致性检查  
 **Target Platform**: Linux/macOS Spring Boot service runtime with ABS-owned H5  
 **Project Type**: Web service  
-**Performance Goals**: H5 页面由艾博生统一承载，核心查询/提交流程仍以接口 SLA 500ms-1500ms 为参考  
-**Constraints**: 保持现有 controller -> service -> repository 分层；云卡仅承担 gateway 与记录职责；艾博生不直接调用科技平台；本轮不新增数据库表  
-**Scale/Scope**: 本轮先完成云卡 gateway 契约与页面职责重排，不在本轮完成全部页面控制器与业务编排
+**Performance Goals**: H5 查询与提交接口继续以 500ms-1500ms 为参考；上游 Yunka/小花响应遵循现有 SLA 设计  
+**Constraints**: 保持 `controller -> service -> repository` 分层；统一 `Result<T>`；接口路径不带版本号；关键日志包含 `traceId + bizOrderNo`；艾博生不直接集成小花协议细节到 controller 层  
+**Scale/Scope**: 本轮聚焦“已实现代码与小花 4.22 文档的对齐改造”，不在本轮内直接完成全部云卡新状态机接口改造
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-- `Result<T>` response envelope, `@Valid` request validation, and versionless API paths are identified for后续艾博生 H5 API；本轮主要新增外部接口文档，不直接暴露新的代码接口。
-- Business logic placement remains `controller -> service -> repository`；云卡 gateway 作为外部边界被隔离，不把科技平台协议细节直接扩散到页面层。
-- Domain data rules are preserved；本轮未新增数据库实体，跨系统主关联键以 `uid`、`benefitOrderNo`、`applyId`、`loanId` 等为主。
-- Operational rules are covered：云卡 gateway 文档明确要求记录 `traceId + requestId + bizOrderNo`，后续实现时再补具体日志与审计表设计。
-- Verification plan includes plan/spec/contract consistency review，恢复代码实现后再执行 `mvn test`、`mvn clean package -DskipTests`、`mvn checkstyle:check`。
+- 继续保持所有新增/改造的 REST 接口返回 `Result<T>`，并使用 `@Valid` 做参数校验。
+- 所有业务逻辑继续放在 service 层，controller 只负责参数接收与响应包装。
+- Yunka 仍是艾博生访问小花的唯一网关边界，小花协议字段不直接扩散到页面控制器。
+- 关键主键至少覆盖 `traceId`、`bizOrderNo`、`applicationId`、`loanId`、`repaymentId`、`requestId` 等链路标识。
+- 本轮验证以“共享 facade 单测 + 现有 loan/repay/benefits service/controller 测试补齐”为主，之后再做联调级验证。
 
 ## Project Structure
 
@@ -48,11 +67,17 @@ specs/004-benefit-loan-flow/
 ├── data-model.md
 ├── quickstart.md
 ├── contracts/
-│   └── page-flow-api.md
+│   ├── page-flow-api.md
+│   └── tech-platform-outbound.md
 └── tasks.md
 
-docs/third-part/云卡/
-└── 20260410_艾博生调用云卡接口文档.md
+docs/third-part/科技平台/
+└── 科技平台-小花接口文档-艾博生4.22_整理分析.md
+
+docs/plan/
+├── 20260423_小花云卡齐为联动会议纪要与行动计划.md
+├── 20260424_小花4.22现有实现差异分析与开发计划.md
+└── 20260424_小花4.22开发任务拆解.md
 ```
 
 ### Source Code (repository root)
@@ -69,44 +94,132 @@ src/
 │   │   ├── entity/
 │   │   ├── dto/request/
 │   │   ├── dto/response/
-│   │   └── thirdparty/
+│   │   ├── thirdparty/techplatform/
+│   │   └── thirdparty/yunka/
 │   └── resources/application.yml
 └── test/
-    └── resources/
+    └── java/com/nexusfin/equity/
 ```
 
-**Structure Decision**: 保持单体 Spring Boot 服务结构，不把外部协议细节散落到 service 层。后续如恢复代码实现，统一收敛在 `src/main/java/com/nexusfin/equity/thirdparty/` 下，以“艾博生 -> 云卡 gateway”为第一层封装边界。
+**Structure Decision**: 保持现有单体 Spring Boot 结构，但后续不再让 `LoanServiceImpl`、`RepaymentServiceImpl` 直接堆叠原始 Yunka JSON 解析，而是收敛为共享 `XiaohuaGatewayService` 或同等边界服务。
+
+## Current Implementation Baseline
+
+### 已实现能力
+
+1. H5 权益、借款、还款 API 入口已存在。
+2. 借款和还款核心上游调用已经走 `YunkaGatewayClient`。
+3. `NotificationCallbackController` 已有放款/还款 forward callback 基础入口。
+4. `TechPlatformClient` 已存在，但目前只保留旧的 3 个 notify 类接口，不是小花 `4.22` 主链。
+
+### 已识别主要缺口
+
+1. Yunka 路径配置只覆盖：
+   - `/loan/trail`
+   - `/loan/query`
+   - `/loan/apply`
+   - `/repay/trial`
+   - `/repay/apply`
+   - `/repay/query`
+2. 还缺以下小花 `4.22` 关键能力：
+   - `/protocol/queryProtocolAggregationLink`
+   - `/user/token`
+   - `/user/query`
+   - `/loan/repayPlan`
+   - `/card/smsSend`
+   - `/card/smsConfirm`
+   - `/card/userCards`
+   - `/credit/image/query`
+   - `2.15 权益订单同步`
+3. 当前 `LoanServiceImpl` 对 `loan/query` 的状态映射与小花 `4.22` 文档冲突：
+   - 当前代码将 `7003` 映射为成功
+   - 小花文档要求：`7001=成功`、`7002=处理中`、`7003=失败`
+4. 权益页仍以本地静态展示逻辑为主，未接动态协议和绑卡列表。
+5. 还款链路缺少短信发送、短信确认、动态绑卡列表。
+6. 回调链路仍是旧 forward callback 语义，未显式定义“小花通过云卡回调艾博生”的标准 DTO。
+
+## Gap Summary
+
+### Gap 1：共享基础层缺失
+
+- 没有面向小花 `4.22` 的 typed request/response 模型层
+- 没有统一的“小花经云卡 facade/service”
+- 没有统一的新放款/还款回调 DTO 与状态映射
+
+### Gap 2：权益页动态能力不足
+
+- 未接协议列表
+- 未接用户已绑卡列表
+- 未做权益订单同步
+- 协议阅读完成状态未形成稳定后端约束
+
+### Gap 3：借款链路与新主线不一致
+
+- `loan/apply` 字段不完整
+- `loan/query` 状态映射错误
+- 缺少 `loan/repayPlan`
+- 仍未显式适配“云卡先建放款订单，再触发小花放款”的新方案
+
+### Gap 4：还款链路缺少前置步骤
+
+- 没有 `smsSend`
+- 没有 `smsConfirm`
+- 没有 `userCards` 动态列表
+- 还款回调模型仍待标准化
+
+### Gap 5：旧 tasks 已过期
+
+- `T013-T033` 基于旧边界，不能直接继续执行
+- 需按当前代码实际完成度和新文档边界重写
 
 ## Delivery Sequence
 
-1. 第一阶段：优先完成艾博生 H5 页面与艾博生后端接口的联通性开发、页面冒烟验证和前后端联调。
-2. 第二阶段：在第一阶段稳定后，再完成艾博生调用云卡 gateway、由云卡转发科技平台接口的开发与联调。
-3. 排障顺序保持“先内部、后外部”，避免在页面链路未稳定时过早引入跨系统联调噪音。
+1. 第一阶段：共享基础收口
+   - 扩展 Yunka path 配置
+   - 建立 typed DTO
+   - 建立共享 facade/service
+   - 固化放款/还款回调 DTO
+2. 第二阶段：权益页动态化
+   - 接协议列表
+   - 接绑卡列表
+   - 补权益同步
+3. 第三阶段：借款链路对齐
+   - 修状态映射
+   - 补申请字段
+   - 补 `loan/repayPlan`
+   - 接放款回调
+4. 第四阶段：还款链路对齐
+   - 接 `smsSend`
+   - 接 `smsConfirm`
+   - 接 `userCards`
+   - 接还款回调
+5. 第五阶段：待云卡新接口定稿后，再推进“云卡建放款订单 / 云卡状态查询 / 放弃权益关单”主链改造
 
 ## Phase 0: Research Summary
 
-- `2026-04-10` 决策已将所有 H5 页面统一收敛到艾博生，因此原“云卡页面”假设不再成立。
-- 艾博生与科技平台之间不再直连，统一改为调用云卡 gateway，再由云卡转发科技平台。
-- 云卡当前只承担 gateway 职责，因此最先需要定版的是接口清单、统一 header、统一响应结构、幂等与日志要求。
-- 在网关真实协议未确认前，不继续推进直接面向科技平台的代码实现，以避免边界返工。
+- `docs/third-part/科技平台/科技平台-小花接口文档-艾博生4.22_整理分析.md` 已明确当前项目实际方向：艾博生通过云卡调用小花，小花通过云卡回调艾博生。
+- `docs/plan/20260423_小花云卡齐为联动会议纪要与行动计划.md` 已确认借款主链变化：云卡先建放款订单，权益成功后再触发放款。
+- 当前代码已落地 H5 主入口，因此本轮不是从零开发，而是“在现有入口上做文档和协议对齐”。
+- 旧的 `specs/004-benefit-loan-flow/tasks.md` 未完成部分已经落后于当前代码与外部文档边界，必须重排。
 
 ## Phase 1: Design Outputs
 
-- 页面职责重排：权益页、借款确认页、借款审核页、还款页均由艾博生提供
-- 网关契约文档：`docs/third-part/云卡/20260410_艾博生调用云卡接口文档.md`
-- 页面边界文档：`specs/004-benefit-loan-flow/contracts/page-flow-api.md`
-- 第一阶段实现入口：优先落艾博生 H5 所需页面接口与内部服务编排
-- 第二阶段实现入口：待云卡 gateway 契约确认后，再拆分 `auth`、`credit`、`loan`、`repay` 客户端模型
+- 对齐分析文档：`docs/plan/20260424_小花4.22现有实现差异分析与开发计划.md`
+- 任务拆解文档：`docs/plan/20260424_小花4.22开发任务拆解.md`
+- 小花 `4.22` Markdown 整理文档：`docs/third-part/科技平台/科技平台-小花接口文档-艾博生4.22_整理分析.md`
+- 本 feature 新版 `plan.md`
+- 本 feature 新版 `tasks.md`
 
 ## Post-Design Constitution Check
 
-- 没有引入跨系统职责越界：ABS 仅承载 H5 与自身业务，云卡仅做 gateway，科技平台继续作为能力提供方。
-- 没有新增数据库耦合或绕过 service 的捷径。
-- 页面责任与服务端调用责任已在文档中重新隔离。
-- 在真实接口未定前，先做文档定版而不是推进错误边界下的实现，符合低返工原则。
+- 没有回退到“艾博生直连小花”的旧边界。
+- 没有把云卡网关协议细节直接散落到 controller。
+- 没有忽略当前代码已实现基线，而是按“增量对齐”方式规划。
+- 没有继续沿用已过期的 `T013-T033` 任务顺序。
 
 ## Complexity Tracking
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| 先更新文档而不恢复代码实现 | 新技术边界刚调整，优先避免错误实现继续扩散 | 直接沿旧方案继续开发会放大“页面归属”和“调用方向”的返工成本 |
+| 保留现有 H5 API 入口并做增量对齐，而不是整体推倒重写 | 当前代码已存在完整第一版主链，整体重写风险高且回归范围大 | 从零重写会丢失现有 H5 联通成果，并放大联调风险 |
+| 暂不直接落“云卡先建放款订单”真实主链代码 | 云卡新接口尚未定稿 | 过早编码会把未确认状态机固化进代码 |

@@ -7,6 +7,8 @@ public record RepaymentInfoResponse(
         BigDecimal repaymentAmount,
         String repaymentType,
         BankAccountResponse bankCard,
+        java.util.List<BankAccountResponse> bankCards,
+        boolean smsRequired,
         String tip
 ) {
 }

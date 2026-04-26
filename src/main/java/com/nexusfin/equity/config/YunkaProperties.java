@@ -19,7 +19,16 @@ public record YunkaProperties(
             String loanApply,
             String repayTrial,
             String repayApply,
-            String repayQuery
+            String repayQuery,
+            String protocolQuery,
+            String userToken,
+            String userQuery,
+            String loanRepayPlan,
+            String cardSmsSend,
+            String cardSmsConfirm,
+            String cardUserCards,
+            String creditImageQuery,
+            String benefitSync
     ) {
     }
 }

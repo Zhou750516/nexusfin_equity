@@ -75,7 +75,16 @@ class RestYunkaGatewayClientTest {
                         "/loan/apply",
                         "/repay/trial",
                         "/repay/apply",
-                        "/repay/query"
+                        "/repay/query",
+                        "/protocol/queryProtocolAggregationLink",
+                        "/user/token",
+                        "/user/query",
+                        "/loan/repayPlan",
+                        "/card/smsSend",
+                        "/card/smsConfirm",
+                        "/card/userCards",
+                        "/credit/image/query",
+                        "/benefit/sync"
                 )
         );
     }

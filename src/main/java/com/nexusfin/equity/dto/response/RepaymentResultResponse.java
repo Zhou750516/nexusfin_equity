@@ -5,6 +5,7 @@ import java.util.List;
 
 public record RepaymentResultResponse(
         String repaymentId,
+        String swiftNumber,
         String status,
         BigDecimal amount,
         String repaymentTime,

@@ -15,9 +15,14 @@ import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
+import com.nexusfin.equity.service.XiaohuaGatewayService;
+import com.nexusfin.equity.thirdparty.yunka.ProtocolLink;
+import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryResponse;
+import com.nexusfin.equity.thirdparty.yunka.UserCardListResponse;
 import com.nexusfin.equity.util.JwtUtil;
 import com.nexusfin.equity.util.SensitiveDataCipher;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,10 +30,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -72,6 +82,9 @@ class Phase9TaskGroupAIntegrationTest {
     @Autowired
     private SensitiveDataCipher sensitiveDataCipher;
 
+    @MockBean
+    private XiaohuaGatewayService xiaohuaGatewayService;
+
     @BeforeEach
     void setUp() {
         contractArchiveRepository.delete(null);
@@ -82,6 +95,13 @@ class Phase9TaskGroupAIntegrationTest {
         memberChannelRepository.delete(null);
         memberInfoRepository.delete(null);
         benefitProductRepository.delete(null);
+
+        // Safe defaults: match what mock-mode RestYunkaGatewayClient returns (empty lists),
+        // so card-detail tests keep working. The activate test overrides queryProtocols below.
+        lenient().when(xiaohuaGatewayService.queryProtocols(any(), any(), any()))
+                .thenReturn(new ProtocolQueryResponse(List.of()));
+        lenient().when(xiaohuaGatewayService.queryUserCards(any(), any(), any()))
+                .thenReturn(new UserCardListResponse(List.of()));
     }
 
     @Test
@@ -167,6 +187,13 @@ class Phase9TaskGroupAIntegrationTest {
         MemberInfo memberInfo = createMember("mem-benefit-activate", "user-benefit-activate");
         createChannel(memberInfo.getMemberId(), memberInfo.getExternalUserId());
         createActiveProtocol(memberInfo.getMemberId(), memberInfo.getExternalUserId());
+
+        // Override default empty protocols: activate flow checks protocolReady which requires
+        // a non-empty dynamic protocol list (in addition to the active payment protocol seeded above).
+        when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(new ProtocolQueryResponse(List.of(
+                        new ProtocolLink("借款协议", 1, "https://agreements/loan")
+                )));
 
         mockMvc.perform(post("/api/benefits/activate")
                         .cookie(authCookie(memberInfo))

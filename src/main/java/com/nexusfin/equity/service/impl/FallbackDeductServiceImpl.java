@@ -2,7 +2,7 @@ package com.nexusfin.equity.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.nexusfin.equity.config.BusinessProperties;
-import com.nexusfin.equity.dto.request.GrantForwardCallbackRequest;
+import com.nexusfin.equity.dto.request.LoanResultCallbackRequest;
 import com.nexusfin.equity.dto.response.PaymentStatusResponse;
 import com.nexusfin.equity.entity.BenefitOrder;
 import com.nexusfin.equity.entity.PaymentRecord;
@@ -37,7 +37,7 @@ public class FallbackDeductServiceImpl implements FallbackDeductService {
 
     @Override
     @Transactional
-    public PaymentStatusResponse triggerFallback(BenefitOrder order, GrantForwardCallbackRequest request) {
+    public PaymentStatusResponse triggerFallback(BenefitOrder order, LoanResultCallbackRequest request) {
         // 兜底代扣只能被 grant success 事件推动一次，所以先查既有记录，避免重复触发。
         PaymentRecord existing = paymentRecordRepository.selectOne(Wrappers.<PaymentRecord>lambdaQuery()
                 .eq(PaymentRecord::getBenefitOrderNo, order.getBenefitOrderNo())

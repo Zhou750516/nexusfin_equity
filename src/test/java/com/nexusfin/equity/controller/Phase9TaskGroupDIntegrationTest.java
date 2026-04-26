@@ -5,13 +5,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.enums.MemberStatusEnum;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
-import com.nexusfin.equity.repository.ContractArchiveRepository;
 import com.nexusfin.equity.repository.IdempotencyRecordRepository;
 import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
+import com.nexusfin.equity.support.AbstractYunkaXiaohuaIT;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import com.nexusfin.equity.util.JwtUtil;
 import com.nexusfin.equity.util.SensitiveDataCipher;
@@ -23,9 +23,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
@@ -40,10 +37,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
-@AutoConfigureMockMvc
 @ExtendWith(OutputCaptureExtension.class)
-class Phase9TaskGroupDIntegrationTest {
+class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
 
     @Autowired
     private MockMvc mockMvc;
@@ -67,7 +62,7 @@ class Phase9TaskGroupDIntegrationTest {
     private SignTaskRepository signTaskRepository;
 
     @Autowired
-    private ContractArchiveRepository contractArchiveRepository;
+    private com.nexusfin.equity.repository.ContractArchiveRepository contractArchiveRepository;
 
     @Autowired
     private IdempotencyRecordRepository idempotencyRecordRepository;
@@ -80,9 +75,6 @@ class Phase9TaskGroupDIntegrationTest {
 
     @Autowired
     private SensitiveDataCipher sensitiveDataCipher;
-
-    @MockBean
-    private YunkaGatewayClient yunkaGatewayClient;
 
     @BeforeEach
     void setUp() {

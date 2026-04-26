@@ -11,6 +11,16 @@ public record LoanApprovalResultResponse(
         List<LoanApprovalStatusResponse.ApprovalStep> steps,
         boolean benefitsCardActivated,
         String tip,
-        String loanId
+        String loanId,
+        List<RepaymentPlanItem> repaymentPlan
 ) {
+
+    public record RepaymentPlanItem(
+            Integer periodNo,
+            String repaymentDate,
+            BigDecimal repaymentPrincipal,
+            BigDecimal repaymentInterest,
+            BigDecimal repaymentAmount
+    ) {
+    }
 }

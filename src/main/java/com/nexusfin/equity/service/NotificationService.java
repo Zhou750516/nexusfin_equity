@@ -1,15 +1,15 @@
 package com.nexusfin.equity.service;
 
 import com.nexusfin.equity.dto.request.ExerciseCallbackRequest;
-import com.nexusfin.equity.dto.request.GrantForwardCallbackRequest;
-import com.nexusfin.equity.dto.request.RepaymentForwardCallbackRequest;
+import com.nexusfin.equity.dto.request.LoanResultCallbackRequest;
+import com.nexusfin.equity.dto.request.RepaymentResultCallbackRequest;
 import com.nexusfin.equity.dto.request.RefundCallbackRequest;
 
 public interface NotificationService {
 
-    void handleGrant(GrantForwardCallbackRequest request);
+    void handleGrant(LoanResultCallbackRequest request);
 
-    void handleRepayment(RepaymentForwardCallbackRequest request);
+    void handleRepayment(RepaymentResultCallbackRequest request);
 
     void handleExercise(ExerciseCallbackRequest request);
 

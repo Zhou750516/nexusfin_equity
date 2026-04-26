@@ -6,7 +6,7 @@ import com.nexusfin.equity.dto.response.BenefitsCardDetailResponse;
 
 public interface BenefitsService {
 
-    BenefitsCardDetailResponse getCardDetail();
+    BenefitsCardDetailResponse getCardDetail(String memberId, String uid);
 
-    BenefitsActivateResponse activate(String memberId, BenefitsActivateRequest request);
+    BenefitsActivateResponse activate(String memberId, String uid, BenefitsActivateRequest request);
 }

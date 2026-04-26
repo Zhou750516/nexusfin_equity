@@ -66,15 +66,17 @@ class NotificationCallbackControllerIntegrationTest {
         String body = """
                 {
                   "requestId": "%s",
+                  "userId": "%s",
                   "benefitOrderNo": "%s",
-                  "grantStatus": "SUCCESS",
-                  "actualAmount": 680000,
-                  "loanOrderNo": "loan-%s",
-                  "failReason": null,
-                  "grantTime": "2026-03-23T20:10:00",
-                  "timestamp": 1711195800
+                  "platformBenefitOrderNo": "%s",
+                  "loanId": "loan-%s",
+                  "status": 7001,
+                  "remark": null,
+                  "loanAmount": 680000,
+                  "repayAmount": 710000,
+                  "loanDate": 1711195800
                 }
-                """.formatted(requestId, order.getBenefitOrderNo(), requestId);
+                """.formatted(requestId, order.getExternalUserId(), order.getBenefitOrderNo(), order.getBenefitOrderNo(), requestId);
 
         mockMvc.perform(post("/api/callbacks/grant/forward")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -106,6 +108,8 @@ class NotificationCallbackControllerIntegrationTest {
     @Test
     void shouldPersistRepaymentNotification() throws Exception {
         BenefitOrder order = createOrder("ord-repayment", "user-repayment");
+        order.setLoanOrderNo("loan-repayment");
+        benefitOrderRepository.updateById(order);
         String requestId = "req-repayment-" + UUID.randomUUID().toString().replace("-", "");
 
         mockMvc.perform(post("/api/callbacks/repayment/forward")
@@ -114,16 +118,19 @@ class NotificationCallbackControllerIntegrationTest {
                         .content("""
                                 {
                                   "requestId": "%s",
+                                  "userId": "%s",
                                   "benefitOrderNo": "%s",
-                                  "loanOrderNo": "loan-repayment",
-                                  "termNo": 1,
-                                  "repaymentStatus": "PAID",
-                                  "paidAmount": 680000,
-                                  "paidTime": "2026-03-23T20:12:00",
-                                  "overdueDays": 0,
-                                  "timestamp": 1711195920
+                                  "platformBenefitOrderNo": "%s",
+                                  "loanId": "loan-repayment",
+                                  "swiftNumber": "swift-repayment",
+                                  "status": 8001,
+                                  "repaymentType": 1,
+                                  "periods": "1",
+                                  "remark": null,
+                                  "amount": 680000,
+                                  "successTime": 1711195920
                                 }
-                                """.formatted(requestId, order.getBenefitOrderNo())))
+                                """.formatted(requestId, order.getExternalUserId(), order.getBenefitOrderNo(), order.getBenefitOrderNo())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0));
 
@@ -148,14 +155,17 @@ class NotificationCallbackControllerIntegrationTest {
                         .content("""
                                 {
                                   "requestId": "%s",
+                                  "userId": "user-missing",
                                   "benefitOrderNo": "ord-missing",
-                                  "loanOrderNo": "loan-missing",
-                                  "termNo": 1,
-                                  "repaymentStatus": "PAID",
-                                  "paidAmount": 680000,
-                                  "paidTime": "2026-03-23T20:12:00",
-                                  "overdueDays": 0,
-                                  "timestamp": 1711195920
+                                  "platformBenefitOrderNo": "ord-missing",
+                                  "loanId": "loan-missing",
+                                  "swiftNumber": "swift-missing",
+                                  "status": 8001,
+                                  "repaymentType": 1,
+                                  "periods": "1",
+                                  "remark": null,
+                                  "amount": 680000,
+                                  "successTime": 1711195920
                                 }
                                 """.formatted(requestId)))
                 .andExpect(status().isOk())

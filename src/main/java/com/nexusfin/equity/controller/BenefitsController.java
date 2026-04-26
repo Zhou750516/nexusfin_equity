@@ -32,16 +32,18 @@ public class BenefitsController {
 
     @GetMapping("/card-detail")
     public Result<BenefitsCardDetailResponse> getCardDetail() {
-        String memberId = AuthContextUtil.getRequiredPrincipal().memberId();
+        var principal = AuthContextUtil.getRequiredPrincipal();
+        String memberId = principal.memberId();
         log.info("traceId={} bizOrderNo={} benefits card detail requested by memberId={}",
                 TraceIdUtil.getTraceId(), "benefits-card-detail", memberId);
-        return Result.success(benefitsService.getCardDetail());
+        return Result.success(benefitsService.getCardDetail(memberId, principal.techPlatformUserId()));
     }
 
     @PostMapping("/activate")
     public Result<BenefitsActivateResponse> activate(@Valid @RequestBody BenefitsActivateRequest request) {
-        String memberId = AuthContextUtil.getRequiredPrincipal().memberId();
-        BenefitsActivateResponse response = benefitsService.activate(memberId, request);
+        var principal = AuthContextUtil.getRequiredPrincipal();
+        String memberId = principal.memberId();
+        BenefitsActivateResponse response = benefitsService.activate(memberId, principal.techPlatformUserId(), request);
         log.info("traceId={} bizOrderNo={} benefits activated by memberId={}",
                 TraceIdUtil.getTraceId(), response.activationId(), memberId);
         return Result.success(response);

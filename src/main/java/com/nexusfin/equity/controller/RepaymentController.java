@@ -1,8 +1,12 @@
 package com.nexusfin.equity.controller;
 
+import com.nexusfin.equity.dto.request.RepaymentSmsConfirmRequest;
+import com.nexusfin.equity.dto.request.RepaymentSmsSendRequest;
 import com.nexusfin.equity.dto.request.RepaymentSubmitRequest;
 import com.nexusfin.equity.dto.response.RepaymentInfoResponse;
 import com.nexusfin.equity.dto.response.RepaymentResultResponse;
+import com.nexusfin.equity.dto.response.RepaymentSmsConfirmResponse;
+import com.nexusfin.equity.dto.response.RepaymentSmsSendResponse;
 import com.nexusfin.equity.dto.response.RepaymentSubmitResponse;
 import com.nexusfin.equity.dto.response.Result;
 import com.nexusfin.equity.service.RepaymentService;
@@ -39,6 +43,22 @@ public class RepaymentController {
         log.info("traceId={} bizOrderNo={} repayment info requested by memberId={}",
                 TraceIdUtil.getTraceId(), loanId, principal.memberId());
         return Result.success(repaymentService.getInfo(principal.techPlatformUserId(), loanId));
+    }
+
+    @PostMapping("/sms-send")
+    public Result<RepaymentSmsSendResponse> sendSms(@Valid @RequestBody RepaymentSmsSendRequest request) {
+        AuthPrincipal principal = AuthContextUtil.getRequiredPrincipal();
+        log.info("traceId={} bizOrderNo={} repayment sms send requested by memberId={}",
+                TraceIdUtil.getTraceId(), request.loanId(), principal.memberId());
+        return Result.success(repaymentService.sendSms(principal.techPlatformUserId(), request));
+    }
+
+    @PostMapping("/sms-confirm")
+    public Result<RepaymentSmsConfirmResponse> confirmSms(@Valid @RequestBody RepaymentSmsConfirmRequest request) {
+        AuthPrincipal principal = AuthContextUtil.getRequiredPrincipal();
+        log.info("traceId={} bizOrderNo={} repayment sms confirm requested by memberId={}",
+                TraceIdUtil.getTraceId(), request.loanId(), principal.memberId());
+        return Result.success(repaymentService.confirmSms(principal.techPlatformUserId(), request));
     }
 
     @PostMapping("/submit")

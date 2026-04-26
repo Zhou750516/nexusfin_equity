@@ -108,7 +108,7 @@ class NexusfinEquityApplicationTests {
         mockMvc.perform(post("/api/callbacks/grant/forward")
                         .contentType(MediaType.APPLICATION_JSON)
                         .headers(signatureHeaders("nonce-quickstart-grant"))
-                        .content(grantRequest(grantRequestId, benefitOrderNo)))
+                        .content(grantRequest(grantRequestId, "quickstart-user-001", benefitOrderNo)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0));
 
@@ -218,18 +218,20 @@ class NexusfinEquityApplicationTests {
                 """.formatted(benefitOrderNo);
     }
 
-    private String grantRequest(String requestId, String benefitOrderNo) {
+    private String grantRequest(String requestId, String userId, String benefitOrderNo) {
         return """
                 {
                   "requestId": "%s",
+                  "userId": "%s",
                   "benefitOrderNo": "%s",
-                  "grantStatus": "SUCCESS",
-                  "actualAmount": 880000,
-                  "loanOrderNo": "loan-quickstart-001",
-                  "failReason": null,
-                  "grantTime": "2026-03-23T20:30:00",
-                  "timestamp": 1774269000
+                  "platformBenefitOrderNo": "%s",
+                  "loanId": "loan-quickstart-001",
+                  "status": 7001,
+                  "remark": null,
+                  "loanAmount": 880000,
+                  "repayAmount": 910000,
+                  "loanDate": 1774269000
                 }
-                """.formatted(requestId, benefitOrderNo);
+                """.formatted(requestId, userId, benefitOrderNo, benefitOrderNo);
     }
 }

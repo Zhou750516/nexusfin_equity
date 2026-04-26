@@ -9,7 +9,9 @@ public record BenefitsCardDetailResponse(
         List<Feature> features,
         List<Category> categories,
         List<String> tips,
-        List<ProtocolLink> protocols
+        List<ProtocolLink> protocols,
+        List<UserCard> userCards,
+        boolean protocolReady
 ) {
 
     public record Feature(
@@ -38,6 +40,14 @@ public record BenefitsCardDetailResponse(
     public record ProtocolLink(
             String name,
             String url
+    ) {
+    }
+
+    public record UserCard(
+            String cardId,
+            String bankName,
+            String cardLastFour,
+            boolean defaultCard
     ) {
     }
 }
