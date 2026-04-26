@@ -8,6 +8,7 @@ import { getRepaymentInfo, submitRepayment } from "@/lib/loan-api";
 import { shouldRequestLocalizedData } from "@/lib/localized-request";
 import { buildPath, getQueryParam } from "@/lib/route";
 import type { RepaymentInfo } from "@/types/loan.types";
+import { ChevronLeft, ChevronRight, CreditCard, Info } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -128,7 +129,7 @@ export default function ConfirmRepaymentPage() {
           message={MISSING_CONTEXT_COPY[locale]}
           onAction={() => {
             loan.reset();
-            navigate("/");
+            navigate("/calculator");
           }}
           actionLabel={t("repaymentSuccess.backHome")}
         />
@@ -152,64 +153,79 @@ export default function ConfirmRepaymentPage() {
     );
   }
 
+  const repaymentTypeLabel = info?.repaymentType === "early"
+    ? t("repaymentConfirm.earlyRepayment")
+    : info?.repaymentType ?? "";
+
   return (
     <MobileLayout>
-      <div className="sticky top-0 z-10 bg-white border-b border-[#f2f3f5] h-[54px] flex items-center px-5">
-        <button onClick={() => navigate(approvalResultPath)} className="absolute left-5">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path d="M15 18L9 12L15 6" stroke="#1d2129" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+      <div className="sticky top-0 z-10 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)] h-[68px] flex items-center px-5">
+        <button
+          onClick={() => navigate(approvalResultPath)}
+          aria-label={t("common.back")}
+          className="absolute left-3 size-10 flex items-center justify-center"
+        >
+          <ChevronLeft className="size-6 text-[#1d2129]" strokeWidth={2.5} />
         </button>
-        <h1 className="w-full text-center text-[#1d2129] text-[17px] font-semibold">{t("repaymentConfirm.title")}</h1>
+        <h1 className="w-full text-center text-[#1d2129] text-lg font-semibold tracking-tight">
+          {t("repaymentConfirm.title")}
+        </h1>
       </div>
 
-      <div className="flex-1 overflow-y-auto bg-[#f7f8fa] pb-24">
-        <div className="px-4 pt-4 space-y-3">
+      <div className="flex-1 overflow-y-auto bg-[#f7f8fa] pb-32">
+        <div className="px-5 pt-6 space-y-4">
           {info ? (
             <>
-              <div className="bg-gradient-to-br from-[#165dff] via-[#1a65ff] to-[#4d8fff] rounded-2xl p-6 text-center shadow-[0px_8px_24px_rgba(22,93,255,0.25)]">
-                <p className="text-white/80 text-[13px] mb-2">{t("repaymentConfirm.amountLabel")}</p>
-                <div className="flex items-baseline justify-center gap-1">
-                  <span className="text-white text-[22px] font-medium">¥</span>
-                  <span className="text-white text-[48px] font-bold leading-none">{formatCurrency(info.repaymentAmount, locale, { includeSymbol: false })}</span>
-                </div>
-              </div>
+              <section
+                className="rounded-2xl px-6 pt-6 pb-6 shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)]"
+                style={{ backgroundImage: "linear-gradient(160deg, #165dff 0%, #3d8aff 100%)" }}
+              >
+                <p className="text-white/80 text-sm leading-[21px] tracking-tight text-center">
+                  {t("repaymentConfirm.amountLabel")}
+                </p>
+                <p className="mt-2 text-white text-[42px] font-bold leading-[63px] tracking-[0.4px] text-center">
+                  {formatCurrency(info.repaymentAmount, locale)}
+                </p>
+              </section>
 
-              <div className="bg-white rounded-2xl shadow-sm border border-[#f2f3f5] overflow-hidden">
-                <div className="flex justify-between items-center px-5 py-4 border-b border-[#f2f3f5]">
-                  <span className="text-[#4e5969] text-[15px]">{t("repaymentConfirm.method")}</span>
-                  <span className="text-[#165dff] text-[15px] font-medium">{info.repaymentType}</span>
+              <section className="bg-white rounded-2xl overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-[#e5e6eb]">
+                  <span className="text-[#4e5969] text-[15px] tracking-tight">
+                    {t("repaymentConfirm.method")}
+                  </span>
+                  <span className="text-[#1d2129] text-[15px] tracking-tight">
+                    {repaymentTypeLabel}
+                  </span>
                 </div>
-                <div className="w-full flex items-center gap-3 px-5 py-4">
-                  <div className="w-10 h-10 bg-[#f0f4ff] rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                      <rect x="2" y="5" width="20" height="14" rx="2" stroke="#165DFF" strokeWidth="1.5" />
-                      <path d="M2 10H22" stroke="#165DFF" strokeWidth="1.5" />
-                      <rect x="5" y="13" width="4" height="2" rx="1" fill="#165DFF" />
-                    </svg>
+                <div className="flex items-center justify-between px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="size-10 rounded-full bg-[#165dff]/10 flex items-center justify-center shrink-0">
+                      <CreditCard className="size-5 text-[#165dff]" strokeWidth={2} />
+                    </div>
+                    <div>
+                      <p className="text-[#1d2129] text-[15px] font-medium tracking-tight">
+                        {formatBankCard(info.bankCard.bankName, info.bankCard.lastFour, locale)}
+                      </p>
+                      <p className="text-[#86909c] text-[13px] font-medium tracking-tight">
+                        {t("repaymentConfirm.bankCard")}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1 text-left">
-                    <p className="text-[#1d2129] text-[15px] font-semibold">{formatBankCard(info.bankCard.bankName, info.bankCard.lastFour, locale)}</p>
-                    <p className="text-[#86909c] text-[13px]">{t("repaymentConfirm.bankCard")}</p>
-                  </div>
+                  <ChevronRight className="size-5 text-[#86909c]" strokeWidth={2} />
                 </div>
-              </div>
+              </section>
 
-              <div className="bg-[#fffbf0] rounded-2xl border border-[#ffe8b8] p-5">
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 mt-0.5">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke="#FF9500" strokeWidth="2" />
-                      <path d="M12 8V12" stroke="#FF9500" strokeWidth="2" strokeLinecap="round" />
-                      <circle cx="12" cy="16" r="1" fill="#FF9500" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="text-[#8b4513] text-[13px] font-semibold mb-1">{t("repaymentConfirm.tipTitle")}</h4>
-                    <p className="text-[#8b4513] text-[13px] leading-relaxed">{info.tip}</p>
-                  </div>
+              <section className="bg-[#fff7e6] border border-[#ffe4b3] rounded-[14px] px-4 py-4 flex gap-3">
+                <Info className="size-5 text-[#fbaf19] shrink-0 mt-0.5" strokeWidth={2} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[#1d2129] text-sm font-medium leading-[21px] tracking-tight">
+                    {t("repaymentConfirm.tipTitle")}
+                  </p>
+                  <p className="mt-1 text-[#4e5969] text-[13px] leading-[21.125px]">
+                    {info.tip || t("repaymentConfirm.tipBody")}
+                  </p>
                 </div>
-              </div>
+              </section>
             </>
           ) : null}
 
@@ -217,14 +233,14 @@ export default function ConfirmRepaymentPage() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[440px] bg-white/95 backdrop-blur-sm px-5 py-4 border-t border-[#f2f3f5]">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[440px] bg-white border-t border-[#e5e6eb] px-5 pt-4 pb-6">
         <button
           onClick={() => void handleSubmit()}
           disabled={isSubmitting || !info}
-          className={`w-full h-14 rounded-full text-white text-[17px] font-semibold transition-opacity ${
+          className={`w-full h-14 rounded-full text-white text-[17px] font-semibold tracking-tight transition-opacity ${
             isSubmitting || !info
               ? "bg-[#c9cdd4] cursor-not-allowed"
-              : "bg-gradient-to-r from-[#165dff] to-[#4d8fff] shadow-[0px_8px_24px_rgba(22,93,255,0.35)] active:opacity-90"
+              : "bg-gradient-to-r from-[#165dff] to-[#3d8aff] shadow-[0_20px_25px_rgba(22,93,255,0.4),0_8px_10px_rgba(22,93,255,0.4)] active:opacity-90"
           }`}
         >
           {isSubmitting ? `${PAY_LABEL_COPY[locale]}...` : payButtonText}

@@ -1,6 +1,12 @@
 import MobileLayout from "@/components/MobileLayout";
 import { PageError, PageLoading } from "@/components/PageFeedback";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Drawer,
   DrawerContent,
   DrawerDescription,
@@ -16,10 +22,39 @@ import { useLoan } from "@/contexts/LoanContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { Locale } from "@/i18n/locale";
 import type { AmountRange, CalculateResult, CalculatorConfig } from "@/types/loan.types";
+import { Check, ChevronRight, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 
 const AGREED_PROTOCOLS = ["user_agreement", "loan_agreement", "privacy_policy"];
+
+const LOAN_PURPOSE_KEYS = [
+  "calculator.loanPurpose.shopping",
+  "calculator.loanPurpose.rent",
+  "calculator.loanPurpose.education",
+  "calculator.loanPurpose.travel",
+] as const;
+
+const PROTOCOL_KEYS = [
+  "calculator.protocol.loanContract",
+  "calculator.protocol.privacyAuth",
+  "calculator.protocol.userService",
+  "calculator.protocol.privacy",
+  "calculator.protocol.payment",
+] as const;
+
+type ProtocolKey = (typeof PROTOCOL_KEYS)[number];
+
+const PARTNERS = [
+  { short: "海尔", full: "海尔消费金融", color: "#3d8aff" },
+  { short: "长银", full: "长银消费金融", color: "#ff6b6b" },
+  { short: "小米", full: "小米消费金融", color: "#4b93ff" },
+  { short: "哈银", full: "哈银消费金融", color: "#ff8c42" },
+  { short: "中信", full: "中信消费金融", color: "#e63946" },
+  { short: "蒙商", full: "蒙商消金", color: "#3dafff" },
+  { short: "本溪", full: "本溪银行", color: "#d62828" },
+  { short: "众邦", full: "众邦银行", color: "#165dff" },
+];
 
 export default function CalculatorPage() {
   const [, navigate] = useLocation();
@@ -31,16 +66,21 @@ export default function CalculatorPage() {
   const [amount, setAmount] = useState(loan.amount);
   const [selectedTerm, setSelectedTerm] = useState(loan.term);
   const [draftAmount, setDraftAmount] = useState(String(loan.amount));
-  const [agreed, setAgreed] = useState(false);
+  const [purposeKey, setPurposeKey] = useState<(typeof LOAN_PURPOSE_KEYS)[number]>(
+    "calculator.loanPurpose.shopping",
+  );
   const [expanded, setExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [purposeDrawerOpen, setPurposeDrawerOpen] = useState(false);
+  const [protocolDrawerOpen, setProtocolDrawerOpen] = useState(false);
+  const [viewedProtocols, setViewedProtocols] = useState<Set<ProtocolKey>>(() => new Set());
+  const [partnersDialogOpen, setPartnersDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const agreements = [t("calculator.userAgreement"), t("calculator.loanAgreement"), t("calculator.privacyPolicy")];
-  const agreementSeparator = locale.startsWith("zh") ? "、" : " · ";
+  const allProtocolsAgreed = viewedProtocols.size === PROTOCOL_KEYS.length;
 
   useEffect(() => {
     if (!shouldRequestLocalizedData({ locale, loadedLocale: loadedConfigLocale })) {
@@ -141,7 +181,7 @@ export default function CalculatorPage() {
   }
 
   const firstRepayment = calculateResult?.repaymentPlan[0] ?? null;
-  const annualRate = calculateResult?.annualRate ?? (config ? `${(config.annualRate * 100).toFixed(1)}%` : "--");
+  const annualRateValue = calculateResult?.annualRate ?? (config ? `${(config.annualRate * 100).toFixed(1)}%` : "--");
   const receivingAccountLabel = config
     ? formatBankCard(config.receivingAccount.bankName, config.receivingAccount.lastFour, locale)
     : "--";
@@ -150,7 +190,7 @@ export default function CalculatorPage() {
     : t("calculator.amountRange");
   const drawerStep = config?.amountRange.step ?? 100;
 
-  const isSubmitDisabled = !agreed || !calculateResult || isSubmitting || isCalculating;
+  const isSubmitDisabled = !calculateResult || isSubmitting || isCalculating;
 
   const drawerQuickActions = useMemo(() => {
     if (!config) {
@@ -182,46 +222,56 @@ export default function CalculatorPage() {
 
   return (
     <MobileLayout>
-      <div className="bg-white h-[54px] flex items-center px-5 border-b border-[#f2f3f5]">
-        <button className="flex items-center gap-1 text-[#1d2129] text-[17px] font-medium" onClick={() => history.back()}>
-          <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
-            <path d="M7 1L1 7L7 13" stroke="#1d2129" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span className="ml-1">{t("common.back")}</span>
+      <div className="bg-white/80 backdrop-blur-sm h-[55px] flex items-center px-5 border-b border-[#f2f3f5]">
+        <button
+          className="text-[#1d2129] text-[15px] font-medium tracking-tight"
+          onClick={() => history.back()}
+        >
+          {t("common.back")}
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto bg-[#f7f8fa] pb-24">
-        <div className="px-4 pt-4 space-y-3">
-          <div className="relative bg-gradient-to-br from-[#165dff] via-[#1a65ff] to-[#4d8fff] rounded-2xl shadow-[0px_8px_24px_rgba(22,93,255,0.25)] overflow-hidden">
-            <div className="absolute w-32 h-32 right-[-10px] top-[-10px] bg-white/10 rounded-full blur-3xl" />
-            <div className="relative px-6 pt-5 pb-5">
-              <p className="text-white/80 text-[13px] font-normal mb-3">{t("calculator.loanAmount")}</p>
-              <div className="flex items-end gap-2 border-b border-white/30 pb-3 mb-3">
-                <span className="text-white text-[22px] font-medium leading-none mb-1">¥</span>
-                <span className="text-white text-[56px] font-bold leading-none">{formatCurrency(amount, locale, { includeSymbol: false })}</span>
-                <button className="ml-auto text-white/70 text-[13px] font-normal pb-1" onClick={() => setDrawerOpen(true)}>
+      <div className="flex-1 overflow-y-auto bg-gradient-to-b from-[#f7f8fa] via-[#fcfdfd] to-white">
+        <div className="px-5 pt-5 pb-6 space-y-4">
+          <div
+            className="relative rounded-3xl overflow-hidden shadow-[0_20px_25px_-5px_rgba(22,93,255,0.2),0_8px_10px_-6px_rgba(22,93,255,0.2)]"
+            style={{ backgroundImage: "linear-gradient(153deg, #165dff 0%, #3d8aff 100%)" }}
+          >
+            <div className="absolute -left-8 bottom-0 w-24 h-24 bg-white/10 rounded-full blur-[40px]" />
+            <div className="relative px-8 py-8">
+              <p className="text-white/80 text-sm leading-[21px] tracking-tight">{t("calculator.loanAmount")}</p>
+              <div className="mt-3 flex items-end gap-3 border-b border-white pb-3">
+                <span className="text-white text-2xl font-medium leading-9 mb-1">¥</span>
+                <span className="text-white text-[64px] font-bold leading-[64px] tracking-[0.2px]">
+                  {formatCurrency(amount, locale, { includeSymbol: false })}
+                </span>
+                <button
+                  className="ml-auto mb-1 text-white/60 text-[13px] tracking-tight"
+                  onClick={() => setDrawerOpen(true)}
+                >
                   {t("calculator.editAmount")}
                 </button>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 bg-white/50 rounded-full" />
-                <span className="text-white/70 text-[13px]">{amountRangeLabel}</span>
+              <div className="mt-3 flex items-center gap-2">
+                <span className="w-1 h-1 bg-white/50 rounded-full" />
+                <span className="text-white/70 text-[13px] leading-5 tracking-tight">
+                  {amountRangeLabel}
+                </span>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-[#f2f3f5] px-5 pt-5 pb-4">
-            <h3 className="text-[#1d2129] text-[15px] font-semibold mb-4">{t("calculator.borrowDuration")}</h3>
-            <div className="flex gap-3">
+          <div className="bg-white border border-[#f2f3f5] rounded-2xl px-5 pt-5 pb-5 shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)]">
+            <p className="text-[#1d2129] text-base font-medium tracking-tight">{t("calculator.borrowDuration")}</p>
+            <div className="mt-4 flex gap-3">
               {config?.termOptions.map((option) => (
                 <button
                   key={option.value}
                   onClick={() => setSelectedTerm(option.value)}
-                  className={`flex-1 h-11 rounded-xl text-[15px] font-medium transition-all ${
+                  className={`flex-1 h-11 rounded-[10px] text-[15px] font-medium tracking-tight transition-all border ${
                     selectedTerm === option.value
-                      ? "bg-[#f0f4ff] text-[#165dff] border border-[#165dff]"
-                      : "bg-white text-[#4e5969] border border-[#e5e6eb]"
+                      ? "bg-[#f2f6ff] text-[#165dff] border-[#165dff]"
+                      : "bg-white text-[#4e5969] border-[#e5e6eb]"
                   }`}
                 >
                   {option.label}
@@ -230,24 +280,33 @@ export default function CalculatorPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-[#f2f3f5] px-5 pt-5 pb-5">
-            <h3 className="text-[#1d2129] text-[17px] font-bold mb-4">{t("calculator.repaymentTitle")}</h3>
+          <div className="bg-white border border-[#f2f3f5] rounded-2xl px-5 pt-5 pb-5 shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)]">
+            <h3 className="text-[#1d2129] text-[17px] font-semibold tracking-tight">{t("calculator.repaymentTitle")}</h3>
             {isCalculating && !calculateResult ? (
-              <PageLoading lines={3} />
+              <div className="mt-3">
+                <PageLoading lines={3} />
+              </div>
             ) : firstRepayment && calculateResult ? (
               <>
-                <div className="flex justify-between items-center py-4 border-b border-[#f2f3f5]">
-                  <span className="text-[#4e5969] text-[15px]">{t("calculator.totalFee")}</span>
-                  <span className="text-[#ff6b00] text-[20px] font-bold">{formatCurrency(calculateResult.totalFee, locale)}</span>
+                <div className="flex justify-between items-center pt-4 pb-4 border-b border-[#f2f3f5]">
+                  <span className="text-[#4e5969] text-[15px] tracking-tight">{t("calculator.totalFee")}</span>
+                  <span className="text-[#ff6b00] text-xl font-bold leading-[30px] tracking-tight">
+                    {formatCurrency(calculateResult.totalFee, locale)}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center pt-4">
-                  <span className="text-[#4e5969] text-[15px]">{t("calculator.firstRepayment")}</span>
-                  <div className="flex items-center gap-3">
+                  <span className="text-[#4e5969] text-[15px] tracking-tight">{t("calculator.firstRepayment")}</span>
+                  <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <p className="text-[#86909c] text-[13px]">{formatMonthDay(firstRepayment.date, locale)}</p>
-                      <p className="text-[#1d2129] text-[17px] font-bold">{formatCurrency(firstRepayment.total, locale)}</p>
+                      <p className="text-[#86909c] text-[13px] leading-5">{formatMonthDay(firstRepayment.date, locale)}</p>
+                      <p className="text-[#1d2129] text-[17px] font-bold leading-[25.5px] tracking-tight">
+                        {formatCurrency(firstRepayment.total, locale)}
+                      </p>
                     </div>
-                    <button onClick={() => setExpanded((previous) => !previous)} className="text-[#165dff] text-[13px] font-medium">
+                    <button
+                      onClick={() => setExpanded((previous) => !previous)}
+                      className="text-[#165dff] text-[13px] font-medium tracking-tight"
+                    >
                       {expanded ? t("calculator.collapse") : t("calculator.expand")}
                     </button>
                   </div>
@@ -256,7 +315,9 @@ export default function CalculatorPage() {
                   <div className="mt-4 space-y-3 border-t border-[#f2f3f5] pt-4">
                     {calculateResult.repaymentPlan.map((item) => (
                       <div key={item.period} className="flex justify-between items-center">
-                        <span className="text-[#86909c] text-[13px]">{t("calculator.periodLabel", { period: item.period })}</span>
+                        <span className="text-[#86909c] text-[13px]">
+                          {t("calculator.periodLabel", { period: item.period })}
+                        </span>
                         <div className="text-right">
                           <p className="text-[#86909c] text-[12px]">{formatMonthDay(item.date, locale)}</p>
                           <p className="text-[#1d2129] text-[14px] font-medium">{formatCurrency(item.total, locale)}</p>
@@ -271,69 +332,88 @@ export default function CalculatorPage() {
             ) : null}
           </div>
 
-          <div className="bg-white rounded-2xl border border-[#f2f3f5] px-5 py-4">
-            <div className="flex justify-between items-center">
-              <span className="text-[#4e5969] text-[15px]">{t("calculator.receivingAccount")}</span>
-              <span className="text-[#1d2129] text-[15px] font-medium">{receivingAccountLabel}</span>
+          <div className="bg-white border border-[#f2f3f5] rounded-2xl px-5 py-5 shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)]">
+            <div className="flex items-center justify-between">
+              <span className="text-[#4e5969] text-[15px] tracking-tight">{t("calculator.annualRate")}</span>
+              <div className="text-right">
+                <p className="text-[#4e5969] text-sm font-medium leading-[21px] tracking-tight">
+                  {annualRateValue}
+                  {t("calculator.annualRateMethod")}
+                </p>
+                <p className="mt-1 text-[#86909c] text-xs leading-[18px]">
+                  {t("calculator.annualRateTip")}
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-[#f2f3f5] px-5 py-4">
-            <div className="flex justify-between items-center">
-              <span className="text-[#4e5969] text-[15px]">{t("calculator.lender")}</span>
-              <span className="text-[#1d2129] text-[15px] font-medium">{config?.lender ?? "--"}</span>
+          <div className="bg-white border border-[#f2f3f5] rounded-2xl px-5 py-5 shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)]">
+            <div className="flex items-center justify-between">
+              <span className="text-[#4e5969] text-[15px] tracking-tight">{t("calculator.receivingAccount")}</span>
+              <span className="text-[#1d2129] text-[15px] font-medium tracking-tight">{receivingAccountLabel}</span>
             </div>
           </div>
 
-          <div className="bg-[#f7f8fa] rounded-2xl border border-[#e5e6eb] px-5 py-4">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-[#86909c] text-[13px]">{t("calculator.annualRate")}</span>
-              <span className="text-[#4e5969] text-[13px] font-medium">{annualRate}</span>
+          <button
+            type="button"
+            onClick={() => setPurposeDrawerOpen(true)}
+            className="w-full bg-white border border-[#f2f3f5] rounded-2xl px-5 py-5 shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)] text-left"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[#4e5969] text-[15px] tracking-tight">{t("calculator.loanPurpose")}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[#1d2129] text-[15px] font-medium tracking-tight">{t(purposeKey)}</span>
+                <ChevronRight className="size-4 text-[#86909c]" strokeWidth={2} />
+              </div>
             </div>
-            <p className="text-[#86909c] text-[12px]">{t("calculator.annualRateTip")}</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setProtocolDrawerOpen(true)}
+            className="w-full bg-white border border-[#f2f3f5] rounded-2xl px-5 py-5 shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)] text-left"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[#4e5969] text-[15px] tracking-tight">{t("calculator.loanProtocol")}</span>
+              <span className="text-[#165dff] text-[15px] font-medium tracking-tight">
+                {t("calculator.loanProtocolView")}
+              </span>
+            </div>
+          </button>
+
+          <div className="bg-[#f7f8fa] border border-[#e3e4eb] rounded-2xl px-5 py-5">
+            <p className="text-[#1d2129] text-[15px] font-medium tracking-tight">{t("calculator.tipsTitle")}</p>
+            <div className="mt-4 space-y-3 text-[#4e5969] text-[13px] leading-[21px] tracking-tight">
+              <p>
+                {t("calculator.tip1Prefix")}
+                <button
+                  type="button"
+                  onClick={() => setPartnersDialogOpen(true)}
+                  className="text-[#165dff]"
+                >
+                  {t("calculator.tip1Highlight")}
+                </button>
+                {t("calculator.tip1Suffix")}
+              </p>
+              <p>{t("calculator.tip2")}</p>
+              <p>{t("calculator.tip3")}</p>
+            </div>
           </div>
 
           {error && config ? <PageError message={error} onAction={() => void loadCalculation(amount, selectedTerm)} /> : null}
 
-          <div className="flex items-start gap-3 px-1 py-2">
-            <button
-              onClick={() => setAgreed((previous) => !previous)}
-              className={`mt-0.5 w-[18px] h-[18px] rounded flex-shrink-0 transition-all ${
-                agreed ? "bg-[#165dff] border border-[#165dff]" : "bg-white border border-[#c9cdd4]"
-              } flex items-center justify-center`}
-            >
-              {agreed ? (
-                <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                  <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              ) : null}
-            </button>
-            <p className="text-[#4e5969] text-[13px] leading-relaxed">
-              {t("calculator.agreementPrefix")}
-              {agreements.map((agreement, index) => (
-                <span key={agreement}>
-                  <span className="text-[#165dff]">{agreement}</span>
-                  {index < agreements.length - 1 ? agreementSeparator : ""}
-                </span>
-              ))}
-              {t("calculator.agreementSuffix")}
-            </p>
-          </div>
+          <button
+            onClick={() => void handleSubmit()}
+            disabled={isSubmitDisabled}
+            className={`mt-2 w-full h-14 rounded-full text-white text-[17px] font-semibold tracking-tight transition-opacity ${
+              isSubmitDisabled
+                ? "bg-[#c9cdd4] cursor-not-allowed"
+                : "bg-gradient-to-r from-[#165dff] to-[#3d8aff] active:opacity-90"
+            }`}
+          >
+            {isSubmitting ? `${t("calculator.submit")}...` : t("calculator.submit")}
+          </button>
         </div>
-      </div>
-
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[440px] bg-white/95 backdrop-blur-sm px-5 py-4 border-t border-[#f2f3f5]">
-        <button
-          onClick={() => void handleSubmit()}
-          disabled={isSubmitDisabled}
-          className={`w-full h-14 rounded-full text-white text-[17px] font-semibold shadow-[0px_8px_24px_rgba(22,93,255,0.35)] transition-opacity ${
-            isSubmitDisabled
-              ? "bg-[#c9cdd4] shadow-none cursor-not-allowed"
-              : "bg-gradient-to-r from-[#165dff] to-[#4d8fff] active:opacity-90"
-          }`}
-        >
-          {isSubmitting ? `${t("calculator.submit")}...` : t("calculator.submit")}
-        </button>
       </div>
 
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
@@ -378,13 +458,168 @@ export default function CalculatorPage() {
                 setDraftAmount(String(normalizedAmount));
                 setDrawerOpen(false);
               }}
-              className="w-full h-14 bg-gradient-to-r from-[#165dff] to-[#4d8fff] rounded-full text-white text-[17px] font-semibold"
+              className="w-full h-14 bg-gradient-to-r from-[#165dff] to-[#3d8aff] rounded-full text-white text-[17px] font-semibold"
             >
               {t("calculator.submit")}
             </button>
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
+
+      <Drawer open={purposeDrawerOpen} onOpenChange={setPurposeDrawerOpen}>
+        <DrawerContent className="mx-auto w-full max-w-[440px] rounded-t-[24px] border-none bg-white">
+          <DrawerHeader className="px-5 py-4 border-b border-[#f2f3f5] flex flex-row items-center justify-between space-y-0">
+            <DrawerTitle className="text-[#1d2129] text-[17px] font-semibold tracking-tight">
+              {t("calculator.loanPurposeTitle")}
+            </DrawerTitle>
+            <button
+              type="button"
+              onClick={() => setPurposeDrawerOpen(false)}
+              aria-label={t("common.back")}
+              className="size-6 flex items-center justify-center"
+            >
+              <X className="size-5 text-[#86909c]" strokeWidth={2} />
+            </button>
+          </DrawerHeader>
+          <div className="px-5 pt-2 pb-6 flex flex-col">
+            {LOAN_PURPOSE_KEYS.map((key) => {
+              const selected = key === purposeKey;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    setPurposeKey(key);
+                    setPurposeDrawerOpen(false);
+                  }}
+                  className={`h-[54px] rounded-[14px] px-4 flex items-center justify-between transition-colors ${
+                    selected ? "bg-[#f2f6ff]" : "bg-transparent"
+                  }`}
+                >
+                  <span
+                    className={`text-[15px] font-medium tracking-tight ${
+                      selected ? "text-[#165dff]" : "text-[#1d2129]"
+                    }`}
+                  >
+                    {t(key)}
+                  </span>
+                  {selected ? (
+                    <Check className="size-5 text-[#165dff]" strokeWidth={2} />
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      <Drawer open={protocolDrawerOpen} onOpenChange={setProtocolDrawerOpen}>
+        <DrawerContent className="mx-auto w-full max-w-[440px] rounded-t-[24px] border-none bg-white p-0">
+          <DrawerHeader className="px-5 py-4 border-b border-[#f2f3f5] flex flex-row items-center justify-between space-y-0">
+            <DrawerTitle className="text-[#1d2129] text-[17px] font-semibold tracking-tight">
+              {t("calculator.protocolDrawerTitle")}
+            </DrawerTitle>
+            <button
+              type="button"
+              onClick={() => setProtocolDrawerOpen(false)}
+              aria-label={t("common.back")}
+              className="size-6 flex items-center justify-center"
+            >
+              <X className="size-5 text-[#86909c]" strokeWidth={2} />
+            </button>
+          </DrawerHeader>
+
+          <div className="px-5 pt-4 pb-4 flex flex-col gap-4">
+            <div className="bg-[#f2f3f5] border border-[#e5e6eb] rounded-[14px] px-4 py-4">
+              <p className="text-[#4e5969] text-sm font-semibold leading-[21px] tracking-tight">
+                {t("calculator.protocolImportant")}
+              </p>
+              <p className="mt-2 text-[#4e5969] text-xs leading-[19.5px]">
+                {t("calculator.protocolImportantBody")}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              {PROTOCOL_KEYS.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() =>
+                    setViewedProtocols((previous) => {
+                      const next = new Set(previous);
+                      next.add(key);
+                      return next;
+                    })
+                  }
+                  className="bg-[#f7f8fa] rounded-[14px] h-[45px] px-4 flex items-center justify-between text-left"
+                >
+                  <span className="text-[#1d2129] text-sm leading-[21px] tracking-tight">
+                    {t(key)}
+                  </span>
+                  <ChevronRight className="size-4 text-[#86909c]" strokeWidth={2} />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <DrawerFooter className="px-5 pt-4 pb-5 border-t border-[#f2f3f5]">
+            <button
+              type="button"
+              disabled={!allProtocolsAgreed}
+              onClick={() => setProtocolDrawerOpen(false)}
+              className={`w-full h-12 rounded-full text-base font-medium tracking-tight transition-colors ${
+                allProtocolsAgreed
+                  ? "bg-gradient-to-r from-[#165dff] to-[#3d8aff] text-white"
+                  : "bg-[#e5e6eb] text-[#c9cdd4] cursor-not-allowed"
+              }`}
+            >
+              {t("calculator.protocolAgreeButton", { count: viewedProtocols.size })}
+            </button>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+
+      <Dialog open={partnersDialogOpen} onOpenChange={setPartnersDialogOpen}>
+        <DialogContent
+          showCloseButton={false}
+          className="sm:max-w-none w-[calc(100%-44px)] max-w-[400px] rounded-3xl border-none bg-white px-6 py-6 gap-0"
+        >
+          <DialogTitle className="text-[#1d2129] text-[18px] font-semibold leading-[27px] tracking-tight text-center">
+            {t("calculator.partnersTitle")}
+          </DialogTitle>
+          <DialogDescription className="mt-3 text-[#4e5969] text-sm leading-[22.75px] tracking-tight text-center">
+            {t("calculator.partnersDescription")}
+          </DialogDescription>
+
+          <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4">
+            {PARTNERS.map((partner) => (
+              <div key={partner.full} className="flex items-center gap-3">
+                <div
+                  className="size-10 rounded-full flex items-center justify-center shrink-0 text-white text-xs leading-[18px]"
+                  style={{ backgroundColor: partner.color }}
+                >
+                  {partner.short}
+                </div>
+                <span className="text-[#1d2129] text-sm leading-[21px] tracking-tight">
+                  {partner.full}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <p className="mt-4 text-[#86909c] text-[13px] leading-[19.5px] tracking-tight text-center">
+            {t("calculator.partnersFootnote")}
+          </p>
+
+          <button
+            type="button"
+            onClick={() => setPartnersDialogOpen(false)}
+            className="mt-5 w-full h-12 rounded-full bg-[#fbaf19] text-white text-base font-medium leading-6 tracking-tight"
+          >
+            {t("calculator.partnersAck")}
+          </button>
+        </DialogContent>
+      </Dialog>
     </MobileLayout>
   );
 }

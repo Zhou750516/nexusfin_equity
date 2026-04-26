@@ -10,6 +10,7 @@ import { getApprovalResult } from "@/lib/loan-api";
 import { buildPath, getQueryParam } from "@/lib/route";
 import { shouldFetchApprovalResult } from "@/pages/approval-result.logic";
 import type { ApprovalResult } from "@/types/loan.types";
+import { CheckCircle2, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -114,7 +115,7 @@ export default function ApprovalResultPage() {
           message={MISSING_CONTEXT_COPY[locale]}
           onAction={() => {
             loan.reset();
-            navigate("/");
+            navigate("/calculator");
           }}
           actionLabel={t("repaymentSuccess.backHome")}
         />
@@ -146,44 +147,92 @@ export default function ApprovalResultPage() {
   const loanId = result?.loanId ?? loan.loanId;
   const isApproved = result?.status === "approved";
 
+  const tipBullets = [
+    t("approvalResult.tip1"),
+    t("approvalResult.tip2"),
+    t("approvalResult.tip3"),
+    t("approvalResult.tip4"),
+  ];
+
   return (
     <MobileLayout>
-      <div className="flex-1 overflow-y-auto bg-[#f7f8fa] pb-24">
-        <div className={`bg-gradient-to-b ${headerGradientClass} px-5 pt-14 pb-28 overflow-hidden relative`}>
-          <div className="absolute w-48 h-48 right-[-30px] top-[-20px] bg-white/10 rounded-full" />
-          <div className="absolute w-36 h-36 left-[-15px] bottom-[-10px] bg-white/10 rounded-full" />
+      <div className="flex-1 overflow-y-auto bg-gradient-to-b from-[#f7f8fa] via-[#fcfdfd] to-white pb-32">
+        <section
+          className="relative overflow-hidden px-5 pt-12 pb-24"
+          style={{
+            backgroundImage: isApproved
+              ? "linear-gradient(136deg, #165dff 0%, #3d8aff 100%)"
+              : undefined,
+          }}
+        >
+          {!isApproved ? (
+            <div className={`absolute inset-0 bg-gradient-to-b ${headerGradientClass}`} />
+          ) : null}
+          <div className="absolute -right-8 -top-8 size-64 bg-white/10 rounded-full blur-3xl" />
+          <div className="absolute -left-24 bottom-0 size-48 bg-white/10 rounded-full blur-3xl" />
           <div className="relative flex flex-col items-center">
-            <div className="w-[72px] h-[72px] bg-white/25 rounded-full flex items-center justify-center mb-5">
+            <div className="size-20 bg-white/20 rounded-full flex items-center justify-center mb-6">
               {isApproved ? (
-                <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
-                  <circle cx="20" cy="20" r="17" stroke="white" strokeWidth="3" />
-                  <path d="M12 20L17 25L28 14" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <CheckCircle2 className="size-10 text-white" strokeWidth={2.5} />
               ) : (
-                <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
                   <circle cx="20" cy="20" r="17" stroke="white" strokeWidth="3" />
                   <path d="M14 14L26 26" stroke="white" strokeWidth="3" strokeLinecap="round" />
                   <path d="M26 14L14 26" stroke="white" strokeWidth="3" strokeLinecap="round" />
                 </svg>
               )}
             </div>
-            <h1 className="text-white text-[28px] font-bold mb-3">{displayTitle}</h1>
+            <h1 className="text-white text-[28px] font-bold leading-[42px] tracking-[0.4px] text-center">
+              {displayTitle}
+            </h1>
             {amountLabel ? (
-              <div className="flex flex-col items-center gap-1 mb-2">
-                <span className="text-white/80 text-base">{t("approvalResult.amountLabel")}</span>
-                <span className="text-white text-[36px] font-bold">{amountLabel}</span>
-              </div>
+              <p className="mt-4 text-white text-center leading-none">
+                <span className="text-base">{t("approvalResult.amountLabel")}</span>
+                <span className="text-[36px] font-bold tracking-[0.4px]">{amountLabel}</span>
+                <span className="text-base">{t("approvalResult.amountUnit")}</span>
+              </p>
             ) : null}
-            <p className="text-white/80 text-[13px] text-center px-4">{result?.estimatedArrivalTime && result.estimatedArrivalTime !== "--" ? result.estimatedArrivalTime : tipText}</p>
+            <p className="mt-5 text-white/70 text-[13px] leading-[19.5px] tracking-tight text-center">
+              {isApproved
+                ? t("approvalResult.arrivalTip")
+                : result?.estimatedArrivalTime && result.estimatedArrivalTime !== "--"
+                ? result.estimatedArrivalTime
+                : tipText}
+            </p>
           </div>
-        </div>
+        </section>
 
-        <div className="px-4 -mt-16 space-y-4">
+        <div className="relative z-10 px-5 -mt-20 space-y-5">
           {result?.steps.length ? <ApprovalStepsCard steps={result.steps} /> : null}
 
-          <div className="bg-[#fffbf0] rounded-2xl border border-[#ffe8b8] p-5">
-            <div className="flex gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#fbaf19] to-[#ff9500] rounded-xl flex items-center justify-center flex-shrink-0">
+          {isApproved ? (
+            <div
+              className="rounded-2xl border border-[#fbaf19]/20 px-5 py-5"
+              style={{
+                backgroundImage:
+                  "linear-gradient(155deg, #fff7e8 0%, #fff8ea 50%, #fffbf0 100%)",
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="size-5 text-[#fbaf19]" strokeWidth={2.5} />
+                <h4 className="text-[#1d2129] text-[15px] font-medium tracking-tight">
+                  {t("approvalResult.tipTitle")}
+                </h4>
+              </div>
+              <ul className="mt-3 flex flex-col gap-2">
+                {tipBullets.map((bullet) => (
+                  <li key={bullet} className="flex gap-2 items-start">
+                    <span className="text-[#fbaf19] text-[13px] leading-[19.5px]">•</span>
+                    <p className="text-[#4e5969] text-[13px] leading-[19.5px] tracking-tight flex-1">
+                      {bullet}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : tipText ? (
+            <div className="bg-[#fffbf0] rounded-2xl border border-[#ffe8b8] p-5 flex gap-3">
+              <div className="size-10 bg-gradient-to-br from-[#fbaf19] to-[#ff9500] rounded-xl flex items-center justify-center shrink-0">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                   <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2" />
                   <path d="M12 8V12" stroke="white" strokeWidth="2" strokeLinecap="round" />
@@ -195,7 +244,7 @@ export default function ApprovalResultPage() {
                 <p className="text-[#8b4513] text-[13px] leading-relaxed">{tipText}</p>
               </div>
             </div>
-          </div>
+          ) : null}
 
           {error && result ? <PageError message={error} onAction={() => applicationId ? void loadResult(applicationId) : undefined} /> : null}
         </div>
@@ -209,9 +258,9 @@ export default function ApprovalResultPage() {
               return;
             }
             loan.reset();
-            navigate("/");
+            navigate("/calculator");
           }}
-          className="w-full h-14 bg-gradient-to-r from-[#165dff] to-[#4d8fff] rounded-full text-white text-[17px] font-semibold shadow-[0px_8px_24px_rgba(22,93,255,0.35)] active:opacity-90 transition-opacity"
+          className="w-full h-14 bg-gradient-to-r from-[#165dff] to-[#3d8aff] rounded-full text-white text-[17px] font-semibold tracking-tight shadow-[0_20px_25px_rgba(22,93,255,0.4),0_8px_10px_rgba(22,93,255,0.4)] active:opacity-90 transition-opacity"
         >
           {isApproved && loanId ? t("approvalResult.cta") : t("repaymentSuccess.backHome")}
         </button>

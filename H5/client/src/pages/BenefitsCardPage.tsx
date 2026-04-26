@@ -1,12 +1,3 @@
-import {
-  BackArrow,
-  CarIcon,
-  CardIcon,
-  CheckBlueIcon,
-  LifeIcon,
-  ShopIcon,
-  TvIcon,
-} from "@/components/Icons";
 import MobileLayout from "@/components/MobileLayout";
 import { PageError, PageLoading } from "@/components/PageFeedback";
 import { toast } from "sonner";
@@ -18,7 +9,8 @@ import { activateBenefitsCard, getBenefitsCardDetail } from "@/lib/loan-api";
 import { shouldRequestLocalizedData } from "@/lib/localized-request";
 import { buildPath, getQueryParam } from "@/lib/route";
 import type { BenefitCategory, BenefitsCardDetail } from "@/types/loan.types";
-import { useEffect, useMemo, useState } from "react";
+import { Car, Check, ChevronLeft, ShoppingBag, Sparkles, Tv, Utensils } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
 const MISSING_CONTEXT_COPY: Record<Locale, string> = {
@@ -87,9 +79,6 @@ export default function BenefitsCardPage() {
     }
   }
 
-  const activeCategory = detail?.categories[activeTab] ?? null;
-  const activateLabelLines = t("benefits.activateCta").split("\n");
-
   if (isLoading && !detail) {
     return (
       <MobileLayout>
@@ -106,157 +95,221 @@ export default function BenefitsCardPage() {
     );
   }
 
+  const activeCategory = detail?.categories[activeTab] ?? null;
+  const activateLabelLines = t("benefits.activateCta").split("\n");
+
   return (
     <MobileLayout>
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-100 h-[54px] flex items-center px-5">
-        <button onClick={() => navigate(pendingPath)} className="absolute left-5">
-          <BackArrow className="w-6 h-6" color="#1d2129" />
+      <div className="sticky top-0 z-20 bg-white border-b border-[#e5e6eb] h-[57px] flex items-center px-4">
+        <button onClick={() => navigate(pendingPath)} className="flex items-center gap-2 text-[#1d2129]">
+          <ChevronLeft className="size-5" strokeWidth={2.5} />
+          <span className="text-base font-medium tracking-tight">{t("benefits.title")}</span>
         </button>
-        <h1 className="w-full text-center text-[#1d2129] text-[17px] font-semibold">{t("benefits.title")}</h1>
       </div>
 
-      <div className="flex-1 overflow-y-auto bg-[#f7f8fa] pb-24">
-        <div className="px-4 pt-4 space-y-4">
-          {detail ? (
-            <>
-              <div className="bg-gradient-to-br from-[#165dff] via-[#1a65ff] to-[#4d8fff] rounded-2xl p-5 overflow-hidden relative shadow-[0px_8px_24px_rgba(22,93,255,0.25)]">
-                <div className="absolute w-32 h-32 right-[-10px] top-[-10px] bg-white/10 rounded-full blur-3xl" />
-                <div className="relative">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="w-8 h-8 rounded-[10px] bg-white/20 flex items-center justify-center">
-                      <CardIcon className="w-5 h-5" />
+      <div className="flex-1 overflow-y-auto bg-[#f7f8fa] pb-32">
+        {detail ? (
+          <div className="px-5 pt-6 space-y-5">
+            <section
+              className="relative rounded-2xl overflow-hidden shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)] px-6 pt-6 pb-6"
+              style={{ backgroundImage: "linear-gradient(150deg, #165dff 0%, #0e5ce6 100%)" }}
+            >
+              <h2 className="text-white text-xl font-bold leading-[30px] tracking-tight">
+                {detail.cardName}
+              </h2>
+              <p className="mt-2 text-white/90 text-sm leading-[21px] tracking-tight">
+                {t("benefits.cardSubtitle")}
+              </p>
+              <div className="mt-5 bg-white rounded-[14px] px-5 pt-5 pb-5 shadow-[0_4px_6px_rgba(0,0,0,0.1),0_2px_4px_rgba(0,0,0,0.1)] flex items-center justify-between">
+                <div>
+                  <p className="text-[#86909c] text-xs leading-[18px]">
+                    {t("benefits.priceLabel")}
+                  </p>
+                  <p className="mt-1 leading-none">
+                    <span className="text-[#fbaf19] text-[28px] font-bold tracking-[0.4px]">
+                      {detail.price}
+                    </span>
+                    <span className="ml-0.5 text-[#fbaf19] text-base font-bold tracking-tight">
+                      {t("benefits.priceUnit")}
+                    </span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => void handleActivate()}
+                  disabled={isActivating || !applicationId}
+                  className="relative h-[64px] min-w-[115px] rounded-full overflow-hidden shadow-[0_8px_24px_-4px_rgba(251,175,25,0.4)] disabled:opacity-60 disabled:cursor-not-allowed"
+                  style={{ backgroundImage: "linear-gradient(151deg, #ff6b2c 0%, #fbaf19 50%, #ffd24c 100%)" }}
+                >
+                  <span className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent" />
+                  <span className="relative flex flex-col items-center justify-center px-4 py-2">
+                    <span className="text-white/90 text-xs leading-[18px]">
+                      {activateLabelLines[0]}
+                    </span>
+                    <span className="text-white text-[15px] font-bold leading-[22.5px] tracking-tight">
+                      {activateLabelLines[1] ?? ""}
+                    </span>
+                  </span>
+                </button>
+              </div>
+            </section>
+
+            <section className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)] px-5 pt-5 pb-5">
+              <h3 className="text-[#1d2129] text-base font-bold leading-6 tracking-tight">
+                {t("benefits.featuresTitle")}
+              </h3>
+              <div className="mt-4 flex flex-col gap-4">
+                {detail.features.map((feature) => (
+                  <div key={feature.title} className="flex gap-3 items-start">
+                    <div className="size-6 rounded-full bg-[#165dff]/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <Check className="size-4 text-[#165dff]" strokeWidth={3} />
                     </div>
-                    <h2 className="text-white text-xl font-bold">{detail.cardName}</h2>
-                    <span className="bg-white/20 text-white text-[11px] px-2 py-0.5 rounded-full">{t("benefits.cardTag")}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[#1d2129] text-sm font-semibold leading-[21px] tracking-tight">
+                        {feature.title}
+                      </p>
+                      <p className="mt-1 text-[#86909c] text-[13px] leading-[21.125px]">
+                        {feature.description}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-white/70 text-[13px] mb-4">{t("benefits.cardSubtitle")}</p>
-                  <div className="bg-white/15 rounded-xl p-4 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-white/70 text-xs mb-1">{t("benefits.priceLabel")}</p>
-                      <div className="flex items-baseline gap-0.5">
-                        <span className="text-[#ffd700] text-[32px] font-bold leading-none">{formatCurrency(detail.price, locale)}</span>
-                      </div>
-                    </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)] px-5 pt-5 pb-5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[#1d2129] text-base font-bold leading-6 tracking-tight">
+                  {t("benefits.rightsTitle")}
+                </h3>
+                <p className="flex items-baseline gap-1">
+                  <span className="text-[#86909c] text-[11px]">{t("benefits.savePrefix")}</span>
+                  <span
+                    className="text-xl font-bold leading-[30px] tracking-tight bg-clip-text text-transparent"
+                    style={{ backgroundImage: "linear-gradient(90deg, #ff6b00 0%, #fbaf19 100%)" }}
+                  >
+                    {detail.totalSaving}
+                  </span>
+                  <span className="text-[#ff6b00] text-[13px] font-medium">
+                    {t("benefits.saveSuffix")}
+                  </span>
+                </p>
+              </div>
+
+              <div className="mt-5 bg-[#f7f8fa] rounded-[10px] p-1 flex gap-1">
+                {detail.categories.map((category, index) => {
+                  const Icon = iconByCategory(category);
+                  const isActive = activeTab === index;
+                  return (
                     <button
-                      onClick={() => void handleActivate()}
-                      disabled={isActivating || !applicationId}
-                      className={`rounded-xl px-5 py-3 text-white text-[13px] font-semibold shadow-lg whitespace-pre-line ${
-                        isActivating || !applicationId
-                          ? "bg-[#c9cdd4] cursor-not-allowed shadow-none"
-                          : "bg-gradient-to-br from-[#fbaf19] to-[#ff9500]"
+                      key={`${category.name}-${index}`}
+                      onClick={() => setActiveTab(index)}
+                      className={`flex-1 h-[58px] rounded-lg flex flex-col items-center justify-center gap-1 ${
+                        isActive
+                          ? "bg-white shadow-[0_2px_4px_rgba(22,93,255,0.15)]"
+                          : "bg-transparent"
                       }`}
                     >
-                      {isActivating ? activateLabelLines[0] : activateLabelLines.join("\n")}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl shadow-sm border border-[#f2f3f5] p-5">
-                <h3 className="text-[#1d2129] text-[15px] font-semibold mb-4">{t("benefits.featuresTitle")}</h3>
-                <div className="space-y-4">
-                  {detail.features.map((item, index) => (
-                    <div key={`${item.title}-${index}`} className="flex gap-3">
-                      <div className="w-5 h-5 mt-0.5 flex-shrink-0 bg-[#165dff]/10 rounded-full flex items-center justify-center">
-                        <CheckBlueIcon className="w-3 h-3" />
-                      </div>
-                      <div>
-                        <p className="text-[#1d2129] text-[13px] font-semibold mb-0.5">{item.title}</p>
-                        <p className="text-[#86909c] text-[12px] leading-relaxed">{item.description}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl shadow-sm border border-[#f2f3f5] p-5">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-[#1d2129] text-[15px] font-semibold">{t("benefits.rightsTitle")}</h3>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-[#86909c] text-xs">{t("benefits.savePrefix")}</span>
-                    <span className="text-[#ff6b00] text-lg font-bold">{formatCurrency(detail.totalSaving, locale)}</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-0 mb-4 border-b border-[#f2f3f5] overflow-x-auto">
-                  {detail.categories.map((category, index) => {
-                    const Icon = iconByCategory(category);
-                    return (
-                      <button
-                        key={`${category.name}-${index}`}
-                        onClick={() => setActiveTab(index)}
-                        className={`flex-1 min-w-[72px] flex flex-col items-center gap-1.5 pb-3 pt-1 transition-all ${
-                          activeTab === index ? "border-b-2 border-[#165dff]" : ""
+                      <Icon
+                        className={`size-[18px] ${isActive ? "text-[#165dff]" : "text-[#86909c]"}`}
+                        strokeWidth={2}
+                      />
+                      <span
+                        className={`text-[11px] tracking-tight ${
+                          isActive ? "text-[#165dff] font-medium" : "text-[#86909c]"
                         }`}
                       >
-                        <Icon className="w-6 h-6" active={activeTab === index} />
-                        <span className={`text-[11px] ${activeTab === index ? "text-[#165dff] font-semibold" : "text-[#86909c]"}`}>
-                          {category.name}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                        {category.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
 
-                <div className="space-y-3">
-                  {activeCategory?.benefits.map((benefit, index) => (
-                    <div key={`${benefit.title}-${index}`} className="flex gap-3 bg-[#f7f8fa] rounded-xl p-3">
-                      <div className="w-12 h-12 bg-[#fff3e0] rounded-lg flex flex-col items-center justify-center flex-shrink-0">
-                        <span className="text-[#ff6b00] text-[16px] font-bold leading-none">{benefit.discount}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between mb-1 gap-2">
-                          <p className="text-[#1d2129] text-[13px] font-semibold">{benefit.title}</p>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <span className="text-[#c9cdd4] text-[11px] line-through">{formatCurrency(benefit.originalPrice, locale)}</span>
-                            <span className="bg-[#ff6b00]/10 text-[#ff6b00] text-[10px] font-medium px-1.5 py-0.5 rounded">
-                              {formatCurrency(benefit.saving, locale)}
+              <div className="mt-3 flex flex-col gap-3">
+                {activeCategory && activeCategory.benefits.length > 0 ? (
+                  activeCategory.benefits.map((benefit) => {
+                    const match = benefit.discount.match(/^([\d.]+)(.*)$/);
+                    const discountNumber = match?.[1] ?? benefit.discount;
+                    const discountSuffix = match?.[2] ?? "";
+                    return (
+                      <div
+                        key={benefit.title}
+                        className="relative rounded-[14px] border border-[#ffe7d6] overflow-hidden flex items-stretch h-[104px]"
+                        style={{ backgroundImage: "linear-gradient(164deg, #fffbf5 0%, #fff8f0 100%)" }}
+                      >
+                        <div
+                          className="w-20 flex flex-col items-center justify-center gap-1 shrink-0"
+                          style={{ backgroundImage: "linear-gradient(128deg, #fff5eb 0%, #ffefe0 100%)" }}
+                        >
+                          <span className="text-[#ff6b00] text-[32px] font-black leading-8 tracking-[0.4px]">
+                            {discountNumber}
+                          </span>
+                          <span className="text-[#ff6b00] text-[11px] font-medium leading-[16.5px]">
+                            {discountSuffix}
+                          </span>
+                        </div>
+                        <div className="border-l border-dashed border-[#e5e6eb]" />
+                        <span className="absolute left-[70px] -top-2 size-5 rounded-full bg-[#f7f8fa] border border-[#ffe7d6]" />
+                        <span className="absolute left-[70px] -bottom-2 size-5 rounded-full bg-[#f7f8fa] border border-[#ffe7d6]" />
+                        <div className="flex-1 min-w-0 px-3 py-3 flex items-center gap-2">
+                          <div className="flex-1 min-w-0 flex flex-col gap-1">
+                            <p className="text-[#1d2129] text-sm font-bold leading-[17.5px] tracking-tight truncate">
+                              {benefit.title}
+                            </p>
+                            <p className="text-[#4e5969] text-xs leading-[19.5px] line-clamp-2">
+                              {benefit.description}
+                            </p>
+                            <p className="text-[#86909c] text-[10px] leading-[15px]">
+                              {benefit.validity}
+                            </p>
+                          </div>
+                          <div className="flex flex-col items-end gap-0.5 shrink-0">
+                            <span className="text-[#86909c] text-[10px] leading-[15px] line-through">
+                              {formatCurrency(benefit.originalPrice, locale)}
+                            </span>
+                            <span className="bg-[#00b42a] text-white text-[9px] leading-[13.5px] px-2 py-0.5 rounded-full whitespace-nowrap">
+                              {`省${formatCurrency(benefit.saving, locale)}`}
                             </span>
                           </div>
                         </div>
-                        <p className="text-[#86909c] text-[11px] leading-relaxed whitespace-pre-line">{benefit.description}</p>
-                        <p className="text-[#86909c] text-[11px] mt-2">{benefit.validity}</p>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    );
+                  })
+                ) : (
+                  <p className="py-8 text-center text-[#86909c] text-[13px]">敬请期待</p>
+                )}
               </div>
+            </section>
 
-              <div className="bg-white rounded-2xl shadow-sm border border-[#f2f3f5] p-5">
-                <h3 className="text-[#1d2129] text-[15px] font-semibold mb-3">{t("benefits.tipTitle")}</h3>
-                <div className="space-y-2">
-                  {detail.tips.map((tip, index) => (
-                    <div key={`${tip}-${index}`} className="flex gap-2">
-                      <span className="text-[#86909c] text-xs mt-0.5 flex-shrink-0">•</span>
-                      <p className="text-[#86909c] text-[12px] leading-relaxed">{tip}</p>
-                    </div>
-                  ))}
-                </div>
-                {detail.protocols.length ? (
-                  <div className="mt-4 pt-4 border-t border-[#f2f3f5] flex flex-wrap gap-3">
-                    {detail.protocols.map((protocol) => (
-                      <a key={protocol.url} href={protocol.url} className="text-[#165dff] text-[12px] font-medium">
-                        {protocol.name}
-                      </a>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            </>
-          ) : null}
+            <section className="bg-[#f7f8fa] border border-[#e5e6eb] rounded-[14px] px-4 pt-4 pb-4">
+              <h4 className="text-[#4e5969] text-sm font-medium leading-[21px] tracking-tight">
+                {t("benefits.tipTitle")}
+              </h4>
+              <ul className="mt-3 flex flex-col gap-2 pl-1">
+                {detail.tips.map((tip) => (
+                  <li key={tip} className="flex gap-2">
+                    <span className="text-[#86909c] text-xs leading-[19.5px]">•</span>
+                    <p className="flex-1 text-[#86909c] text-xs leading-[19.5px]">{tip}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
 
-          {error && detail ? <PageError message={error} onAction={() => void loadDetail()} /> : null}
-        </div>
+            {error && detail ? (
+              <PageError message={error} onAction={() => void loadDetail()} />
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[440px] bg-white/95 backdrop-blur-sm px-5 py-4 border-t border-[#f2f3f5]">
         <button
           onClick={() => void handleActivate()}
           disabled={isActivating || !applicationId}
-          className={`w-full h-14 rounded-full text-white text-[17px] font-semibold transition-opacity ${
+          className={`w-full h-14 rounded-full text-white text-base font-semibold tracking-tight transition-opacity ${
             isActivating || !applicationId
               ? "bg-[#c9cdd4] cursor-not-allowed"
-              : "bg-gradient-to-r from-[#165dff] to-[#4d8fff] shadow-[0px_8px_24px_rgba(22,93,255,0.35)] active:opacity-90"
+              : "bg-[#165dff] shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)] active:opacity-90"
           }`}
         >
           {isActivating ? `${t("benefits.openNow")}...` : t("benefits.openNow")}
@@ -269,14 +322,15 @@ export default function BenefitsCardPage() {
 function iconByCategory(category: BenefitCategory) {
   switch (category.icon) {
     case "car":
-      return CarIcon;
+      return Car;
     case "life":
-      return LifeIcon;
+      return Utensils;
     case "shop":
-      return ShopIcon;
+      return ShoppingBag;
     case "tv":
+      return Tv;
     default:
-      return TvIcon;
+      return Sparkles;
   }
 }
 

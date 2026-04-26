@@ -77,7 +77,7 @@ export default function JointEntryPage() {
               window.location.reload();
               return;
             }
-            navigate("/");
+            navigate("/calculator");
           }}
           actionLabel={requestPayload ? t("common.retry") : t("repaymentSuccess.backHome")}
         />

@@ -14,6 +14,7 @@ import ConfirmRepaymentPage from "./pages/ConfirmRepaymentPage";
 import JointDispatchPage from "./pages/JointDispatchPage";
 import JointEntryPage from "./pages/JointEntryPage";
 import JointRefundEntryPage from "./pages/JointRefundEntryPage";
+import LandingPage from "./pages/LandingPage";
 import RepaymentSuccessPage from "./pages/RepaymentSuccessPage";
 
 function Router() {
@@ -22,7 +23,8 @@ function Router() {
       <Route path={"/joint-entry"} component={JointEntryPage} />
       <Route path={"/joint-dispatch"} component={JointDispatchPage} />
       <Route path={"/joint-refund-entry"} component={JointRefundEntryPage} />
-      <Route path={"/"} component={CalculatorPage} />
+      <Route path={"/landing"} component={LandingPage} />
+      <Route path={"/calculator"} component={CalculatorPage} />
       <Route path={"/approval-pending"} component={ApprovalPendingPage} />
       <Route path={"/benefits-card"} component={BenefitsCardPage} />
       <Route path={"/approval-result"} component={ApprovalResultPage} />

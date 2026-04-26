@@ -8,6 +8,7 @@ import { getRepaymentResult } from "@/lib/loan-api";
 import { shouldRequestLocalizedData } from "@/lib/localized-request";
 import { getQueryParam } from "@/lib/route";
 import type { RepaymentResult } from "@/types/loan.types";
+import { Calendar, CheckCircle2, CreditCard, TrendingDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -76,7 +77,7 @@ export default function RepaymentSuccessPage() {
           message={MISSING_CONTEXT_COPY[locale]}
           onAction={() => {
             loan.reset();
-            navigate("/");
+            navigate("/calculator");
           }}
           actionLabel={t("repaymentSuccess.backHome")}
         />
@@ -102,90 +103,77 @@ export default function RepaymentSuccessPage() {
 
   return (
     <MobileLayout>
-      <div className="flex-1 overflow-y-auto bg-[#f7f8fa] pb-24">
-        <div className="bg-gradient-to-b from-[#165dff] to-[#3d7aff] px-5 pt-14 pb-28 overflow-hidden relative">
-          <div className="absolute w-48 h-48 right-[-30px] top-[-20px] bg-white/10 rounded-full" />
-          <div className="absolute w-36 h-36 left-[-15px] bottom-[-10px] bg-white/10 rounded-full" />
+      <div className="flex-1 overflow-y-auto bg-gradient-to-b from-[#f7f8fa] via-[#fcfdfd] to-white pb-32">
+        <section
+          className="relative overflow-hidden px-5 pt-12 pb-24"
+          style={{ backgroundImage: "linear-gradient(138deg, #165dff 0%, #3d8aff 100%)" }}
+        >
+          <div className="absolute -right-8 -top-8 size-64 bg-white/10 rounded-full blur-3xl" />
+          <div className="absolute -left-24 bottom-0 size-48 bg-white/10 rounded-full blur-3xl" />
           <div className="relative flex flex-col items-center">
-            <div className="w-[72px] h-[72px] bg-white/25 rounded-full flex items-center justify-center mb-5">
-              <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
-                <circle cx="20" cy="20" r="17" stroke="white" strokeWidth="3" />
-                <path d="M12 20L17 25L28 14" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+            <div className="size-20 bg-white/20 rounded-full flex items-center justify-center mb-6">
+              <CheckCircle2 className="size-10 text-white" strokeWidth={2.5} />
             </div>
-            <h1 className="text-white text-[28px] font-bold mb-3">{t("repaymentSuccess.title")}</h1>
+            <h1 className="text-white text-[28px] font-bold leading-[42px] tracking-[0.4px] text-center">
+              {t("repaymentSuccess.title")}
+            </h1>
             {result ? (
-              <div className="flex flex-col items-center gap-1">
-                <span className="text-white/80 text-base">{t("repaymentSuccess.amountLabel")}</span>
-                <span className="text-white text-[36px] font-bold">{formatCurrency(result.amount, locale)}</span>
-              </div>
+              <p className="mt-4 text-white text-center leading-none">
+                <span className="text-base">{t("repaymentSuccess.amountLabel")}</span>
+                <span className="text-[36px] font-bold tracking-[0.4px]">
+                  {formatCurrency(result.amount, locale)}
+                </span>
+                <span className="text-base">元</span>
+              </p>
             ) : null}
           </div>
-        </div>
+        </section>
 
-        <div className="px-4 -mt-16 space-y-4">
+        <div className="relative z-10 px-5 -mt-20 space-y-4">
           {result ? (
             <>
-              <div className="bg-white rounded-2xl shadow-[0px_4px_20px_rgba(0,0,0,0.08)] px-5 pt-5 pb-5">
-                <h3 className="text-[#1d2129] text-[15px] font-bold mb-4">{t("repaymentSuccess.detailTitle")}</h3>
-                <div className="border-t border-[#f2f3f5] pt-4 space-y-5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-[#f0f4ff] rounded-full flex items-center justify-center flex-shrink-0">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                        <rect x="3" y="4" width="18" height="18" rx="2" stroke="#165DFF" strokeWidth="1.5" />
-                        <path d="M3 9H21" stroke="#165DFF" strokeWidth="1.5" />
-                        <path d="M8 2V6M16 2V6" stroke="#165DFF" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-[#86909c] text-[12px] mb-0.5">{t("repaymentSuccess.time")}</p>
-                      <p className="text-[#1d2129] text-[15px] font-semibold">{formatDateTime(result.repaymentTime, locale)}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-[#f0f4ff] rounded-full flex items-center justify-center flex-shrink-0">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                        <rect x="2" y="5" width="20" height="14" rx="2" stroke="#165DFF" strokeWidth="1.5" />
-                        <path d="M2 10H22" stroke="#165DFF" strokeWidth="1.5" />
-                        <rect x="5" y="13" width="4" height="2" rx="1" fill="#165DFF" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-[#86909c] text-[12px] mb-0.5">{t("repaymentSuccess.card")}</p>
-                      <p className="text-[#1d2129] text-[15px] font-semibold">{formatBankCard(result.bankCard.bankName, result.bankCard.lastFour, locale)}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-[#f0fff4] rounded-full flex items-center justify-center flex-shrink-0">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                        <path d="M3 7L9 13L13 9L21 17" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M17 17H21V13" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-[#86909c] text-[12px] mb-0.5">{t("repaymentSuccess.savedInterest")}</p>
-                      <p className="text-[#22c55e] text-[15px] font-semibold">{formatCurrency(result.interestSaved, locale)}</p>
-                    </div>
-                  </div>
+              <section className="bg-white rounded-2xl shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)] px-6 pt-6 pb-6">
+                <h3 className="text-[#1d2129] text-[17px] font-semibold leading-[25.5px] tracking-tight pb-4 border-b border-[#e5e6eb]">
+                  {t("repaymentSuccess.detailTitle")}
+                </h3>
+                <div className="mt-4 flex flex-col gap-4">
+                  <DetailRow
+                    icon={<Calendar className="size-5 text-[#86909c]" strokeWidth={2} />}
+                    label={t("repaymentSuccess.time")}
+                    value={formatDateTime(result.repaymentTime, locale)}
+                  />
+                  <DetailRow
+                    icon={<CreditCard className="size-5 text-[#86909c]" strokeWidth={2} />}
+                    label={t("repaymentSuccess.card")}
+                    value={formatBankCard(result.bankCard.bankName, result.bankCard.lastFour, locale)}
+                  />
+                  <DetailRow
+                    icon={<TrendingDown className="size-5 text-[#00b42a]" strokeWidth={2} />}
+                    label={t("repaymentSuccess.savedInterest")}
+                    value={formatCurrency(result.interestSaved, locale)}
+                    valueClassName="text-[#00b42a]"
+                  />
                 </div>
-              </div>
+              </section>
 
-              <div className="bg-white rounded-2xl shadow-sm border border-[#f2f3f5] p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-1 h-5 bg-[#165dff] rounded-full" />
-                  <h3 className="text-[#1d2129] text-[15px] font-semibold">{t("repaymentSuccess.tipTitle")}</h3>
+              <section className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)] px-5 pt-5 pb-5">
+                <div className="flex items-center gap-2">
+                  <span className="w-1 h-4 bg-[#165dff] rounded-[4px]" />
+                  <h3 className="text-[#1d2129] text-base font-semibold leading-6 tracking-tight">
+                    {t("repaymentSuccess.tipTitle")}
+                  </h3>
                 </div>
-                <div className="space-y-2">
-                  {result.tips.map((tip, index) => (
-                    <div key={`${tip}-${index}`} className="flex gap-2">
-                      <span className="text-[#86909c] text-[13px] mt-0.5 flex-shrink-0">•</span>
-                      <p className="text-[#86909c] text-[13px] leading-relaxed">{tip}</p>
-                    </div>
+                <ul className="mt-3 flex flex-col gap-2">
+                  {result.tips.map((tip) => (
+                    <li key={tip} className="flex gap-2 items-start">
+                      <span className="text-[#165dff] text-sm leading-[22.75px]">•</span>
+                      <p className="flex-1 text-[#4e5969] text-sm leading-[22.75px] tracking-tight">
+                        {tip}
+                      </p>
+                    </li>
                   ))}
-                </div>
-              </div>
+                </ul>
+              </section>
             </>
           ) : null}
 
@@ -197,14 +185,44 @@ export default function RepaymentSuccessPage() {
         <button
           onClick={() => {
             loan.reset();
-            navigate("/");
+            navigate("/calculator");
           }}
-          className="w-full h-14 bg-gradient-to-r from-[#165dff] to-[#4d8fff] rounded-full text-white text-[17px] font-semibold shadow-[0px_8px_24px_rgba(22,93,255,0.35)] active:opacity-90 transition-opacity"
+          className="w-full h-14 bg-gradient-to-r from-[#165dff] to-[#3d8aff] rounded-full text-white text-[17px] font-semibold tracking-tight shadow-[0_20px_25px_rgba(22,93,255,0.4),0_8px_10px_rgba(22,93,255,0.4)] active:opacity-90 transition-opacity"
         >
           {t("repaymentSuccess.backHome")}
         </button>
       </div>
     </MobileLayout>
+  );
+}
+
+function DetailRow({
+  icon,
+  label,
+  value,
+  valueClassName,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="size-10 rounded-full bg-[#f2f3f5] flex items-center justify-center shrink-0">
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0 flex flex-col gap-0.5 pt-1">
+        <p className="text-[#86909c] text-[13px] leading-[19.5px] tracking-tight">{label}</p>
+        <p
+          className={`text-[#1d2129] text-[15px] font-medium leading-[22.5px] tracking-tight ${
+            valueClassName ?? ""
+          }`}
+        >
+          {value}
+        </p>
+      </div>
+    </div>
   );
 }
 
