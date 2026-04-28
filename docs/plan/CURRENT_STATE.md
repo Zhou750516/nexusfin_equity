@@ -10,20 +10,20 @@
 
 ## 1. 主线状态
 
-- **当前阶段**：重构降摩擦主线已完成 Phase 1A、1B、2A、2B、2C、2D、2E，当前待推进 Phase 0、Phase 5、Phase 3、Phase 4。
+- **当前阶段**：重构降摩擦主线已完成 Phase 0、1A、1B、2A、2B、2C、2D、2E、5、3、4，当前无待执行的主线 phase。
 - **本周聚焦**：
-  1. 收口 `docs/plan` 与 AGENTS 入口，降低会话入场成本
-  2. 收敛测试 context 风味，降低 `mvn test` 验证成本
-  3. 继续 `thirdparty/qw` 与 H5 大文件拆分
+  1. 维护 `docs/plan` 与 AGENTS 入口的真实状态，避免回填失真
+  2. 保持收敛后的测试 context 与 H5 结构，不回退到高摩擦形态
+  3. 后续新需求优先沿已拆出的 service / gateway / H5 section 边界扩展
 - **本周不做**：
-  - 不重做已完成的 Phase 1A / 1B / 2A / 2B / 2C / 2D / 2E
+  - 不重做已完成的重构阶段
   - 不在存在产品歧义的情况下擅自删除 H5 路由或页面
 
 ## 2. 重构主线状态
 
 | Phase | 状态 | 当前结论 |
 |------|------|---------|
-| **Phase 0 认知半径瘦身** | 🟡 | 结构已基本收口，需保持入口文档真实有效 |
+| **Phase 0 认知半径瘦身** | ✅ | `docs/plan`、AGENTS 入口与 archive 结构已收口 |
 | **Phase 1A shared utils** | ✅ | 已完成，不再重做 |
 | **Phase 1B yunka call template** | ✅ | 已完成，不再重做 |
 | **Phase 2A loan query split** | ✅ | 已完成，不再重做 |
@@ -31,9 +31,9 @@
 | **Phase 2C loan application split** | ✅ | 已完成，不再重做 |
 | **Phase 2D loan application gateway** | ✅ | 已完成，不再重做 |
 | **Phase 2E async compensation typed payload** | ✅ | 已完成，不再重做 |
-| **Phase 5 test context convergence** | ⏳ | 下一优先级，需要先测 baseline 再收敛 |
-| **Phase 3 QW convergence** | ⏳ | 待 Phase 5 后推进 |
-| **Phase 4 H5 decomposition** | ⏳ | 待 Phase 3 / Phase 5 后推进 |
+| **Phase 5 test context convergence** | ✅ | `@SpringBootTest` 已从 18 收敛到 15，`mvn test` wall-clock 从 14.544s 降到 13.582s |
+| **Phase 3 QW convergence** | ✅ | Allinpay request flow 与 `QwProperties` 已收敛，`Skeleton*` 已清空 |
+| **Phase 4 H5 decomposition** | ✅ | `CalculatorPage`、i18n catalog 与 `components/ui` 已收敛，路由边界保留 |
 
 ## 3. 当前阻塞与边界
 
@@ -61,6 +61,9 @@
 - ✅ 2026-04-28：`specs/004-benefit-loan-flow/` 已迁出主入口扫描面
 - ✅ 2026-04-28：`src/main/java/com/nexusfin/equity/thirdparty/qw/demo/` 已移出运行时源码目录
 - ✅ 2026-04-28：Loan 查询 / 计算 / 申请 / gateway / async compensation typed payload 重构已完成
+- ✅ 2026-04-28：测试 context 已完成第一轮收敛，controller-only 场景已切到更薄的 standalone MockMvc
+- ✅ 2026-04-28：QW / Allinpay direct 收敛完成，`QwProperties.java` 已从 359 行降到 81 行
+- ✅ 2026-04-29：H5 `CalculatorPage.tsx` 已拆到 161 行，`messages.ts` 已拆为按域目录，`components/ui` 已收敛到 8 个保留文件
 
 ## 5. 当前入口导航
 
