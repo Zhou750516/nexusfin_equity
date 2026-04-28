@@ -8,20 +8,18 @@ import com.nexusfin.equity.dto.request.CreateBenefitOrderRequest;
 import com.nexusfin.equity.dto.request.LoanApplyRequest;
 import com.nexusfin.equity.dto.response.CreateBenefitOrderResponse;
 import com.nexusfin.equity.dto.response.LoanApplyResponse;
-import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.exception.BenefitPurchaseSyncTimeoutCompensationException;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.ErrorCodes;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
-import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.service.AsyncCompensationEnqueueService;
 import com.nexusfin.equity.service.BenefitOrderService;
 import com.nexusfin.equity.service.H5I18nService;
+import com.nexusfin.equity.service.LoanApplicationGateway;
 import com.nexusfin.equity.service.LoanApplicationService;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import com.nexusfin.equity.util.TraceIdUtil;
-import java.time.LocalDateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -34,12 +32,11 @@ import static com.nexusfin.equity.util.MoneyUnits.yuanToCent;
 public class LoanApplicationServiceImpl implements LoanApplicationService {
 
     private static final Logger log = LoggerFactory.getLogger(LoanApplicationServiceImpl.class);
-    private static final String DEFAULT_CHANNEL_CODE = "KJ";
 
     private final H5LoanProperties h5LoanProperties;
     private final H5BenefitsProperties h5BenefitsProperties;
     private final YunkaProperties yunkaProperties;
-    private final LoanApplicationMappingRepository loanApplicationMappingRepository;
+    private final LoanApplicationGateway loanApplicationGateway;
     private final BenefitOrderService benefitOrderService;
     private final H5I18nService h5I18nService;
     private final AsyncCompensationEnqueueService asyncCompensationEnqueueService;
@@ -49,7 +46,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
             H5LoanProperties h5LoanProperties,
             H5BenefitsProperties h5BenefitsProperties,
             YunkaProperties yunkaProperties,
-            LoanApplicationMappingRepository loanApplicationMappingRepository,
+            LoanApplicationGateway loanApplicationGateway,
             BenefitOrderService benefitOrderService,
             H5I18nService h5I18nService,
             AsyncCompensationEnqueueService asyncCompensationEnqueueService,
@@ -58,7 +55,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
         this.h5LoanProperties = h5LoanProperties;
         this.h5BenefitsProperties = h5BenefitsProperties;
         this.yunkaProperties = yunkaProperties;
-        this.loanApplicationMappingRepository = loanApplicationMappingRepository;
+        this.loanApplicationGateway = loanApplicationGateway;
         this.benefitOrderService = benefitOrderService;
         this.h5I18nService = h5I18nService;
         this.asyncCompensationEnqueueService = asyncCompensationEnqueueService;
@@ -136,7 +133,15 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                     java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos),
                     ErrorCodes.YUNKA_UPSTREAM_TIMEOUT,
                     "Yunka loan apply timeout, async compensation enqueued");
-            saveApplicationMapping(memberId, uid, applicationId, benefitOrder.benefitOrderNo(), loanId, request.purpose(), "PENDING_REVIEW");
+            loanApplicationGateway.save(new LoanApplicationGateway.SaveCommand(
+                    memberId,
+                    uid,
+                    applicationId,
+                    benefitOrder.benefitOrderNo(),
+                    loanId,
+                    request.purpose(),
+                    "PENDING_REVIEW"
+            ));
             asyncCompensationEnqueueService.enqueue(new AsyncCompensationEnqueueService.EnqueueCommand(
                     "YUNKA_LOAN_APPLY_RETRY",
                     "LOAN_APPLY:" + applicationId,
@@ -205,7 +210,15 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
             return buildLoanFailedResponse(applicationId, benefitOrder.benefitOrderNo(), exception.getMessage());
         }
         String upstreamLoanId = readText(response.data(), "loanId", loanId);
-        saveApplicationMapping(memberId, uid, applicationId, benefitOrder.benefitOrderNo(), upstreamLoanId, request.purpose(), "ACTIVE");
+        loanApplicationGateway.save(new LoanApplicationGateway.SaveCommand(
+                memberId,
+                uid,
+                applicationId,
+                benefitOrder.benefitOrderNo(),
+                upstreamLoanId,
+                request.purpose(),
+                "ACTIVE"
+        ));
         return new LoanApplyResponse(
                 applicationId,
                 "pending",
@@ -249,30 +262,6 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                 benefitOrderNo,
                 h5I18nService.text("loan.apply.failurePrefix", "权益购买成功，借款申请失败：") + safeReason
         );
-    }
-
-    private void saveApplicationMapping(
-            String memberId,
-            String uid,
-            String applicationId,
-            String benefitOrderNo,
-            String loanId,
-            String purpose,
-            String mappingStatus
-    ) {
-        LoanApplicationMapping mapping = new LoanApplicationMapping();
-        mapping.setApplicationId(applicationId);
-        mapping.setMemberId(memberId);
-        mapping.setBenefitOrderNo(benefitOrderNo);
-        mapping.setChannelCode(DEFAULT_CHANNEL_CODE);
-        mapping.setExternalUserId(uid);
-        mapping.setUpstreamQueryType("loanId");
-        mapping.setUpstreamQueryValue(loanId);
-        mapping.setPurpose(purpose);
-        mapping.setMappingStatus(mappingStatus);
-        mapping.setCreatedTs(LocalDateTime.now());
-        mapping.setUpdatedTs(LocalDateTime.now());
-        loanApplicationMappingRepository.insert(mapping);
     }
 
     private String readRemark(JsonNode data) {

@@ -8,10 +8,8 @@ import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.dto.request.LoanApplyRequest;
 import com.nexusfin.equity.dto.response.CreateBenefitOrderResponse;
 import com.nexusfin.equity.dto.response.LoanApplyResponse;
-import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
-import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.service.impl.LoanApplicationServiceImpl;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
@@ -44,7 +42,7 @@ class LoanApplicationServiceTest {
     private YunkaGatewayClient yunkaGatewayClient;
 
     @Mock
-    private LoanApplicationMappingRepository loanApplicationMappingRepository;
+    private LoanApplicationGateway loanApplicationGateway;
 
     @Mock
     private BenefitOrderService benefitOrderService;
@@ -64,7 +62,7 @@ class LoanApplicationServiceTest {
                 h5LoanProperties(),
                 h5BenefitsProperties(),
                 yunkaProperties(),
-                loanApplicationMappingRepository,
+                loanApplicationGateway,
                 benefitOrderService,
                 h5I18nService,
                 asyncCompensationEnqueueService,
@@ -107,14 +105,14 @@ class LoanApplicationServiceTest {
         assertThat(forwardData.path("contactInfo").isArray()).isTrue();
         assertThat(forwardData.path("imageInfo").isArray()).isTrue();
 
-        ArgumentCaptor<LoanApplicationMapping> mappingCaptor =
-                ArgumentCaptor.forClass(LoanApplicationMapping.class);
-        verify(loanApplicationMappingRepository).insert(mappingCaptor.capture());
-        assertThat(mappingCaptor.getValue().getApplicationId()).isEqualTo(response.applicationId());
-        assertThat(mappingCaptor.getValue().getBenefitOrderNo()).isEqualTo("BEN-001");
-        assertThat(mappingCaptor.getValue().getUpstreamQueryValue()).isEqualTo("LN-UPSTREAM-001");
-        assertThat(mappingCaptor.getValue().getPurpose()).isEqualTo("rent");
-        assertThat(mappingCaptor.getValue().getMappingStatus()).isEqualTo("ACTIVE");
+        ArgumentCaptor<LoanApplicationGateway.SaveCommand> saveCaptor =
+                ArgumentCaptor.forClass(LoanApplicationGateway.SaveCommand.class);
+        verify(loanApplicationGateway).save(saveCaptor.capture());
+        assertThat(saveCaptor.getValue().applicationId()).isEqualTo(response.applicationId());
+        assertThat(saveCaptor.getValue().benefitOrderNo()).isEqualTo("BEN-001");
+        assertThat(saveCaptor.getValue().upstreamLoanId()).isEqualTo("LN-UPSTREAM-001");
+        assertThat(saveCaptor.getValue().purpose()).isEqualTo("rent");
+        assertThat(saveCaptor.getValue().mappingStatus()).isEqualTo("ACTIVE");
     }
 
     @Test
@@ -152,12 +150,13 @@ class LoanApplicationServiceTest {
         assertThat(response.status()).isEqualTo("pending");
         assertThat(response.benefitOrderNo()).isEqualTo("BEN-TIMEOUT");
 
-        ArgumentCaptor<LoanApplicationMapping> mappingCaptor =
-                ArgumentCaptor.forClass(LoanApplicationMapping.class);
-        verify(loanApplicationMappingRepository).insert(mappingCaptor.capture());
-        assertThat(mappingCaptor.getValue().getApplicationId()).isEqualTo(response.applicationId());
-        assertThat(mappingCaptor.getValue().getBenefitOrderNo()).isEqualTo("BEN-TIMEOUT");
-        assertThat(mappingCaptor.getValue().getMappingStatus()).isEqualTo("PENDING_REVIEW");
+        ArgumentCaptor<LoanApplicationGateway.SaveCommand> saveCaptor =
+                ArgumentCaptor.forClass(LoanApplicationGateway.SaveCommand.class);
+        verify(loanApplicationGateway).save(saveCaptor.capture());
+        assertThat(saveCaptor.getValue().applicationId()).isEqualTo(response.applicationId());
+        assertThat(saveCaptor.getValue().benefitOrderNo()).isEqualTo("BEN-TIMEOUT");
+        assertThat(saveCaptor.getValue().mappingStatus()).isEqualTo("PENDING_REVIEW");
+        assertThat(saveCaptor.getValue().upstreamLoanId()).startsWith("LN-");
 
         ArgumentCaptor<AsyncCompensationEnqueueService.EnqueueCommand> enqueueCaptor =
                 ArgumentCaptor.forClass(AsyncCompensationEnqueueService.EnqueueCommand.class);
