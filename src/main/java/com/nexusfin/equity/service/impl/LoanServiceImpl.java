@@ -178,7 +178,15 @@ public class LoanServiceImpl implements LoanService {
                             yunkaProperties.paths().loanApply(),
                             applicationId,
                             forwardData
-                    ).withMemberId(memberId).withBenefitOrderNo(benefitOrder.benefitOrderNo())
+                    ).withMemberId(memberId).withBenefitOrderNo(benefitOrder.benefitOrderNo()),
+                    gatewayResponse -> {
+                        YunkaGatewayClient.YunkaGatewayResponse presentResponse =
+                                yunkaCallTemplate.requirePresentResponse(gatewayResponse);
+                        if (!yunkaCallTemplate.isSuccessful(presentResponse)) {
+                            throw new BizException(ErrorCodes.YUNKA_UPSTREAM_REJECTED, presentResponse.message());
+                        }
+                        return presentResponse;
+                    }
             );
         } catch (UpstreamTimeoutException exception) {
             log.warn("traceId={} bizOrderNo={} requestId={} memberId={} benefitOrderNo={} path={} elapsedMs={} errorNo={} errorMsg={}",
@@ -237,7 +245,8 @@ public class LoanServiceImpl implements LoanService {
             return buildLoanFailedResponse(
                     applicationId,
                     benefitOrder.benefitOrderNo(),
-                    ErrorCodes.YUNKA_RESPONSE_EMPTY.equals(exception.getErrorNo())
+                    (ErrorCodes.YUNKA_RESPONSE_EMPTY.equals(exception.getErrorNo())
+                            || ErrorCodes.YUNKA_UPSTREAM_REJECTED.equals(exception.getErrorNo()))
                             ? exception.getErrorMsg()
                             : exception.getMessage()
             );
@@ -257,9 +266,6 @@ public class LoanServiceImpl implements LoanService {
                             ? bizException.getErrorMsg()
                             : exception.getMessage());
             return buildLoanFailedResponse(applicationId, benefitOrder.benefitOrderNo(), exception.getMessage());
-        }
-        if (!yunkaCallTemplate.isSuccessful(response)) {
-            return buildLoanFailedResponse(applicationId, benefitOrder.benefitOrderNo(), response.message());
         }
         String upstreamLoanId = readText(response.data(), "loanId", loanId);
         saveApplicationMapping(memberId, uid, applicationId, benefitOrder.benefitOrderNo(), upstreamLoanId, request.purpose(), "ACTIVE");

@@ -26,6 +26,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,7 +35,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class LoanServiceTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -162,7 +164,7 @@ class LoanServiceTest {
     }
 
     @Test
-    void shouldReturnFailedResponseWhenLoanApplyIsRejected() throws Exception {
+    void shouldReturnFailedResponseWhenLoanApplyIsRejected(CapturedOutput output) throws Exception {
         when(benefitOrderService.createOrder(eq("mem-001"), any()))
                 .thenReturn(new CreateBenefitOrderResponse("BEN-REJECT", "FIRST_DEDUCT_PENDING", "/redirect"));
         when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
@@ -177,6 +179,10 @@ class LoanServiceTest {
         assertThat(response.status()).isEqualTo("loan_failed");
         assertThat(response.benefitOrderNo()).isEqualTo("BEN-REJECT");
         assertThat(response.message()).isEqualTo("权益购买成功，借款申请失败：invalid loan state");
+        assertThat(output)
+                .contains("scene=loan apply")
+                .contains("errorNo=YUNKA_UPSTREAM_REJECTED")
+                .doesNotContain("yunka request success");
     }
 
     @Test
