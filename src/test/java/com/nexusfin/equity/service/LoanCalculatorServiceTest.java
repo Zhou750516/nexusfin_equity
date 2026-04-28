@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -39,7 +40,7 @@ class LoanCalculatorServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(h5I18nService.text(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
+        lenient().when(h5I18nService.text(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
         loanCalculatorService = new LoanCalculatorServiceImpl(
                 h5LoanProperties(),
                 yunkaProperties(),
