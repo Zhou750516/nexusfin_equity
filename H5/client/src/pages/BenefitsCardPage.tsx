@@ -1,5 +1,6 @@
 import MobileLayout from "@/components/MobileLayout";
 import { PageError, PageLoading } from "@/components/PageFeedback";
+import StickyActionBar from "@/components/shared/StickyActionBar";
 import { toast } from "sonner";
 import { useLoan } from "@/contexts/LoanContext";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -160,14 +161,14 @@ export default function BenefitsCardPage() {
 
   return (
     <MobileLayout>
-      <div className="sticky top-0 z-20 bg-white border-b border-[#e5e6eb] h-[57px] flex items-center px-4">
-        <button onClick={() => navigate(pendingPath)} className="flex items-center gap-2 text-[#1d2129]">
+      <div className="sticky top-0 z-20 flex h-[57px] items-center border-b border-h5-border-soft bg-white px-4">
+        <button onClick={() => navigate(pendingPath)} className="flex items-center gap-2 text-h5-text-primary">
           <ChevronLeft className="size-5" strokeWidth={2.5} />
           <span className="text-base font-medium tracking-tight">{t("benefits.title")}</span>
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto bg-[#f7f8fa] pb-32">
+      <div className="h5-page-shell bg-h5-surface pb-32">
         {detail ? (
           <div className="px-5 pt-6 space-y-5">
             <section
@@ -436,19 +437,21 @@ export default function BenefitsCardPage() {
         ) : null}
       </div>
 
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[440px] bg-white/95 backdrop-blur-sm px-5 py-4 border-t border-[#f2f3f5]">
-        <button
-          onClick={() => void handleActivate()}
-          disabled={isActivating || !activationAllowed}
-          className={`w-full h-14 rounded-full text-white text-base font-semibold tracking-tight transition-opacity ${
-            isActivating || !activationAllowed
-              ? "bg-[#c9cdd4] cursor-not-allowed"
-              : "bg-[#165dff] shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)] active:opacity-90"
-          }`}
-        >
-          {isActivating ? `${t("benefits.openNow")}...` : t("benefits.openNow")}
-        </button>
-      </div>
+      <StickyActionBar
+        primary={
+          <button
+            onClick={() => void handleActivate()}
+            disabled={isActivating || !activationAllowed}
+            className={`w-full text-base tracking-tight ${
+              isActivating || !activationAllowed
+                ? "h-14 cursor-not-allowed rounded-full bg-[#c9cdd4] font-semibold text-white"
+                : "h5-primary-button w-full text-base"
+            }`}
+          >
+            {isActivating ? `${t("benefits.openNow")}...` : t("benefits.openNow")}
+          </button>
+        }
+      />
     </MobileLayout>
   );
 }

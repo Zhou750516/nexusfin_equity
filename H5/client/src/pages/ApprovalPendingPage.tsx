@@ -1,5 +1,6 @@
 import MobileLayout from "@/components/MobileLayout";
 import { PageError, PageLoading } from "@/components/PageFeedback";
+import StickyActionBar from "@/components/shared/StickyActionBar";
 import { useLoan } from "@/contexts/LoanContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { Locale } from "@/i18n/locale";
@@ -142,7 +143,7 @@ export default function ApprovalPendingPage() {
 
   return (
     <MobileLayout>
-      <div className="flex-1 overflow-y-auto bg-gradient-to-b from-[#f7f8fa] via-[#fcfdfd] to-white pb-32">
+      <div className="h5-page-shell bg-gradient-to-b from-[#f7f8fa] via-[#fcfdfd] to-white pb-32">
         <section
           className="px-5 pt-12 pb-12 flex flex-col items-center"
           style={{ backgroundImage: "linear-gradient(141deg, #165dff 0%, #3d8aff 100%)" }}
@@ -173,7 +174,7 @@ export default function ApprovalPendingPage() {
             <button
               type="button"
               onClick={() => navigate(benefitsPath)}
-              className="w-full bg-white border border-[#ffe7d6] rounded-2xl px-5 py-4 flex items-center justify-between shadow-[0_4px_12px_rgba(251,175,25,0.08)] active:opacity-90 transition-opacity"
+              className="flex w-full items-center justify-between rounded-2xl border border-[#ffe7d6] bg-h5-surface-strong px-5 py-4 shadow-[0_4px_12px_rgba(251,175,25,0.08)] transition-opacity active:opacity-90"
             >
               <div className="flex items-center gap-3">
                 <div
@@ -183,10 +184,10 @@ export default function ApprovalPendingPage() {
                   <Sparkles className="size-5 text-white" strokeWidth={2} />
                 </div>
                 <div className="flex flex-col items-start gap-0.5">
-                  <p className="text-[#1d2129] text-[15px] font-semibold tracking-tight">
+                  <p className="text-[15px] font-semibold tracking-tight text-h5-text-primary">
                     {t("benefits.cardName")}
                   </p>
-                  <p className="text-[#86909c] text-xs leading-[18px]">
+                  <p className="text-xs leading-[18px] text-h5-text-secondary">
                     {t("benefits.cardSubtitle")}
                   </p>
                 </div>
@@ -209,20 +210,22 @@ export default function ApprovalPendingPage() {
       </div>
 
       {shouldShowBenefits ? (
-        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[440px] bg-white/95 backdrop-blur-sm px-5 pt-6 pb-6 flex flex-col gap-4">
-          <button
-            onClick={() => navigate(benefitsPath)}
-            className="w-full h-14 rounded-full bg-gradient-to-r from-[#165dff] to-[#3d8aff] text-white text-[17px] font-semibold tracking-tight shadow-[0_20px_25px_rgba(22,93,255,0.4),0_8px_10px_rgba(22,93,255,0.4)] active:opacity-90 transition-opacity"
-          >
-            {t("approvalPending.activate")}
-          </button>
-          <button
-            onClick={() => setBenefitDismissed(true)}
-            className="w-full text-center text-[#86909c] text-[13px] font-medium tracking-tight"
-          >
-            {t("approvalPending.skip")}
-          </button>
-        </div>
+        <StickyActionBar
+          primary={
+            <button onClick={() => navigate(benefitsPath)} className="h5-primary-button w-full text-[17px] tracking-tight">
+              {t("approvalPending.activate")}
+            </button>
+          }
+          secondary={
+            <button
+              onClick={() => setBenefitDismissed(true)}
+              className="w-full text-center text-[13px] font-medium tracking-tight text-h5-text-secondary"
+            >
+              {t("approvalPending.skip")}
+            </button>
+          }
+          className="pt-6 pb-6"
+        />
       ) : null}
     </MobileLayout>
   );
