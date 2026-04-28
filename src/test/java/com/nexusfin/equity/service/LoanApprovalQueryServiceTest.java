@@ -7,7 +7,6 @@ import com.nexusfin.equity.dto.response.LoanApprovalResultResponse;
 import com.nexusfin.equity.dto.response.LoanApprovalStatusResponse;
 import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.exception.BizException;
-import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.service.impl.LoanApprovalQueryServiceImpl;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanItem;
@@ -33,7 +32,7 @@ class LoanApprovalQueryServiceTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Mock
-    private LoanApplicationMappingRepository loanApplicationMappingRepository;
+    private LoanApplicationGateway loanApplicationGateway;
 
     @Mock
     private H5I18nService h5I18nService;
@@ -52,7 +51,7 @@ class LoanApprovalQueryServiceTest {
         loanApprovalQueryService = new LoanApprovalQueryServiceImpl(
                 h5BenefitsProperties(),
                 yunkaProperties(),
-                loanApplicationMappingRepository,
+                loanApplicationGateway,
                 h5I18nService,
                 xiaohuaGatewayService,
                 yunkaCallTemplate
@@ -61,7 +60,7 @@ class LoanApprovalQueryServiceTest {
 
     @Test
     void shouldBuildRejectedApprovalStatusWithBenefitsPreview() {
-        when(loanApplicationMappingRepository.selectOne(any()))
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-001", "APP-003"))
                 .thenReturn(mapping("APP-003", "LN-003", "rent"));
         when(yunkaCallTemplate.executeForData(any()))
                 .thenReturn(objectMapper.createObjectNode()
@@ -83,7 +82,7 @@ class LoanApprovalQueryServiceTest {
 
     @Test
     void shouldBuildApprovedApprovalResultAndMapRepayPlan() throws Exception {
-        when(loanApplicationMappingRepository.selectOne(any()))
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-001", "APP-001"))
                 .thenReturn(mapping("APP-001", "LN-001", "rent"));
         when(yunkaCallTemplate.executeForData(any()))
                 .thenReturn(objectMapper.readTree("""
@@ -113,7 +112,7 @@ class LoanApprovalQueryServiceTest {
 
     @Test
     void shouldReturnEmptyRepayPlanWhenRepayPlanQueryThrowsBizException() throws Exception {
-        when(loanApplicationMappingRepository.selectOne(any()))
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-001", "APP-002"))
                 .thenReturn(mapping("APP-002", "LN-002", "education"));
         when(yunkaCallTemplate.executeForData(any()))
                 .thenReturn(objectMapper.readTree("""
@@ -135,7 +134,7 @@ class LoanApprovalQueryServiceTest {
 
     @Test
     void shouldThrowNotFoundWhenApplicationMappingDoesNotExist() {
-        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(null);
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-001", "APP-404")).thenReturn(null);
 
         assertThatThrownBy(() -> loanApprovalQueryService.getApprovalStatus("mem-001", "APP-404"))
                 .isInstanceOf(BizException.class)

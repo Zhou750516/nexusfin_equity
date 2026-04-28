@@ -1,6 +1,5 @@
 package com.nexusfin.equity.service.impl;
 
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.nexusfin.equity.config.H5BenefitsProperties;
 import com.nexusfin.equity.config.YunkaProperties;
@@ -8,8 +7,8 @@ import com.nexusfin.equity.dto.response.LoanApprovalResultResponse;
 import com.nexusfin.equity.dto.response.LoanApprovalStatusResponse;
 import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.exception.BizException;
-import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.service.H5I18nService;
+import com.nexusfin.equity.service.LoanApplicationGateway;
 import com.nexusfin.equity.service.LoanApprovalQueryService;
 import com.nexusfin.equity.service.XiaohuaGatewayService;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
@@ -34,7 +33,7 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
 
     private final H5BenefitsProperties h5BenefitsProperties;
     private final YunkaProperties yunkaProperties;
-    private final LoanApplicationMappingRepository loanApplicationMappingRepository;
+    private final LoanApplicationGateway loanApplicationGateway;
     private final H5I18nService h5I18nService;
     private final XiaohuaGatewayService xiaohuaGatewayService;
     private final YunkaCallTemplate yunkaCallTemplate;
@@ -42,14 +41,14 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
     public LoanApprovalQueryServiceImpl(
             H5BenefitsProperties h5BenefitsProperties,
             YunkaProperties yunkaProperties,
-            LoanApplicationMappingRepository loanApplicationMappingRepository,
+            LoanApplicationGateway loanApplicationGateway,
             H5I18nService h5I18nService,
             XiaohuaGatewayService xiaohuaGatewayService,
             YunkaCallTemplate yunkaCallTemplate
     ) {
         this.h5BenefitsProperties = h5BenefitsProperties;
         this.yunkaProperties = yunkaProperties;
-        this.loanApplicationMappingRepository = loanApplicationMappingRepository;
+        this.loanApplicationGateway = loanApplicationGateway;
         this.h5I18nService = h5I18nService;
         this.xiaohuaGatewayService = xiaohuaGatewayService;
         this.yunkaCallTemplate = yunkaCallTemplate;
@@ -91,13 +90,8 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
     }
 
     private LoanApplicationMapping findMapping(String memberId, String applicationId) {
-        LoanApplicationMapping mapping = loanApplicationMappingRepository.selectOne(
-                Wrappers.<LoanApplicationMapping>lambdaQuery()
-                        .eq(LoanApplicationMapping::getApplicationId, applicationId)
-                        .eq(LoanApplicationMapping::getMemberId, memberId)
-                        .in(LoanApplicationMapping::getMappingStatus, "ACTIVE", "PENDING_REVIEW")
-                        .last("limit 1")
-        );
+        LoanApplicationMapping mapping =
+                loanApplicationGateway.findActiveOrPendingMapping(memberId, applicationId);
         if (mapping == null) {
             throw new BizException(404, "application mapping not found");
         }
