@@ -181,6 +181,7 @@ public class LoanServiceImpl implements LoanService {
                 request.term(),
                 upstreamBankCardNum,
                 upstreamBankCardNum,
+                request.purpose(),
                 request.loanReason(),
                 request.basicInfo(),
                 request.idInfo(),
@@ -215,7 +216,7 @@ public class LoanServiceImpl implements LoanService {
                     elapsedMs(startNanos),
                     ErrorCodes.YUNKA_UPSTREAM_TIMEOUT,
                     "Yunka loan apply timeout, async compensation enqueued");
-            saveApplicationMapping(memberId, uid, applicationId, benefitOrder.benefitOrderNo(), loanId, "PENDING_REVIEW");
+            saveApplicationMapping(memberId, uid, applicationId, benefitOrder.benefitOrderNo(), loanId, request.purpose(), "PENDING_REVIEW");
             asyncCompensationEnqueueService.enqueue(new AsyncCompensationEnqueueService.EnqueueCommand(
                     "YUNKA_LOAN_APPLY_RETRY",
                     "LOAN_APPLY:" + applicationId,
@@ -287,7 +288,7 @@ public class LoanServiceImpl implements LoanService {
                 yunkaProperties.paths().loanApply(),
                 elapsedMs(startNanos));
         String upstreamLoanId = readText(response.data(), "loanId", loanId);
-        saveApplicationMapping(memberId, uid, applicationId, benefitOrder.benefitOrderNo(), upstreamLoanId, "ACTIVE");
+        saveApplicationMapping(memberId, uid, applicationId, benefitOrder.benefitOrderNo(), upstreamLoanId, request.purpose(), "ACTIVE");
         return new LoanApplyResponse(
                 applicationId,
                 "pending",
@@ -306,6 +307,7 @@ public class LoanServiceImpl implements LoanService {
         return new LoanApprovalStatusResponse(
                 applicationId,
                 h5Status,
+                mapping.getPurpose(),
                 buildApprovalStatusSteps(h5Status),
                 buildBenefitsCardPreview()
         );
@@ -321,6 +323,7 @@ public class LoanServiceImpl implements LoanService {
         return new LoanApprovalResultResponse(
                 applicationId,
                 h5Status,
+                mapping.getPurpose(),
                 approved ? centsToYuan(data.path("loanAmount").asLong(0L)) : BigDecimal.ZERO,
                 approved || reviewing ? h5I18nService.text("loan.approval.arrivalTime", "30分钟") : "--",
                 buildApprovalStatusSteps(h5Status),
@@ -385,6 +388,7 @@ public class LoanServiceImpl implements LoanService {
             String applicationId,
             String benefitOrderNo,
             String loanId,
+            String purpose,
             String mappingStatus
     ) {
         LoanApplicationMapping mapping = new LoanApplicationMapping();
@@ -395,6 +399,7 @@ public class LoanServiceImpl implements LoanService {
         mapping.setExternalUserId(uid);
         mapping.setUpstreamQueryType("loanId");
         mapping.setUpstreamQueryValue(loanId);
+        mapping.setPurpose(purpose);
         mapping.setMappingStatus(mappingStatus);
         mapping.setCreatedTs(LocalDateTime.now());
         mapping.setUpdatedTs(LocalDateTime.now());
@@ -706,6 +711,7 @@ public class LoanServiceImpl implements LoanService {
             Integer loanPeriod,
             String bankCardNo,
             String bankCardNum,
+            String purpose,
             String loanReason,
             JsonNode basicInfo,
             JsonNode idInfo,

@@ -8,8 +8,9 @@ import { formatCurrency } from "@/lib/format";
 import { activateBenefitsCard, getBenefitsCardDetail } from "@/lib/loan-api";
 import { shouldRequestLocalizedData } from "@/lib/localized-request";
 import { buildPath, getQueryParam } from "@/lib/route";
+import { canActivateBenefits, resolveDefaultBenefitsUserCard } from "@/pages/benefits-card.logic";
 import type { BenefitCategory, BenefitsCardDetail } from "@/types/loan.types";
-import { Car, Check, ChevronLeft, ShoppingBag, Sparkles, Tv, Utensils } from "lucide-react";
+import { Car, Check, ChevronLeft, FileText, ShoppingBag, Sparkles, Tv, Utensils, WalletCards } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -18,6 +19,60 @@ const MISSING_CONTEXT_COPY: Record<Locale, string> = {
   "zh-TW": "缺少借款申請編號，暫時無法開通權益。",
   "en-US": "Missing application ID. Benefits cannot be activated right now.",
   "vi-VN": "Thiếu mã hồ sơ vay nên chưa thể kích hoạt quyền lợi.",
+};
+
+const PROTOCOL_NOT_READY_COPY: Record<Locale, string> = {
+  "zh-CN": "当前缺少可用协议或扣费协议未生效，请先完成签约后再开通权益。",
+  "zh-TW": "目前缺少可用協議或扣費協議尚未生效，請先完成簽約後再開通權益。",
+  "en-US": "Required agreements or payment protocol are not ready yet. Complete signing before activating benefits.",
+  "vi-VN": "Thỏa thuận cần thiết hoặc giao thức khấu trừ chưa sẵn sàng. Hãy hoàn tất ký kết trước khi kích hoạt.",
+};
+
+const SECTION_COPY: Record<Locale, {
+  protocolTitle: string;
+  cardTitle: string;
+  protocolReady: string;
+  protocolPending: string;
+  noCard: string;
+  viewProtocol: string;
+  defaultCard: string;
+}> = {
+  "zh-CN": {
+    protocolTitle: "服务协议",
+    cardTitle: "默认扣费卡",
+    protocolReady: "签约状态已满足",
+    protocolPending: "签约状态待完成",
+    noCard: "暂无可用银行卡",
+    viewProtocol: "查看",
+    defaultCard: "默认",
+  },
+  "zh-TW": {
+    protocolTitle: "服務協議",
+    cardTitle: "預設扣費卡",
+    protocolReady: "簽約狀態已滿足",
+    protocolPending: "簽約狀態待完成",
+    noCard: "暫無可用銀行卡",
+    viewProtocol: "查看",
+    defaultCard: "預設",
+  },
+  "en-US": {
+    protocolTitle: "Agreements",
+    cardTitle: "Default Deduction Card",
+    protocolReady: "Signing requirements met",
+    protocolPending: "Signing still required",
+    noCard: "No available bank card",
+    viewProtocol: "View",
+    defaultCard: "Default",
+  },
+  "vi-VN": {
+    protocolTitle: "Thỏa thuận dịch vụ",
+    cardTitle: "Thẻ khấu trừ mặc định",
+    protocolReady: "Điều kiện ký kết đã sẵn sàng",
+    protocolPending: "Cần hoàn tất ký kết",
+    noCard: "Chưa có thẻ ngân hàng khả dụng",
+    viewProtocol: "Xem",
+    defaultCard: "Mặc định",
+  },
 };
 
 export default function BenefitsCardPage() {
@@ -97,6 +152,11 @@ export default function BenefitsCardPage() {
 
   const activeCategory = detail?.categories[activeTab] ?? null;
   const activateLabelLines = t("benefits.activateCta").split("\n");
+  const defaultUserCard = detail ? resolveDefaultBenefitsUserCard(detail.userCards) : null;
+  const activationAllowed = detail ? canActivateBenefits({
+    applicationId,
+    protocolReady: detail.protocolReady,
+  }) : false;
 
   return (
     <MobileLayout>
@@ -136,7 +196,7 @@ export default function BenefitsCardPage() {
                 </div>
                 <button
                   onClick={() => void handleActivate()}
-                  disabled={isActivating || !applicationId}
+                  disabled={isActivating || !activationAllowed}
                   className="relative h-[64px] min-w-[115px] rounded-full overflow-hidden shadow-[0_8px_24px_-4px_rgba(251,175,25,0.4)] disabled:opacity-60 disabled:cursor-not-allowed"
                   style={{ backgroundImage: "linear-gradient(151deg, #ff6b2c 0%, #fbaf19 50%, #ffd24c 100%)" }}
                 >
@@ -150,6 +210,72 @@ export default function BenefitsCardPage() {
                     </span>
                   </span>
                 </button>
+              </div>
+            </section>
+
+            <section className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)] px-5 pt-5 pb-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="size-4 text-[#165dff]" strokeWidth={2.25} />
+                  <h3 className="text-[#1d2129] text-base font-bold leading-6 tracking-tight">
+                    {SECTION_COPY[locale].protocolTitle}
+                  </h3>
+                </div>
+                <span className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  detail.protocolReady
+                    ? "bg-[#22c55e]/10 text-[#16a34a]"
+                    : "bg-[#fbaf19]/12 text-[#d97706]"
+                }`}>
+                  {detail.protocolReady ? SECTION_COPY[locale].protocolReady : SECTION_COPY[locale].protocolPending}
+                </span>
+              </div>
+              <div className="mt-4 flex flex-col gap-3">
+                {detail.protocols.map((protocol) => (
+                  <a
+                    key={`${protocol.name}-${protocol.url}`}
+                    href={protocol.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between rounded-xl border border-[#e5e6eb] bg-[#f7f8fa] px-4 py-3"
+                  >
+                    <span className="text-[#1d2129] text-sm font-medium tracking-tight">
+                      {protocol.name}
+                    </span>
+                    <span className="text-[#165dff] text-xs font-semibold tracking-tight">
+                      {SECTION_COPY[locale].viewProtocol}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            </section>
+
+            <section className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)] px-5 pt-5 pb-5">
+              <div className="flex items-center gap-2">
+                <WalletCards className="size-4 text-[#165dff]" strokeWidth={2.25} />
+                <h3 className="text-[#1d2129] text-base font-bold leading-6 tracking-tight">
+                  {SECTION_COPY[locale].cardTitle}
+                </h3>
+              </div>
+              <div className="mt-4 rounded-xl border border-[#e5e6eb] bg-[#f7f8fa] px-4 py-4">
+                {defaultUserCard ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[#1d2129] text-sm font-semibold tracking-tight">
+                        {defaultUserCard.bankName}
+                      </p>
+                      <p className="mt-1 text-[#86909c] text-[13px] tracking-tight">
+                        {`**** ${defaultUserCard.cardLastFour}`}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-[#165dff]/10 px-3 py-1 text-xs font-medium text-[#165dff]">
+                      {SECTION_COPY[locale].defaultCard}
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-[#86909c] text-sm tracking-tight">
+                    {SECTION_COPY[locale].noCard}
+                  </p>
+                )}
               </div>
             </section>
 
@@ -298,6 +424,14 @@ export default function BenefitsCardPage() {
             {error && detail ? (
               <PageError message={error} onAction={() => void loadDetail()} />
             ) : null}
+
+            {!detail.protocolReady ? (
+              <section className="bg-[#fff7e6] border border-[#ffe4b3] rounded-[14px] px-4 py-4">
+                <p className="text-[#ad6800] text-[13px] leading-[21px]">
+                  {PROTOCOL_NOT_READY_COPY[locale]}
+                </p>
+              </section>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -305,9 +439,9 @@ export default function BenefitsCardPage() {
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[440px] bg-white/95 backdrop-blur-sm px-5 py-4 border-t border-[#f2f3f5]">
         <button
           onClick={() => void handleActivate()}
-          disabled={isActivating || !applicationId}
+          disabled={isActivating || !activationAllowed}
           className={`w-full h-14 rounded-full text-white text-base font-semibold tracking-tight transition-opacity ${
-            isActivating || !applicationId
+            isActivating || !activationAllowed
               ? "bg-[#c9cdd4] cursor-not-allowed"
               : "bg-[#165dff] shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)] active:opacity-90"
           }`}

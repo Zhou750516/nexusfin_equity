@@ -7,6 +7,9 @@ import express, { type Request, type Response } from "express";
 const app = express();
 app.use(express.json());
 
+const applicationPurposeStore = new Map<string, string>();
+let applicationSequence = 1;
+
 function ok<T>(data: T) {
   return { code: 0, data };
 }
@@ -60,10 +63,14 @@ app.post("/api/loan/calculate", (req: Request, res: Response) => {
   );
 });
 
-app.post("/api/loan/apply", (_req: Request, res: Response) => {
+app.post("/api/loan/apply", (req: Request, res: Response) => {
+  const purpose = typeof req.body?.purpose === "string" ? req.body.purpose : "shopping";
+  const applicationId = `mock-app-${String(applicationSequence).padStart(3, "0")}`;
+  applicationSequence += 1;
+  applicationPurposeStore.set(applicationId, purpose);
   res.json(
     ok({
-      applicationId: "mock-app-001",
+      applicationId,
       status: "pending",
       estimatedTime: "1-3分钟",
       benefitsActivated: false,
@@ -72,10 +79,12 @@ app.post("/api/loan/apply", (_req: Request, res: Response) => {
 });
 
 app.get("/api/loan/approval-status/:applicationId", (req: Request, res: Response) => {
+  const purpose = applicationPurposeStore.get(req.params.applicationId) ?? "shopping";
   res.json(
     ok({
       applicationId: req.params.applicationId,
       status: "reviewing",
+      purpose,
       steps: [
         { name: "提交申请", status: "completed", description: "申请已提交" },
         { name: "智能审批", status: "in_progress", description: "正在进行资质审核" },
@@ -91,10 +100,12 @@ app.get("/api/loan/approval-status/:applicationId", (req: Request, res: Response
 });
 
 app.get("/api/loan/approval-result/:applicationId", (req: Request, res: Response) => {
+  const purpose = applicationPurposeStore.get(req.params.applicationId) ?? "shopping";
   res.json(
     ok({
       applicationId: req.params.applicationId,
       status: "approved",
+      purpose,
       approvedAmount: 3000,
       estimatedArrivalTime: "预计30分钟内到账，具体以短信通知为准",
       steps: [

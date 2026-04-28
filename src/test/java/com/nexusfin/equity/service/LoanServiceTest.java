@@ -145,6 +145,7 @@ class LoanServiceTest {
                 3,
                 "acc_001",
                 List.of("loan", "user"),
+                "rent",
                 "DAILY_CONSUMPTION",
                 "6222020202028648",
                 objectMapper.readTree("""
@@ -175,6 +176,7 @@ class LoanServiceTest {
                 ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
         verify(yunkaGatewayClient).proxy(captor.capture());
         JsonNode forwardData = objectMapper.valueToTree(captor.getValue().data());
+        assertThat(forwardData.path("purpose").asText()).isEqualTo("rent");
         assertThat(forwardData.path("loanReason").asText()).isEqualTo("DAILY_CONSUMPTION");
         assertThat(forwardData.path("bankCardNum").asText()).isEqualTo("6222020202028648");
         assertThat(forwardData.path("platformBenefitOrderNo").asText()).isEqualTo("PBEN-001");

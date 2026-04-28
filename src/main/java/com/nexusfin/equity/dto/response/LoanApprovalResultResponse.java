@@ -6,6 +6,7 @@ import java.util.List;
 public record LoanApprovalResultResponse(
         String applicationId,
         String status,
+        String purpose,
         BigDecimal approvedAmount,
         String estimatedArrivalTime,
         List<LoanApprovalStatusResponse.ApprovalStep> steps,
