@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.ErrorCodes;
+import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import com.nexusfin.equity.util.TraceIdUtil;
 import java.util.function.Function;
@@ -70,6 +71,21 @@ public class YunkaCallTemplate {
                     elapsedMs(startNanos),
                     exception.getErrorNo(),
                     exception.getErrorMsg()
+            );
+            throw exception;
+        } catch (UpstreamTimeoutException exception) {
+            log.warn(
+                    "traceId={} bizOrderNo={} requestId={} memberId={} benefitOrderNo={} path={} scene={} elapsedMs={} errorNo={} errorMsg={}",
+                    TraceIdUtil.getTraceId(),
+                    call.bizOrderNo(),
+                    call.requestId(),
+                    normalize(call.memberId()),
+                    normalize(call.benefitOrderNo()),
+                    call.path(),
+                    call.scene(),
+                    elapsedMs(startNanos),
+                    ErrorCodes.YUNKA_UPSTREAM_TIMEOUT,
+                    defaultMessage(exception)
             );
             throw exception;
         } catch (RuntimeException exception) {

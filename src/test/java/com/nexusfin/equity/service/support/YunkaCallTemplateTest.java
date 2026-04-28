@@ -4,12 +4,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.ErrorCodes;
+import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -17,7 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class YunkaCallTemplateTest {
 
     @Mock
@@ -91,5 +94,22 @@ class YunkaCallTemplateTest {
         assertThat(response.message()).isEqualTo("processing");
         assertThat(template.isSuccessful(response)).isFalse();
         assertThat(template.hasData(response)).isFalse();
+    }
+
+    @Test
+    void shouldLogTimeoutCodeAndRethrowUpstreamTimeoutException(CapturedOutput output) {
+        YunkaCallTemplate template = new YunkaCallTemplate(yunkaGatewayClient);
+        when(yunkaGatewayClient.proxy(any()))
+                .thenThrow(new UpstreamTimeoutException("gateway timeout"));
+
+        assertThatThrownBy(() -> template.execute(
+                YunkaCallTemplate.YunkaCall.of("loan apply", "LA-TIMEOUT", "/loan/apply", "APP-TIMEOUT", new Object())
+        )).isInstanceOf(UpstreamTimeoutException.class)
+                .hasMessage("gateway timeout");
+
+        assertThat(output)
+                .contains("requestId=LA-TIMEOUT")
+                .contains("errorNo=" + ErrorCodes.YUNKA_UPSTREAM_TIMEOUT)
+                .contains("errorMsg=gateway timeout");
     }
 }
