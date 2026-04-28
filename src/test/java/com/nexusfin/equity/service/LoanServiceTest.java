@@ -6,6 +6,7 @@ import com.nexusfin.equity.config.H5BenefitsProperties;
 import com.nexusfin.equity.config.H5LoanProperties;
 import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.dto.request.LoanApplyRequest;
+import com.nexusfin.equity.dto.response.LoanApprovalStatusResponse;
 import com.nexusfin.equity.dto.response.CreateBenefitOrderResponse;
 import com.nexusfin.equity.dto.response.LoanApprovalResultResponse;
 import com.nexusfin.equity.dto.response.LoanApplyResponse;
@@ -14,8 +15,6 @@ import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.service.impl.LoanServiceImpl;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
-import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanItem;
-import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanResponse;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -32,6 +31,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,11 +58,14 @@ class LoanServiceTest {
     @Mock
     private XiaohuaGatewayService xiaohuaGatewayService;
 
+    @Mock
+    private LoanApprovalQueryService loanApprovalQueryService;
+
     private LoanService loanService;
 
     @BeforeEach
     void setUp() {
-        when(h5I18nService.text(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
+        lenient().when(h5I18nService.text(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
         loanService = new LoanServiceImpl(
                 h5LoanProperties(),
                 h5BenefitsProperties(),
@@ -73,60 +76,48 @@ class LoanServiceTest {
                 h5I18nService,
                 asyncCompensationEnqueueService,
                 xiaohuaGatewayService,
-                new YunkaCallTemplate(yunkaGatewayClient)
+                new YunkaCallTemplate(yunkaGatewayClient),
+                loanApprovalQueryService
         );
     }
 
     @Test
-    void shouldMapApprovedResultAndRepayPlanFromLatestLoanStatuses() throws Exception {
-        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(mapping("APP-001", "LN-001"));
-        when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
-                0,
-                "SUCCESS",
-                objectMapper.readTree("""
-                        {
-                          "status": "7001",
-                          "loanAmount": 300000,
-                          "remark": "放款成功"
-                        }
-                        """)
-        ));
-        when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("APP-001"), any()))
-                .thenReturn(new LoanRepayPlanResponse(List.of(
-                        new LoanRepayPlanItem(1, "2026-05-07", 100000L, 4500L, 104500L),
-                        new LoanRepayPlanItem(2, "2026-06-07", 100000L, 3000L, 103000L)
-                )));
+    void shouldDelegateApprovalStatusToLoanApprovalQueryService() {
+        LoanApprovalStatusResponse delegated = new LoanApprovalStatusResponse(
+                "APP-STATUS-001",
+                "reviewing",
+                "rent",
+                List.of(),
+                new LoanApprovalStatusResponse.BenefitsCardPreview(true, 300L, List.of("免息券"))
+        );
+        when(loanApprovalQueryService.getApprovalStatus("mem-001", "APP-STATUS-001")).thenReturn(delegated);
 
-        LoanApprovalResultResponse response = loanService.getApprovalResult("mem-001", "APP-001");
+        LoanApprovalStatusResponse response = loanService.getApprovalStatus("mem-001", "APP-STATUS-001");
 
-        assertThat(response.status()).isEqualTo("approved");
-        assertThat(response.approvedAmount()).isEqualByComparingTo("3000.00");
-        assertThat(response.loanId()).isEqualTo("LN-001");
-        assertThat(response.repaymentPlan()).hasSize(2);
-        assertThat(response.repaymentPlan().get(0).repaymentAmount()).isEqualByComparingTo("1045.00");
+        assertThat(response).isSameAs(delegated);
+        verify(loanApprovalQueryService).getApprovalStatus("mem-001", "APP-STATUS-001");
     }
 
     @Test
-    void shouldKeepReviewingWhenLoanQueryIsStillProcessing() throws Exception {
-        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(mapping("APP-002", "LN-002"));
-        when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
-                0,
-                "SUCCESS",
-                objectMapper.readTree("""
-                        {
-                          "status": "7002",
-                          "loanAmount": 300000,
-                          "remark": "放款处理中"
-                        }
-                        """)
-        ));
+    void shouldDelegateApprovalResultToLoanApprovalQueryService() {
+        LoanApprovalResultResponse delegated = new LoanApprovalResultResponse(
+                "APP-RESULT-001",
+                "approved",
+                "rent",
+                new BigDecimal("3000.00"),
+                "30分钟",
+                List.of(),
+                true,
+                "审批通过，预计30分钟内到账",
+                "LN-001",
+                List.of()
+        );
+        when(loanApprovalQueryService.getApprovalResult("mem-001", "APP-RESULT-001")).thenReturn(delegated);
 
-        LoanApprovalResultResponse response = loanService.getApprovalResult("mem-001", "APP-002");
+        LoanApprovalResultResponse response = loanService.getApprovalResult("mem-001", "APP-RESULT-001");
 
-        assertThat(response.status()).isEqualTo("reviewing");
-        assertThat(response.approvedAmount()).isEqualByComparingTo("0.00");
-        assertThat(response.loanId()).isNull();
-        assertThat(response.repaymentPlan()).isEmpty();
+        assertThat(response).isSameAs(delegated);
+        verify(loanApprovalQueryService).getApprovalResult("mem-001", "APP-RESULT-001");
     }
 
     @Test
@@ -197,22 +188,6 @@ class LoanServiceTest {
         assertThat(response.status()).isEqualTo("pending");
         verify(asyncCompensationEnqueueService).enqueue(any());
     }
-
-    private LoanApplicationMapping mapping(String applicationId, String loanId) {
-        LoanApplicationMapping mapping = new LoanApplicationMapping();
-        mapping.setApplicationId(applicationId);
-        mapping.setMemberId("mem-001");
-        mapping.setBenefitOrderNo("BEN-001");
-        mapping.setChannelCode("KJ");
-        mapping.setExternalUserId("user-001");
-        mapping.setUpstreamQueryType("loanId");
-        mapping.setUpstreamQueryValue(loanId);
-        mapping.setMappingStatus("ACTIVE");
-        mapping.setCreatedTs(LocalDateTime.now());
-        mapping.setUpdatedTs(LocalDateTime.now());
-        return mapping;
-    }
-
     private LoanApplyRequest buildApplyRequest() throws Exception {
         return new LoanApplyRequest(
                 3000L,
