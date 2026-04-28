@@ -16,30 +16,26 @@ class AllinpayDirectConfigurationTest {
             .withUserConfiguration(BaseConfiguration.class, AllinpayDirectConfiguration.class);
 
     @Test
-    void shouldRegisterSkeletonProtocolBeansByDefault() {
+    void shouldRegisterConvergedDirectBeansByDefault() {
         contextRunner.run(context -> {
-            assertThat(context).hasSingleBean(AllinpayDirectRequestFactory.class);
-            assertThat(context).hasSingleBean(AllinpayDirectPayloadMapperRegistry.class);
-            assertThat(context).hasSingleBean(AllinpayDirectEnvelopeFactory.class);
+            assertThat(context).hasSingleBean(AllinpayDirectRequestBuilder.class);
             assertThat(context).hasSingleBean(AllinpayDirectProtocolSerializer.class);
             assertThat(context).hasSingleBean(AllinpayDirectTransportMapper.class);
             assertThat(context).hasSingleBean(AllinpayDirectHttpExecutor.class);
             assertThat(context).hasSingleBean(AllinpayDirectResponseVerificationStage.class);
             assertThat(context).hasSingleBean(AllinpayDirectResponseParser.class);
 
-            assertThat(context.getBean(AllinpayDirectRequestFactory.class)).isNotNull();
-            assertThat(context.getBean(AllinpayDirectPayloadMapperRegistry.class)).isNotNull();
-            assertThat(context.getBean(AllinpayDirectEnvelopeFactory.class)).isNotNull();
+            assertThat(context.getBean(AllinpayDirectRequestBuilder.class)).isNotNull();
             assertThat(context.getBean(AllinpayDirectProtocolSerializer.class))
                     .isInstanceOf(AllinpayDirectSkeletonProtocolSerializer.class);
             assertThat(context.getBean(AllinpayDirectTransportMapper.class))
                     .isInstanceOf(AllinpayDirectSkeletonTransportMapper.class);
             assertThat(context.getBean(AllinpayDirectHttpExecutor.class))
-                    .isInstanceOf(AllinpayDirectSkeletonHttpExecutor.class);
+                    .isInstanceOf(AllinpayDirectUnsupportedProtocolHandler.class);
             assertThat(context.getBean(AllinpayDirectResponseVerificationStage.class))
-                    .isInstanceOf(AllinpayDirectSkeletonResponseVerificationStage.class);
+                    .isInstanceOf(AllinpayDirectUnsupportedProtocolHandler.class);
             assertThat(context.getBean(AllinpayDirectResponseParser.class))
-                    .isInstanceOf(AllinpayDirectSkeletonResponseParser.class);
+                    .isInstanceOf(AllinpayDirectUnsupportedProtocolHandler.class);
         });
     }
 
@@ -74,12 +70,8 @@ class AllinpayDirectConfigurationTest {
                         AllinpayDirectConfiguration.class
                 )
                 .run(context -> {
-                    assertThat(context.getBean(AllinpayDirectRequestFactory.class))
-                            .isSameAs(CustomFactoryConfiguration.REQUEST_FACTORY);
-                    assertThat(context.getBean(AllinpayDirectPayloadMapperRegistry.class))
-                            .isSameAs(CustomFactoryConfiguration.PAYLOAD_MAPPER_REGISTRY);
-                    assertThat(context.getBean(AllinpayDirectEnvelopeFactory.class))
-                            .isSameAs(CustomFactoryConfiguration.ENVELOPE_FACTORY);
+                    assertThat(context.getBean(AllinpayDirectRequestBuilder.class))
+                            .isSameAs(CustomFactoryConfiguration.REQUEST_BUILDER);
                 });
     }
 
@@ -161,30 +153,19 @@ class AllinpayDirectConfigurationTest {
     @Configuration
     static class CustomFactoryConfiguration {
 
-        private static final AllinpayDirectRequestFactory REQUEST_FACTORY =
-                new AllinpayDirectRequestFactory(new com.nexusfin.equity.config.QwProperties());
-        private static final AllinpayDirectPayloadMapperRegistry PAYLOAD_MAPPER_REGISTRY =
-                new AllinpayDirectPayloadMapperRegistry(
+        private static final AllinpayDirectRequestBuilder REQUEST_BUILDER =
+                new AllinpayDirectRequestBuilder(
+                        new com.nexusfin.equity.config.QwProperties(),
                         new ObjectMapper(),
+                        org.mockito.Mockito.mock(AllinpayRequestSigner.class),
                         new AllinpayMemberSyncPayloadMapper(),
                         new AllinpayExerciseUrlPayloadMapper(),
                         new AllinpayLendingNotifyPayloadMapper()
                 );
-        private static final AllinpayDirectEnvelopeFactory ENVELOPE_FACTORY = new AllinpayDirectEnvelopeFactory();
 
         @Bean
-        AllinpayDirectRequestFactory allinpayDirectRequestFactory() {
-            return REQUEST_FACTORY;
-        }
-
-        @Bean
-        AllinpayDirectPayloadMapperRegistry allinpayDirectPayloadMapperRegistry() {
-            return PAYLOAD_MAPPER_REGISTRY;
-        }
-
-        @Bean
-        AllinpayDirectEnvelopeFactory allinpayDirectEnvelopeFactory() {
-            return ENVELOPE_FACTORY;
+        AllinpayDirectRequestBuilder allinpayDirectRequestBuilder() {
+            return REQUEST_BUILDER;
         }
     }
 }
