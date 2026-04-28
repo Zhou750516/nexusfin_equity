@@ -72,11 +72,16 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
                                 payload.loanPeriod(),
                                 payload.bankCardNo()
                         )
-                )
+                ),
+                gatewayResponse -> {
+                    YunkaGatewayClient.YunkaGatewayResponse presentResponse =
+                            yunkaCallTemplate.requirePresentResponse(gatewayResponse);
+                    if (!yunkaCallTemplate.isSuccessful(presentResponse)) {
+                        throw new BizException(ErrorCodes.YUNKA_UPSTREAM_REJECTED, presentResponse.message());
+                    }
+                    return presentResponse;
+                }
         );
-        if (!yunkaCallTemplate.isSuccessful(response)) {
-            throw new BizException(ErrorCodes.YUNKA_UPSTREAM_REJECTED, response.message());
-        }
         markMappingActive(payload.applyId(), response);
         return new ExecutionResult(writeResponse(response));
     }
@@ -107,15 +112,22 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
         ObjectNode queryData = objectMapper.createObjectNode();
         queryData.put("uid", externalUserId);
         queryData.put("loanId", upstreamQueryValue);
-        return yunkaCallTemplate.execute(
-                YunkaCallTemplate.YunkaCall.of(
-                        "yunka loan apply retry query",
-                        payload.requestId(),
-                        yunkaProperties.paths().loanQuery(),
-                        payload.applyId(),
-                        queryData
-                )
-        );
+        try {
+            return yunkaCallTemplate.execute(
+                    YunkaCallTemplate.YunkaCall.of(
+                            "yunka loan apply retry query",
+                            payload.requestId(),
+                            yunkaProperties.paths().loanQuery(),
+                            payload.applyId(),
+                            queryData
+                    )
+            );
+        } catch (BizException exception) {
+            if (ErrorCodes.YUNKA_RESPONSE_EMPTY.equals(exception.getErrorNo())) {
+                return null;
+            }
+            throw exception;
+        }
     }
 
     private YunkaLoanApplyPayload readPayload(AsyncCompensationTask task) {

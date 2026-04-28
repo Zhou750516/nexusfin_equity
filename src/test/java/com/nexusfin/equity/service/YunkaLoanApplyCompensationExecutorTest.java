@@ -16,6 +16,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,7 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class YunkaLoanApplyCompensationExecutorTest {
 
     @Mock
@@ -263,6 +265,102 @@ class YunkaLoanApplyCompensationExecutorTest {
         verify(yunkaGatewayClient, org.mockito.Mockito.times(2)).proxy(requestCaptor.capture());
         assertThat(requestCaptor.getAllValues().get(0).path()).isEqualTo("/loan/query");
         assertThat(requestCaptor.getAllValues().get(1).path()).isEqualTo("/loan/apply");
+    }
+
+    @Test
+    void shouldFallbackToLoanApplyWhenPendingReviewQueryReturnsNull() {
+        YunkaProperties yunkaProperties = buildYunkaProperties();
+        YunkaLoanApplyCompensationExecutor executor =
+                new YunkaLoanApplyCompensationExecutor(
+                        new YunkaCallTemplate(yunkaGatewayClient),
+                        loanApplicationMappingRepository,
+                        yunkaProperties,
+                        new ObjectMapper()
+                );
+        AsyncCompensationTask task = new AsyncCompensationTask();
+        task.setTaskId("task-yunka-null-fallback");
+        task.setTaskType("YUNKA_LOAN_APPLY_RETRY");
+        task.setRequestPayload("""
+                {
+                  "requestId": "LA-006",
+                  "path": "/loan/apply",
+                  "bizOrderNo": "APP-006",
+                  "uid": "tech-user-006",
+                  "benefitOrderNo": "ord-006",
+                  "applyId": "APP-006",
+                  "loanId": "LN-006",
+                  "loanAmount": 300000,
+                  "loanPeriod": 3,
+                  "bankCardNo": "acc_006"
+                }
+                """);
+        LoanApplicationMapping mapping = new LoanApplicationMapping();
+        mapping.setApplicationId("APP-006");
+        mapping.setExternalUserId("tech-user-006");
+        mapping.setUpstreamQueryValue("LN-006");
+        mapping.setMappingStatus("PENDING_REVIEW");
+        when(loanApplicationMappingRepository.selectById("APP-006")).thenReturn(mapping);
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(null)
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                        0,
+                        "SUCCESS",
+                        JsonNodeFactory.instance.objectNode().put("loanId", "LN-006")
+                ));
+
+        AsyncCompensationExecutor.ExecutionResult result = executor.execute(task);
+
+        assertThat(result.responsePayload()).contains("LN-006");
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> requestCaptor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient, org.mockito.Mockito.times(2)).proxy(requestCaptor.capture());
+        assertThat(requestCaptor.getAllValues().get(0).path()).isEqualTo("/loan/query");
+        assertThat(requestCaptor.getAllValues().get(1).path()).isEqualTo("/loan/apply");
+    }
+
+    @Test
+    void shouldNotLogSuccessWhenApplyRetryIsRejected(CapturedOutput output) {
+        YunkaProperties yunkaProperties = buildYunkaProperties();
+        YunkaLoanApplyCompensationExecutor executor =
+                new YunkaLoanApplyCompensationExecutor(
+                        new YunkaCallTemplate(yunkaGatewayClient),
+                        loanApplicationMappingRepository,
+                        yunkaProperties,
+                        new ObjectMapper()
+                );
+        AsyncCompensationTask task = new AsyncCompensationTask();
+        task.setTaskId("task-yunka-reject-log");
+        task.setTaskType("YUNKA_LOAN_APPLY_RETRY");
+        task.setRequestPayload("""
+                {
+                  "requestId": "LA-007",
+                  "path": "/loan/apply",
+                  "bizOrderNo": "APP-007",
+                  "uid": "tech-user-007",
+                  "benefitOrderNo": "ord-007",
+                  "applyId": "APP-007",
+                  "loanId": "LN-007",
+                  "loanAmount": 300000,
+                  "loanPeriod": 3,
+                  "bankCardNo": "acc_007"
+                }
+                """);
+        when(loanApplicationMappingRepository.selectById("APP-007")).thenReturn(null);
+        when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                502,
+                "gateway unavailable",
+                null
+        ));
+
+        assertThatThrownBy(() -> executor.execute(task))
+                .isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo(ErrorCodes.YUNKA_UPSTREAM_REJECTED);
+
+        assertThat(output)
+                .contains("scene=yunka loan apply retry apply")
+                .contains("errorNo=YUNKA_UPSTREAM_REJECTED")
+                .doesNotContain("scene=yunka loan apply retry apply elapsedMs=0 yunka request success");
     }
 
     private YunkaProperties buildYunkaProperties() {
