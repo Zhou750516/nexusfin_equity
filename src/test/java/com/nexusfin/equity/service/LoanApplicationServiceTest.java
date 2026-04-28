@@ -165,10 +165,14 @@ class LoanApplicationServiceTest {
         assertThat(enqueueCaptor.getValue().bizKey()).isEqualTo("LOAN_APPLY:" + response.applicationId());
         assertThat(enqueueCaptor.getValue().bizOrderNo()).isEqualTo(response.applicationId());
         assertThat(enqueueCaptor.getValue().requestPath()).isEqualTo("/api/gateway/proxy");
-        JsonNode payload = objectMapper.readTree(enqueueCaptor.getValue().requestPayload());
-        assertThat(payload.path("path").asText()).isEqualTo("/loan/apply");
-        assertThat(payload.path("benefitOrderNo").asText()).isEqualTo("BEN-TIMEOUT");
-        assertThat(payload.path("uid").asText()).isEqualTo("user-001");
+        assertThat(enqueueCaptor.getValue().requestPayload())
+                .isInstanceOf(AsyncCompensationEnqueuePayload.YunkaLoanApplyRetry.class);
+        AsyncCompensationEnqueuePayload.YunkaLoanApplyRetry payload =
+                (AsyncCompensationEnqueuePayload.YunkaLoanApplyRetry) enqueueCaptor.getValue().requestPayload();
+        assertThat(payload.path()).isEqualTo("/loan/apply");
+        assertThat(payload.benefitOrderNo()).isEqualTo("BEN-TIMEOUT");
+        assertThat(payload.uid()).isEqualTo("user-001");
+        assertThat(payload.applyId()).isEqualTo(response.applicationId());
     }
 
     @Test

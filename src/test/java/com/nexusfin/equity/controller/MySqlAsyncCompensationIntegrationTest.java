@@ -8,6 +8,7 @@ import com.nexusfin.equity.repository.AsyncCompensationAttemptRepository;
 import com.nexusfin.equity.repository.AsyncCompensationPartitionRuntimeRepository;
 import com.nexusfin.equity.repository.AsyncCompensationTaskRepository;
 import com.nexusfin.equity.service.AsyncCompensationEnqueueService;
+import com.nexusfin.equity.service.AsyncCompensationEnqueuePayload;
 import com.nexusfin.equity.service.AsyncCompensationExecutor;
 import com.nexusfin.equity.service.AsyncCompensationSupervisorService;
 import com.nexusfin.equity.service.AsyncCompensationWorkerService;
@@ -85,7 +86,18 @@ class MySqlAsyncCompensationIntegrationTest {
                 "/api/gateway/proxy",
                 "POST",
                 null,
-                "{\"path\":\"/loan/apply\",\"bizOrderNo\":\"%s\"}".formatted(bizOrderNo)
+                new AsyncCompensationEnqueuePayload.YunkaLoanApplyRetry(
+                        "LA-MYSQL-001",
+                        "/loan/apply",
+                        bizOrderNo,
+                        "mysql-it-user",
+                        "BEN-MYSQL-001",
+                        bizOrderNo,
+                        "LN-MYSQL-001",
+                        300000L,
+                        3,
+                        "acc_001"
+                )
         ));
 
         AsyncCompensationTask task = taskRepository.selectOne(Wrappers.<AsyncCompensationTask>lambdaQuery()
@@ -93,6 +105,8 @@ class MySqlAsyncCompensationIntegrationTest {
                 .last("limit 1"));
         assertThat(task).isNotNull();
         assertThat(task.getTaskStatus()).isEqualTo("INIT");
+        assertThat(task.getRequestPayload()).contains("\"path\":\"/loan/apply\"");
+        assertThat(task.getRequestPayload()).contains("\"bizOrderNo\":\"" + bizOrderNo + "\"");
 
         when(routerExecutor.execute(any()))
                 .thenReturn(new AsyncCompensationExecutor.ExecutionResult(

@@ -282,6 +282,17 @@ class BenefitOrderServiceTest {
         )).isInstanceOf(BizException.class)
                 .hasMessageContaining("QW_SYNC_TIMEOUT");
 
-        verify(asyncCompensationEnqueueService).enqueue(any());
+        ArgumentCaptor<AsyncCompensationEnqueueService.EnqueueCommand> enqueueCaptor =
+                ArgumentCaptor.forClass(AsyncCompensationEnqueueService.EnqueueCommand.class);
+        verify(asyncCompensationEnqueueService).enqueue(enqueueCaptor.capture());
+        assertThat(enqueueCaptor.getValue().taskType()).isEqualTo("QW_BENEFIT_PURCHASE_RETRY");
+        assertThat(enqueueCaptor.getValue().bizKey()).startsWith("BENEFIT_PURCHASE:");
+        assertThat(enqueueCaptor.getValue().requestPayload())
+                .isInstanceOf(AsyncCompensationEnqueuePayload.QwBenefitPurchaseRetry.class);
+        AsyncCompensationEnqueuePayload.QwBenefitPurchaseRetry payload =
+                (AsyncCompensationEnqueuePayload.QwBenefitPurchaseRetry) enqueueCaptor.getValue().requestPayload();
+        assertThat(payload.externalUserId()).isEqualTo("user-4");
+        assertThat(payload.productCode()).isEqualTo("P-4");
+        assertThat(payload.loanAmount()).isEqualTo(680000L);
     }
 }

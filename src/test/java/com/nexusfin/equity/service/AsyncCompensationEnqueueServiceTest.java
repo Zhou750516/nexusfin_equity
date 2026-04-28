@@ -45,7 +45,18 @@ class AsyncCompensationEnqueueServiceTest {
                 "/api/gateway/proxy",
                 "POST",
                 null,
-                "{\"path\":\"/loan/apply\"}"
+                new AsyncCompensationEnqueuePayload.YunkaLoanApplyRetry(
+                        "LA-001",
+                        "/loan/apply",
+                        "APP-20260418-001",
+                        "user-001",
+                        "BEN-001",
+                        "APP-20260418-001",
+                        "LN-001",
+                        300000L,
+                        3,
+                        "acc_001"
+                )
         ));
 
         ArgumentCaptor<AsyncCompensationTask> captor = ArgumentCaptor.forClass(AsyncCompensationTask.class);
@@ -55,6 +66,11 @@ class AsyncCompensationEnqueueServiceTest {
         assertThat(captor.getValue().getMaxRetryCount()).isEqualTo(5);
         assertThat(captor.getValue().getPartitionNo()).isBetween(0, 7);
         assertThat(captor.getValue().getBizKey()).isEqualTo("LOAN_APPLY:APP-20260418-001");
+        assertThat(captor.getValue().getRequestPayload())
+                .contains("\"path\":\"/loan/apply\"")
+                .contains("\"bizOrderNo\":\"APP-20260418-001\"")
+                .contains("\"loanAmount\":300000")
+                .contains("\"loanPeriod\":3");
         assertThat(output)
                 .contains("traceId=")
                 .contains("bizOrderNo=APP-20260418-001")
@@ -86,7 +102,18 @@ class AsyncCompensationEnqueueServiceTest {
                 "/api/gateway/proxy",
                 "POST",
                 null,
-                "{\"path\":\"/loan/apply\"}"
+                new AsyncCompensationEnqueuePayload.YunkaLoanApplyRetry(
+                        "LA-002",
+                        "/loan/apply",
+                        "APP-20260418-duplicate",
+                        "user-001",
+                        "BEN-001",
+                        "APP-20260418-duplicate",
+                        "LN-001",
+                        300000L,
+                        3,
+                        "acc_001"
+                )
         ))).doesNotThrowAnyException();
 
         verify(taskRepository).insert(any());
