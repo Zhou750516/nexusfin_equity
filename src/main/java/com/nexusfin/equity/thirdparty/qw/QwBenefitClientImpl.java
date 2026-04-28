@@ -114,7 +114,7 @@ public class QwBenefitClientImpl implements QwBenefitClient {
                     .requestFactory(requestFactory())
                     .build();
             String rawResponse = restClient.post()
-                    .uri(URI.create(qwProperties.getBaseUrl() + qwProperties.getMethodPath()))
+                    .uri(URI.create(qwProperties.getHttp().getBaseUrl() + qwProperties.getHttp().getMethodPath()))
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(request)
                     .retrieve()
@@ -152,12 +152,16 @@ public class QwBenefitClientImpl implements QwBenefitClient {
     private String encodeBusinessData(Object businessRequest) {
         try {
             byte[] jsonBytes = objectMapper.writeValueAsBytes(businessRequest);
-            Cipher cipher = Cipher.getInstance(qwProperties.getAesAlgorithm());
+            Cipher cipher = Cipher.getInstance(qwProperties.getSecurity().getAesAlgorithm());
             byte[] payload;
             if (requiresGcm()) {
-                byte[] iv = new byte[qwProperties.getIvLengthBytes()];
+                byte[] iv = new byte[qwProperties.getSecurity().getIvLengthBytes()];
                 secureRandom.nextBytes(iv);
-                cipher.init(Cipher.ENCRYPT_MODE, secretKey, new GCMParameterSpec(qwProperties.getGcmTagBits(), iv));
+                cipher.init(
+                        Cipher.ENCRYPT_MODE,
+                        secretKey,
+                        new GCMParameterSpec(qwProperties.getSecurity().getGcmTagBits(), iv)
+                );
                 byte[] encrypted = cipher.doFinal(jsonBytes);
                 payload = ByteBuffer.allocate(iv.length + encrypted.length)
                         .put(iv)
@@ -178,17 +182,21 @@ public class QwBenefitClientImpl implements QwBenefitClient {
     private String decodeBusinessData(String ciphertext) {
         try {
             byte[] payload = decodeCiphertext(ciphertext);
-            Cipher cipher = Cipher.getInstance(qwProperties.getAesAlgorithm());
+            Cipher cipher = Cipher.getInstance(qwProperties.getSecurity().getAesAlgorithm());
             byte[] plaintext;
             if (requiresGcm()) {
-                if (payload.length <= qwProperties.getIvLengthBytes()) {
+                if (payload.length <= qwProperties.getSecurity().getIvLengthBytes()) {
                     throw new BizException("QW_RESPONSE_INVALID", "QW response payload is invalid");
                 }
-                byte[] iv = new byte[qwProperties.getIvLengthBytes()];
-                byte[] encrypted = new byte[payload.length - qwProperties.getIvLengthBytes()];
+                byte[] iv = new byte[qwProperties.getSecurity().getIvLengthBytes()];
+                byte[] encrypted = new byte[payload.length - qwProperties.getSecurity().getIvLengthBytes()];
                 System.arraycopy(payload, 0, iv, 0, iv.length);
                 System.arraycopy(payload, iv.length, encrypted, 0, encrypted.length);
-                cipher.init(Cipher.DECRYPT_MODE, secretKey, new GCMParameterSpec(qwProperties.getGcmTagBits(), iv));
+                cipher.init(
+                        Cipher.DECRYPT_MODE,
+                        secretKey,
+                        new GCMParameterSpec(qwProperties.getSecurity().getGcmTagBits(), iv)
+                );
                 plaintext = cipher.doFinal(encrypted);
             } else {
                 cipher.init(Cipher.DECRYPT_MODE, secretKey);
@@ -204,7 +212,11 @@ public class QwBenefitClientImpl implements QwBenefitClient {
 
     private String sign(String method, String timestamp) {
         try {
-            String payload = method + qwProperties.getPartnerNo() + timestamp + qwProperties.getVersion() + qwProperties.getSignKey();
+            String payload = method
+                    + qwProperties.getPartnerNo()
+                    + timestamp
+                    + qwProperties.getVersion()
+                    + qwProperties.getSecurity().getSignKey();
             byte[] digest = MessageDigest.getInstance("MD5").digest(payload.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest);
         } catch (GeneralSecurityException exception) {
@@ -214,14 +226,14 @@ public class QwBenefitClientImpl implements QwBenefitClient {
 
     private SimpleClientHttpRequestFactory requestFactory() {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(qwProperties.getConnectTimeoutMs());
-        requestFactory.setReadTimeout(qwProperties.getReadTimeoutMs());
+        requestFactory.setConnectTimeout(qwProperties.getHttp().getConnectTimeoutMs());
+        requestFactory.setReadTimeout(qwProperties.getHttp().getReadTimeoutMs());
         return requestFactory;
     }
 
     private SecretKey buildSecretKey() {
-        if (qwProperties.getAesKeyEncoding() == QwProperties.AesKeyEncoding.RAW) {
-            String aesKey = qwProperties.getAesKey();
+        if (qwProperties.getSecurity().getAesKeyEncoding() == QwProperties.AesKeyEncoding.RAW) {
+            String aesKey = qwProperties.getSecurity().getAesKey();
             if (aesKey == null || aesKey.isBlank()) {
                 throw new BizException("QW_AES_KEY_INVALID", "QW AES key must not be blank");
             }
@@ -229,7 +241,7 @@ public class QwBenefitClientImpl implements QwBenefitClient {
             validateAesKeyLength(keyBytes);
             return new SecretKeySpec(keyBytes, "AES");
         }
-        return buildBase64SecretKey(qwProperties.getAesKeyBase64());
+        return buildBase64SecretKey(qwProperties.getSecurity().getAesKeyBase64());
     }
 
     private SecretKey buildBase64SecretKey(String keyBase64) {
@@ -249,21 +261,22 @@ public class QwBenefitClientImpl implements QwBenefitClient {
     }
 
     private String encodeCiphertext(byte[] payload) {
-        return switch (qwProperties.getCiphertextEncoding()) {
+        return switch (qwProperties.getSecurity().getCiphertextEncoding()) {
             case BASE64 -> Base64.getEncoder().encodeToString(payload);
             case HEX -> HexFormat.of().formatHex(payload);
         };
     }
 
     private byte[] decodeCiphertext(String ciphertext) {
-        return switch (qwProperties.getCiphertextEncoding()) {
+        return switch (qwProperties.getSecurity().getCiphertextEncoding()) {
             case BASE64 -> Base64.getDecoder().decode(ciphertext);
             case HEX -> HexFormat.of().parseHex(ciphertext);
         };
     }
 
     private boolean requiresGcm() {
-        return qwProperties.getAesAlgorithm() != null && qwProperties.getAesAlgorithm().contains("/GCM/");
+        return qwProperties.getSecurity().getAesAlgorithm() != null
+                && qwProperties.getSecurity().getAesAlgorithm().contains("/GCM/");
     }
 
     private void ensureEnabled() {
@@ -288,7 +301,7 @@ public class QwBenefitClientImpl implements QwBenefitClient {
     }
 
     private QwExerciseUrlResponse mockExerciseUrl(QwExerciseUrlRequest request) {
-        String redirectUrl = qwProperties.getMockExerciseBaseUrl()
+        String redirectUrl = qwProperties.getHttp().getMockExerciseBaseUrl()
                 + "?partnerOrderNo=" + request.partnerOrderNo()
                 + "&uniqueId=" + request.uniqueId()
                 + "&token=mock-token-" + request.partnerOrderNo();

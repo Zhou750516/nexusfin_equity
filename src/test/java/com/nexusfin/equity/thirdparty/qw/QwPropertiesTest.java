@@ -12,10 +12,10 @@ class QwPropertiesTest {
         QwProperties properties = new QwProperties();
 
         properties.setMode(QwProperties.Mode.ALLINPAY_DIRECT);
-        properties.setAesKey("FbRW7iaiwcEKk2kY");
-        properties.setAesKeyEncoding(QwProperties.AesKeyEncoding.RAW);
-        properties.setCiphertextEncoding(QwProperties.CiphertextEncoding.HEX);
-        properties.setAllowMemberSyncPayProtocolNoOverride(true);
+        properties.getSecurity().setAesKey("FbRW7iaiwcEKk2kY");
+        properties.getSecurity().setAesKeyEncoding(QwProperties.AesKeyEncoding.RAW);
+        properties.getSecurity().setCiphertextEncoding(QwProperties.CiphertextEncoding.HEX);
+        properties.getPayment().setAllowMemberSyncPayProtocolNoOverride(true);
         properties.getDirect().setBaseUrl("https://tlt-test.allinpay.com");
         properties.getDirect().setProcessPath("/aipg/ProcessServlet");
         properties.getDirect().setMerchantId("200000000007804");
@@ -24,10 +24,10 @@ class QwPropertiesTest {
         properties.getDirect().setVerifyCertPath("docs/third-part/齐为/通联测试证书/public-rsa.cer");
 
         assertThat(properties.getMode()).isEqualTo(QwProperties.Mode.ALLINPAY_DIRECT);
-        assertThat(properties.getAesKey()).isEqualTo("FbRW7iaiwcEKk2kY");
-        assertThat(properties.getAesKeyEncoding()).isEqualTo(QwProperties.AesKeyEncoding.RAW);
-        assertThat(properties.getCiphertextEncoding()).isEqualTo(QwProperties.CiphertextEncoding.HEX);
-        assertThat(properties.isAllowMemberSyncPayProtocolNoOverride()).isTrue();
+        assertThat(properties.getSecurity().getAesKey()).isEqualTo("FbRW7iaiwcEKk2kY");
+        assertThat(properties.getSecurity().getAesKeyEncoding()).isEqualTo(QwProperties.AesKeyEncoding.RAW);
+        assertThat(properties.getSecurity().getCiphertextEncoding()).isEqualTo(QwProperties.CiphertextEncoding.HEX);
+        assertThat(properties.getPayment().isAllowMemberSyncPayProtocolNoOverride()).isTrue();
         assertThat(properties.getDirect().getBaseUrl()).isEqualTo("https://tlt-test.allinpay.com");
         assertThat(properties.getDirect().getProcessPath()).isEqualTo("/aipg/ProcessServlet");
         assertThat(properties.getDirect().getMerchantId()).isEqualTo("200000000007804");

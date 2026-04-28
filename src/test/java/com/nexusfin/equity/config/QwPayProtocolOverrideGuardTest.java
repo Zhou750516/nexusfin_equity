@@ -15,9 +15,9 @@ class QwPayProtocolOverrideGuardTest {
     @Test
     void shouldLogWarningWhenOverrideEnabledInAllowedProfile(CapturedOutput output) {
         QwProperties properties = new QwProperties();
-        properties.setMemberSyncPayProtocolNoOverride("AIP-MOCK-001");
-        properties.setAllowMemberSyncPayProtocolNoOverride(true);
-        properties.setMemberSyncPayProtocolNoOverrideAllowedProfiles(java.util.List.of("test", "mysql-it"));
+        properties.getPayment().setMemberSyncPayProtocolNoOverride("AIP-MOCK-001");
+        properties.getPayment().setAllowMemberSyncPayProtocolNoOverride(true);
+        properties.getPayment().setMemberSyncPayProtocolNoOverrideAllowedProfiles(java.util.List.of("test", "mysql-it"));
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("test");
         QwPayProtocolOverrideGuard guard = new QwPayProtocolOverrideGuard(properties, environment);
@@ -32,8 +32,8 @@ class QwPayProtocolOverrideGuardTest {
     @Test
     void shouldFailWhenOverrideConfiguredButSwitchDisabled() {
         QwProperties properties = new QwProperties();
-        properties.setMemberSyncPayProtocolNoOverride("AIP-MOCK-001");
-        properties.setAllowMemberSyncPayProtocolNoOverride(false);
+        properties.getPayment().setMemberSyncPayProtocolNoOverride("AIP-MOCK-001");
+        properties.getPayment().setAllowMemberSyncPayProtocolNoOverride(false);
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("test");
         QwPayProtocolOverrideGuard guard = new QwPayProtocolOverrideGuard(properties, environment);
@@ -47,9 +47,9 @@ class QwPayProtocolOverrideGuardTest {
     @Test
     void shouldFailWhenOverrideConfiguredOutsideAllowedProfiles() {
         QwProperties properties = new QwProperties();
-        properties.setMemberSyncPayProtocolNoOverride("AIP-MOCK-001");
-        properties.setAllowMemberSyncPayProtocolNoOverride(true);
-        properties.setMemberSyncPayProtocolNoOverrideAllowedProfiles(java.util.List.of("test", "mysql-it"));
+        properties.getPayment().setMemberSyncPayProtocolNoOverride("AIP-MOCK-001");
+        properties.getPayment().setAllowMemberSyncPayProtocolNoOverride(true);
+        properties.getPayment().setMemberSyncPayProtocolNoOverrideAllowedProfiles(java.util.List.of("test", "mysql-it"));
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("prod");
         QwPayProtocolOverrideGuard guard = new QwPayProtocolOverrideGuard(properties, environment);

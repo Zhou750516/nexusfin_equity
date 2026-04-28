@@ -88,8 +88,8 @@ public class PaymentProtocolServiceImpl implements PaymentProtocolService {
                     SOURCE_ALLINPAY);
             return new ResolvedPaymentProtocol(activeProtocol.getProtocolNo(), SOURCE_ALLINPAY);
         }
-        String configuredOverride = qwProperties.getMemberSyncPayProtocolNoOverride();
-        if (qwProperties.isAllowMemberSyncPayProtocolNoOverride()
+        String configuredOverride = qwProperties.getPayment().getMemberSyncPayProtocolNoOverride();
+        if (qwProperties.getPayment().isAllowMemberSyncPayProtocolNoOverride()
                 && configuredOverride != null
                 && !configuredOverride.isBlank()) {
             log.info("traceId={} bizOrderNo={} using configured qw payProtocolNo override",

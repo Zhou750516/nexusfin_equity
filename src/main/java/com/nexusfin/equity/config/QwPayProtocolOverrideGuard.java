@@ -25,16 +25,18 @@ public class QwPayProtocolOverrideGuard {
 
     @PostConstruct
     void validateOnStartup() {
-        String override = qwProperties.getMemberSyncPayProtocolNoOverride();
+        String override = qwProperties.getPayment().getMemberSyncPayProtocolNoOverride();
         if (override == null || override.isBlank()) {
             return;
         }
-        if (!qwProperties.isAllowMemberSyncPayProtocolNoOverride()) {
+        if (!qwProperties.getPayment().isAllowMemberSyncPayProtocolNoOverride()) {
             throw new IllegalStateException(
                     "QW_MEMBER_SYNC_PAY_PROTOCOL_NO_OVERRIDE is configured but QW_ALLOW_MEMBER_SYNC_PAY_PROTOCOL_NO_OVERRIDE is false"
             );
         }
-        List<String> allowedProfiles = normalizeProfiles(qwProperties.getMemberSyncPayProtocolNoOverrideAllowedProfiles());
+        List<String> allowedProfiles = normalizeProfiles(
+                qwProperties.getPayment().getMemberSyncPayProtocolNoOverrideAllowedProfiles()
+        );
         List<String> activeProfiles = normalizeProfiles(Arrays.asList(environment.getActiveProfiles()));
         boolean matched = activeProfiles.stream().anyMatch(allowedProfiles::contains);
         if (!matched) {

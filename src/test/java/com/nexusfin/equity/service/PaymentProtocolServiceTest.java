@@ -1,6 +1,7 @@
 package com.nexusfin.equity.service;
 
 import com.nexusfin.equity.config.QwProperties;
+import com.nexusfin.equity.config.QwPaymentProperties;
 import com.nexusfin.equity.entity.BenefitOrder;
 import com.nexusfin.equity.entity.MemberPaymentProtocol;
 import com.nexusfin.equity.exception.BizException;
@@ -30,6 +31,9 @@ class PaymentProtocolServiceTest {
     @Mock
     private QwProperties qwProperties;
 
+    @Mock
+    private QwPaymentProperties qwPaymentProperties;
+
     @InjectMocks
     private PaymentProtocolServiceImpl paymentProtocolService;
 
@@ -56,8 +60,9 @@ class PaymentProtocolServiceTest {
         BenefitOrder order = buildOrder();
         when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-1", "ALLINPAY")).thenReturn(null);
         when(memberPaymentProtocolRepository.selectActiveByExternalUserId("user-1", "ALLINPAY")).thenReturn(null);
-        when(qwProperties.isAllowMemberSyncPayProtocolNoOverride()).thenReturn(true);
-        when(qwProperties.getMemberSyncPayProtocolNoOverride()).thenReturn("AIP-MOCK-001");
+        when(qwProperties.getPayment()).thenReturn(qwPaymentProperties);
+        when(qwPaymentProperties.isAllowMemberSyncPayProtocolNoOverride()).thenReturn(true);
+        when(qwPaymentProperties.getMemberSyncPayProtocolNoOverride()).thenReturn("AIP-MOCK-001");
 
         PaymentProtocolService.ResolvedPaymentProtocol resolved = paymentProtocolService.resolveForBenefitOrder(order);
 
@@ -70,7 +75,8 @@ class PaymentProtocolServiceTest {
         BenefitOrder order = buildOrder();
         when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-1", "ALLINPAY")).thenReturn(null);
         when(memberPaymentProtocolRepository.selectActiveByExternalUserId("user-1", "ALLINPAY")).thenReturn(null);
-        when(qwProperties.isAllowMemberSyncPayProtocolNoOverride()).thenReturn(false);
+        when(qwProperties.getPayment()).thenReturn(qwPaymentProperties);
+        when(qwPaymentProperties.isAllowMemberSyncPayProtocolNoOverride()).thenReturn(false);
 
         assertThatThrownBy(() -> paymentProtocolService.resolveForBenefitOrder(order))
                 .isInstanceOf(BizException.class)

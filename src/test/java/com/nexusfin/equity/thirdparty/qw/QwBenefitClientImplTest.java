@@ -101,15 +101,15 @@ class QwBenefitClientImplTest {
         QwProperties properties = new QwProperties();
         properties.setEnabled(true);
         properties.setMode(QwProperties.Mode.QWEIMOBILE_HTTP);
-        properties.setBaseUrl("https://t-api.test.qweimobile.com");
-        properties.setMethodPath("/api/abs/method");
+        properties.getHttp().setBaseUrl("https://t-api.test.qweimobile.com");
+        properties.getHttp().setMethodPath("/api/abs/method");
         properties.setPartnerNo("abs");
         properties.setVersion("v1.0");
-        properties.setSignKey("h2Zh53keYy8eksijfj7HfPCncmEMCBXt");
-        properties.setAesKey("FbRW7iaiwcEKk2kY");
-        properties.setAesKeyEncoding(QwProperties.AesKeyEncoding.RAW);
-        properties.setAesAlgorithm("AES/ECB/PKCS5Padding");
-        properties.setCiphertextEncoding(QwProperties.CiphertextEncoding.HEX);
+        properties.getSecurity().setSignKey("h2Zh53keYy8eksijfj7HfPCncmEMCBXt");
+        properties.getSecurity().setAesKey("FbRW7iaiwcEKk2kY");
+        properties.getSecurity().setAesKeyEncoding(QwProperties.AesKeyEncoding.RAW);
+        properties.getSecurity().setAesAlgorithm("AES/ECB/PKCS5Padding");
+        properties.getSecurity().setCiphertextEncoding(QwProperties.CiphertextEncoding.HEX);
         return properties;
     }
 
