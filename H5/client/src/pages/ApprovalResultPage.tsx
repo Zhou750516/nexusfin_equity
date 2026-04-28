@@ -7,10 +7,16 @@ import type { Locale } from "@/i18n/locale";
 import { formatCurrency } from "@/lib/format";
 import { shouldRequestLocalizedData } from "@/lib/localized-request";
 import { getApprovalResult } from "@/lib/loan-api";
+import { toLoanPurposeKey } from "@/lib/loan-purpose";
 import { buildPath, getQueryParam } from "@/lib/route";
-import { shouldFetchApprovalResult } from "@/pages/approval-result.logic";
+import {
+  normalizeApprovalResultStatus,
+  resolveApprovalResultPrimaryAction,
+  shouldFetchApprovalResult,
+  shouldPollApprovalResult,
+} from "@/pages/approval-result.logic";
 import type { ApprovalResult } from "@/types/loan.types";
-import { CheckCircle2, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Clock3, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -34,6 +40,15 @@ const LOAN_FAILED_TITLE_COPY: Record<Locale, string> = {
   "en-US": "Loan Application Failed",
   "vi-VN": "Gửi yêu cầu vay thất bại",
 };
+
+const REVIEWING_TITLE_COPY: Record<Locale, string> = {
+  "zh-CN": "审批处理中",
+  "zh-TW": "審批處理中",
+  "en-US": "Application Reviewing",
+  "vi-VN": "Đang thẩm định hồ sơ",
+};
+
+const POLL_INTERVAL_MS = 10000;
 
 export default function ApprovalResultPage() {
   const [, navigate] = useLocation();
@@ -74,6 +89,20 @@ export default function ApprovalResultPage() {
     }
   }, [applicationId, loadedApplicationId, loadedLocale, loan.approvalStatus, locale]);
 
+  useEffect(() => {
+    if (!applicationId || !result || !shouldPollApprovalResult(result.status)) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void loadResult(applicationId);
+    }, POLL_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [applicationId, result?.status, locale]);
+
   async function loadResult(currentApplicationId: string) {
     setIsLoading(true);
     setError(null);
@@ -82,6 +111,7 @@ export default function ApprovalResultPage() {
       setResult(nextResult);
       setLoadedLocale(locale);
       setLoadedApplicationId(currentApplicationId);
+      loan.setPurpose(nextResult.purpose ?? loan.purpose);
       loan.setApprovalStatus(nextResult.status);
       loan.setBenefitsCardActivated(nextResult.benefitsCardActivated);
       loan.setLoanId(nextResult.loanId);
@@ -93,10 +123,16 @@ export default function ApprovalResultPage() {
     }
   }
 
-  const displayStatus = result?.status ?? (isLoanFailedFallback ? "loan_failed" : loan.approvalStatus);
+  const displayStatus = normalizeApprovalResultStatus(
+    result?.status ?? null,
+    isLoanFailedFallback ? "loan_failed" : loan.approvalStatus,
+  );
   const displayTitle = useMemo(() => {
     if (displayStatus === "approved") {
       return t("approvalResult.title");
+    }
+    if (displayStatus === "reviewing") {
+      return REVIEWING_TITLE_COPY[locale];
     }
     if (displayStatus === "loan_failed") {
       return LOAN_FAILED_TITLE_COPY[locale];
@@ -106,6 +142,8 @@ export default function ApprovalResultPage() {
 
   const headerGradientClass = displayStatus === "approved"
     ? "from-[#165dff] to-[#3d7aff]"
+    : displayStatus === "reviewing"
+    ? "from-[#fbaf19] to-[#ff9500]"
     : "from-[#ff9500] to-[#ff6b00]";
 
   if (!applicationId && !isLoanFailedFallback) {
@@ -146,6 +184,11 @@ export default function ApprovalResultPage() {
   const tipText = result?.tip ?? loan.approvalMessage ?? "";
   const loanId = result?.loanId ?? loan.loanId;
   const isApproved = result?.status === "approved";
+  const isReviewing = result?.status === "reviewing";
+  const primaryAction = resolveApprovalResultPrimaryAction(displayStatus, Boolean(loanId));
+  const purposeKey = result?.purpose || loan.purpose
+    ? toLoanPurposeKey(result?.purpose ?? loan.purpose)
+    : null;
 
   const tipBullets = [
     t("approvalResult.tip1"),
@@ -174,6 +217,8 @@ export default function ApprovalResultPage() {
             <div className="size-20 bg-white/20 rounded-full flex items-center justify-center mb-6">
               {isApproved ? (
                 <CheckCircle2 className="size-10 text-white" strokeWidth={2.5} />
+              ) : isReviewing ? (
+                <Clock3 className="size-10 text-white" strokeWidth={2.5} />
               ) : (
                 <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
                   <circle cx="20" cy="20" r="17" stroke="white" strokeWidth="3" />
@@ -195,10 +240,22 @@ export default function ApprovalResultPage() {
             <p className="mt-5 text-white/70 text-[13px] leading-[19.5px] tracking-tight text-center">
               {isApproved
                 ? t("approvalResult.arrivalTip")
+                : isReviewing
+                ? tipText || result?.estimatedArrivalTime || t("approvalPending.subtitle")
                 : result?.estimatedArrivalTime && result.estimatedArrivalTime !== "--"
                 ? result.estimatedArrivalTime
                 : tipText}
             </p>
+            {purposeKey ? (
+              <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2">
+                <span className="text-white/70 text-xs leading-[18px] tracking-tight">
+                  {t("calculator.loanPurpose")}
+                </span>
+                <span className="text-white text-sm font-semibold leading-[21px] tracking-tight">
+                  {t(purposeKey)}
+                </span>
+              </div>
+            ) : null}
           </div>
         </section>
 
@@ -253,8 +310,12 @@ export default function ApprovalResultPage() {
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[440px] bg-white/95 backdrop-blur-sm px-5 py-4 border-t border-[#f2f3f5]">
         <button
           onClick={() => {
-            if (isApproved && loanId) {
+            if (primaryAction === "repayment" && loanId) {
               navigate(buildPath("/confirm-repayment", { loanId }));
+              return;
+            }
+            if (primaryAction === "reload" && applicationId) {
+              void loadResult(applicationId);
               return;
             }
             loan.reset();
@@ -262,7 +323,7 @@ export default function ApprovalResultPage() {
           }}
           className="w-full h-14 bg-gradient-to-r from-[#165dff] to-[#3d8aff] rounded-full text-white text-[17px] font-semibold tracking-tight shadow-[0_20px_25px_rgba(22,93,255,0.4),0_8px_10px_rgba(22,93,255,0.4)] active:opacity-90 transition-opacity"
         >
-          {isApproved && loanId ? t("approvalResult.cta") : t("repaymentSuccess.backHome")}
+          {primaryAction === "repayment" ? t("approvalResult.cta") : primaryAction === "reload" ? t("common.retry") : t("repaymentSuccess.backHome")}
         </button>
       </div>
     </MobileLayout>

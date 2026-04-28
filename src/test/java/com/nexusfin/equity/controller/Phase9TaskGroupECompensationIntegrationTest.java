@@ -128,7 +128,8 @@ class Phase9TaskGroupECompensationIntegrationTest {
                                   "amount": 3000,
                                   "term": 3,
                                   "receivingAccountId": "acc_001",
-                                  "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"]
+                                  "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
+                                  "purpose": "shopping"
                                 }
                                 """))
                 .andExpect(status().isOk())

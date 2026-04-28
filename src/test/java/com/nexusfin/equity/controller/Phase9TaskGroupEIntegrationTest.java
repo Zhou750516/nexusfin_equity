@@ -38,6 +38,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -86,6 +87,9 @@ class Phase9TaskGroupEIntegrationTest {
     private LoanApplicationMappingRepository loanApplicationMappingRepository;
 
     @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
     private JwtUtil jwtUtil;
 
     @Autowired
@@ -132,7 +136,8 @@ class Phase9TaskGroupEIntegrationTest {
                                   "amount": 3000,
                                   "term": 3,
                                   "receivingAccountId": "acc_001",
-                                  "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"]
+                                  "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
+                                  "purpose": "shopping"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -176,6 +181,64 @@ class Phase9TaskGroupEIntegrationTest {
     }
 
     @Test
+    void shouldPersistPurposeFromLoanApplyRequest() throws Exception {
+        MemberInfo memberInfo = createReadyMember("mem-loan-purpose", "user-loan-purpose");
+        createProduct("HUXUAN_CARD");
+        JsonNode yunkaData = objectMapper.readTree("""
+                {
+                  "status": "4001",
+                  "loanId": "LOAN202604270001",
+                  "remark": "借款申请已受理"
+                }
+                """);
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", yunkaData));
+
+        mockMvc.perform(post("/api/loan/apply")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": 3000,
+                                  "term": 3,
+                                  "receivingAccountId": "acc_001",
+                                  "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
+                                  "purpose": "rent"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0));
+
+        String purpose = jdbcTemplate.queryForObject(
+                "select purpose from loan_application_mapping where member_id = ?",
+                String.class,
+                memberInfo.getMemberId()
+        );
+        assertThat(purpose).isEqualTo("rent");
+    }
+
+    @Test
+    void shouldRejectLoanApplyWhenPurposeIsMissing() throws Exception {
+        MemberInfo memberInfo = createReadyMember("mem-loan-purpose-missing", "user-loan-purpose-missing");
+        createProduct("HUXUAN_CARD");
+
+        mockMvc.perform(post("/api/loan/apply")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": 3000,
+                                  "term": 3,
+                                  "receivingAccountId": "acc_001",
+                                  "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("purpose")));
+    }
+
+    @Test
     void shouldReturnLoanFailedWhenBenefitsCreatedButYunkaLoanApplyFails() throws Exception {
         MemberInfo memberInfo = createReadyMember("mem-loan-apply-partial", "user-loan-apply-partial");
         createProduct("HUXUAN_CARD");
@@ -190,7 +253,8 @@ class Phase9TaskGroupEIntegrationTest {
                                   "amount": 3000,
                                   "term": 3,
                                   "receivingAccountId": "acc_001",
-                                  "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"]
+                                  "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
+                                  "purpose": "shopping"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -222,7 +286,8 @@ class Phase9TaskGroupEIntegrationTest {
                                   "amount": 3000,
                                   "term": 3,
                                   "receivingAccountId": "acc_001",
-                                  "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"]
+                                  "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
+                                  "purpose": "shopping"
                                 }
                                 """))
                 .andExpect(status().isOk())

@@ -5,6 +5,7 @@ import java.util.List;
 public record LoanApprovalStatusResponse(
         String applicationId,
         String status,
+        String purpose,
         List<ApprovalStep> steps,
         BenefitsCardPreview benefitsCard
 ) {

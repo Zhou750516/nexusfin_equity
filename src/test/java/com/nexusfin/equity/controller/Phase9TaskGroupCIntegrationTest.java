@@ -166,6 +166,7 @@ class Phase9TaskGroupCIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.applicationId").value("APP202604130001"))
+                .andExpect(jsonPath("$.data.purpose").value("rent"))
                 .andExpect(jsonPath("$.data.status").value("reviewing"))
                 .andExpect(jsonPath("$.data.steps[1].status").value("in_progress"))
                 .andExpect(jsonPath("$.data.benefitsCard.available").value(true));
@@ -204,6 +205,7 @@ class Phase9TaskGroupCIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.applicationId").value("APP202604130002"))
+                .andExpect(jsonPath("$.data.purpose").value("rent"))
                 .andExpect(jsonPath("$.data.status").value("approved"))
                 .andExpect(jsonPath("$.data.approvedAmount").value(3000))
                 .andExpect(jsonPath("$.data.benefitsCardActivated").value(true))
@@ -245,6 +247,7 @@ class Phase9TaskGroupCIntegrationTest extends AbstractYunkaXiaohuaIT {
         mapping.setExternalUserId(memberInfo.getExternalUserId());
         mapping.setUpstreamQueryType("loanId");
         mapping.setUpstreamQueryValue(loanId);
+        mapping.setPurpose("rent");
         mapping.setMappingStatus("ACTIVE");
         mapping.setCreatedTs(LocalDateTime.now());
         mapping.setUpdatedTs(LocalDateTime.now());

@@ -15,6 +15,7 @@ public class LoanApplicationMapping {
     private String externalUserId;
     private String upstreamQueryType;
     private String upstreamQueryValue;
+    private String purpose;
     private String mappingStatus;
     private LocalDateTime createdTs;
     private LocalDateTime updatedTs;
@@ -73,6 +74,14 @@ public class LoanApplicationMapping {
 
     public void setUpstreamQueryValue(String upstreamQueryValue) {
         this.upstreamQueryValue = upstreamQueryValue;
+    }
+
+    public String getPurpose() {
+        return purpose;
+    }
+
+    public void setPurpose(String purpose) {
+        this.purpose = purpose;
     }
 
     public String getMappingStatus() {

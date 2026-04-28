@@ -1,3 +1,5 @@
+import { isLoanPurpose } from "@/lib/loan-purpose";
+import type { LoanPurpose } from "@/types/loan.types";
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
 
 export type LoanFlowStatus = "idle" | "pending" | "reviewing" | "approved" | "rejected" | "loan_failed";
@@ -5,6 +7,7 @@ export type LoanFlowStatus = "idle" | "pending" | "reviewing" | "approved" | "re
 export interface LoanState {
   amount: number;
   term: number;
+  purpose: LoanPurpose | null;
   applicationId: string | null;
   approvalStatus: LoanFlowStatus;
   approvalMessage: string | null;
@@ -18,6 +21,7 @@ export interface LoanState {
 interface LoanContextValue extends LoanState {
   setAmount: (amount: number) => void;
   setTerm: (term: number) => void;
+  setPurpose: (purpose: LoanPurpose | null) => void;
   setApplicationId: (applicationId: string | null) => void;
   setApprovalStatus: (status: LoanFlowStatus) => void;
   setApprovalMessage: (message: string | null) => void;
@@ -34,6 +38,7 @@ const STORAGE_KEY = "nexusfin.h5.loan-state";
 const DEFAULT_STATE: LoanState = {
   amount: 3000,
   term: 3,
+  purpose: null,
   applicationId: null,
   approvalStatus: "idle",
   approvalMessage: null,
@@ -61,6 +66,7 @@ function readStoredState(): LoanState {
     return {
       amount: typeof parsed.amount === "number" ? parsed.amount : DEFAULT_STATE.amount,
       term: typeof parsed.term === "number" ? parsed.term : DEFAULT_STATE.term,
+      purpose: isLoanPurpose(parsed.purpose) ? parsed.purpose : null,
       applicationId: typeof parsed.applicationId === "string" ? parsed.applicationId : null,
       approvalStatus: isLoanFlowStatus(parsed.approvalStatus) ? parsed.approvalStatus : DEFAULT_STATE.approvalStatus,
       approvalMessage: typeof parsed.approvalMessage === "string" ? parsed.approvalMessage : null,
@@ -102,6 +108,7 @@ export function LoanProvider({ children }: LoanProviderProps) {
     ...state,
     setAmount: (amount) => setState((previous) => ({ ...previous, amount })),
     setTerm: (term) => setState((previous) => ({ ...previous, term })),
+    setPurpose: (purpose) => setState((previous) => ({ ...previous, purpose })),
     setApplicationId: (applicationId) => setState((previous) => ({ ...previous, applicationId })),
     setApprovalStatus: (approvalStatus) => setState((previous) => ({ ...previous, approvalStatus })),
     setApprovalMessage: (approvalMessage) => setState((previous) => ({ ...previous, approvalMessage })),

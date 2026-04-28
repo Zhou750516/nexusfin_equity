@@ -49,11 +49,14 @@ export interface CalculateResult {
   repaymentPlan: RepaymentPlanItem[];
 }
 
+export type LoanPurpose = "shopping" | "rent" | "education" | "travel";
+
 export interface ApplyParams {
   amount: number;
   term: number;
   receivingAccountId: string;
   agreedProtocols: string[];
+  purpose: LoanPurpose;
 }
 
 export interface ApplyResult {
@@ -84,6 +87,7 @@ export type ApprovalStatusValue = "pending" | "reviewing" | "approved" | "reject
 export interface ApprovalStatus {
   applicationId: string;
   status: ApprovalStatusValue;
+  purpose?: LoanPurpose;
   steps: ApprovalStep[];
   benefitsCard: BenefitsCardPreview;
 }
@@ -113,6 +117,13 @@ export interface ProtocolLink {
   url: string;
 }
 
+export interface BenefitsUserCard {
+  cardId: string;
+  bankName: string;
+  cardLastFour: string;
+  defaultCard: boolean;
+}
+
 export interface BenefitsCardDetail {
   cardName: string;
   price: number;
@@ -121,6 +132,8 @@ export interface BenefitsCardDetail {
   categories: BenefitCategory[];
   tips: string[];
   protocols: ProtocolLink[];
+  userCards: BenefitsUserCard[];
+  protocolReady: boolean;
 }
 
 export interface ActivateParams {
@@ -136,13 +149,15 @@ export interface ActivateResult {
 
 export interface ApprovalResult {
   applicationId: string;
-  status: "approved" | "rejected";
+  status: "reviewing" | "approved" | "rejected";
+  purpose?: LoanPurpose;
   approvedAmount: number;
   estimatedArrivalTime: string;
   steps: ApprovalStep[];
   benefitsCardActivated: boolean;
   tip: string;
   loanId: string | null;
+  repaymentPlan?: RepaymentPlanItem[];
 }
 
 export interface RepaymentInfo {
@@ -150,6 +165,8 @@ export interface RepaymentInfo {
   repaymentAmount: number;
   repaymentType: string;
   bankCard: BankAccount;
+  bankCards: BankAccount[];
+  smsRequired: boolean;
   tip: string;
 }
 
@@ -166,9 +183,30 @@ export interface RepaymentSubmitResult {
   message: string;
 }
 
+export interface RepaymentSmsSendParams {
+  loanId: string;
+  bankCardId: string;
+}
+
+export interface RepaymentSmsSendResult {
+  smsSeq: string;
+  status: "sent" | "failed";
+  message: string;
+}
+
+export interface RepaymentSmsConfirmParams {
+  loanId: string;
+  captcha: string;
+}
+
+export interface RepaymentSmsConfirmResult {
+  status: "confirmed" | "failed";
+  message: string;
+}
+
 export interface RepaymentResult {
   repaymentId: string;
-  status: "success" | "failed";
+  status: "processing" | "success" | "failed";
   amount: number;
   repaymentTime: string;
   bankCard: BankAccount;

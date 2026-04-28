@@ -137,6 +137,7 @@ create table if not exists loan_application_mapping (
     external_user_id varchar(64),
     upstream_query_type varchar(32),
     upstream_query_value varchar(128),
+    purpose varchar(32),
     mapping_status varchar(32) not null,
     created_ts timestamp not null,
     updated_ts timestamp not null

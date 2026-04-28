@@ -16,8 +16,10 @@ import {
 } from "@/components/ui/drawer";
 import { calculateLoan, getCalculatorConfig, applyLoan } from "@/lib/loan-api";
 import { formatBankCard, formatCurrency, formatMonthDay } from "@/lib/format";
+import { toLoanPurposeKey } from "@/lib/loan-purpose";
 import { shouldRequestLocalizedData } from "@/lib/localized-request";
 import { buildPath } from "@/lib/route";
+import { buildApplyLoanPayload } from "./calculator.logic";
 import { useLoan } from "@/contexts/LoanContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { Locale } from "@/i18n/locale";
@@ -67,7 +69,7 @@ export default function CalculatorPage() {
   const [selectedTerm, setSelectedTerm] = useState(loan.term);
   const [draftAmount, setDraftAmount] = useState(String(loan.amount));
   const [purposeKey, setPurposeKey] = useState<(typeof LOAN_PURPOSE_KEYS)[number]>(
-    "calculator.loanPurpose.shopping",
+    toLoanPurposeKey(loan.purpose),
   );
   const [expanded, setExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -152,12 +154,16 @@ export default function CalculatorPage() {
     setIsSubmitting(true);
     setError(null);
     try {
-      const result = await applyLoan({
+      const payload = buildApplyLoanPayload({
         amount,
         term: selectedTerm,
         receivingAccountId: config.receivingAccount.accountId ?? loan.receivingAccountId ?? "",
         agreedProtocols: AGREED_PROTOCOLS,
+        purposeKey,
       });
+      loan.setPurpose(payload.purpose);
+
+      const result = await applyLoan(payload);
 
       loan.setApplicationId(result.applicationId);
       loan.setApprovalStatus(result.status === "loan_failed" ? "loan_failed" : "pending");

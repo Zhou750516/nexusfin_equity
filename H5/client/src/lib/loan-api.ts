@@ -11,6 +11,10 @@ import type {
   CalculateResult,
   CalculatorConfig,
   RepaymentInfo,
+  RepaymentSmsConfirmParams,
+  RepaymentSmsConfirmResult,
+  RepaymentSmsSendParams,
+  RepaymentSmsSendResult,
   RepaymentResult,
   RepaymentSubmitResult,
   RepaymentParams,
@@ -72,6 +76,22 @@ export function getRepaymentInfo(loanId: string) {
   return apiRequest<RepaymentInfo>({
     method: "GET",
     url: `/repayment/info/${loanId}`,
+  });
+}
+
+export function sendRepaymentSms(payload: RepaymentSmsSendParams) {
+  return apiRequest<RepaymentSmsSendResult>({
+    method: "POST",
+    url: "/repayment/sms-send",
+    data: payload,
+  });
+}
+
+export function confirmRepaymentSms(payload: RepaymentSmsConfirmParams) {
+  return apiRequest<RepaymentSmsConfirmResult>({
+    method: "POST",
+    url: "/repayment/sms-confirm",
+    data: payload,
   });
 }
 
