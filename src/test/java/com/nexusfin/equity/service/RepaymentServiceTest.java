@@ -12,6 +12,7 @@ import com.nexusfin.equity.dto.response.RepaymentSmsSendResponse;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.impl.RepaymentServiceImpl;
+import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.CardSmsConfirmResponse;
 import com.nexusfin.equity.thirdparty.yunka.CardSmsSendResponse;
 import com.nexusfin.equity.thirdparty.yunka.UserCardListResponse;
@@ -66,7 +67,8 @@ class RepaymentServiceTest {
                 h5I18nService,
                 xiaohuaGatewayService,
                 memberInfoRepository,
-                sensitiveDataCipher
+                sensitiveDataCipher,
+                new YunkaCallTemplate(yunkaGatewayClient)
         );
     }
 

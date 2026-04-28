@@ -10,8 +10,10 @@ import com.nexusfin.equity.dto.response.CreateBenefitOrderResponse;
 import com.nexusfin.equity.dto.response.LoanApprovalResultResponse;
 import com.nexusfin.equity.dto.response.LoanApplyResponse;
 import com.nexusfin.equity.entity.LoanApplicationMapping;
+import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.service.impl.LoanServiceImpl;
+import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanItem;
 import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanResponse;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
@@ -68,7 +70,8 @@ class LoanServiceTest {
                 benefitOrderService,
                 h5I18nService,
                 asyncCompensationEnqueueService,
-                xiaohuaGatewayService
+                xiaohuaGatewayService,
+                new YunkaCallTemplate(yunkaGatewayClient)
         );
     }
 
@@ -140,7 +143,72 @@ class LoanServiceTest {
                         """)
         ));
 
-        LoanApplyRequest request = new LoanApplyRequest(
+        LoanApplyRequest request = buildApplyRequest();
+
+        LoanApplyResponse response = loanService.apply("mem-001", "user-001", request);
+
+        assertThat(response.applicationId()).startsWith("APP-");
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> captor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(captor.capture());
+        JsonNode forwardData = objectMapper.valueToTree(captor.getValue().data());
+        assertThat(forwardData.path("purpose").asText()).isEqualTo("rent");
+        assertThat(forwardData.path("loanReason").asText()).isEqualTo("DAILY_CONSUMPTION");
+        assertThat(forwardData.path("bankCardNum").asText()).isEqualTo("6222020202028648");
+        assertThat(forwardData.path("platformBenefitOrderNo").asText()).isEqualTo("PBEN-001");
+        assertThat(forwardData.path("basicInfo").path("education").asText()).isEqualTo("BACHELOR");
+        assertThat(forwardData.path("contactInfo").isArray()).isTrue();
+        assertThat(forwardData.path("imageInfo").isArray()).isTrue();
+    }
+
+    @Test
+    void shouldReturnFailedResponseWhenLoanApplyIsRejected() throws Exception {
+        when(benefitOrderService.createOrder(eq("mem-001"), any()))
+                .thenReturn(new CreateBenefitOrderResponse("BEN-REJECT", "FIRST_DEDUCT_PENDING", "/redirect"));
+        when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                10003,
+                "invalid loan state",
+                objectMapper.readTree("{}")
+        ));
+
+        LoanApplyResponse response = loanService.apply("mem-001", "user-001", buildApplyRequest());
+
+        assertThat(response.applicationId()).isNull();
+        assertThat(response.status()).isEqualTo("loan_failed");
+        assertThat(response.benefitOrderNo()).isEqualTo("BEN-REJECT");
+        assertThat(response.message()).isEqualTo("权益购买成功，借款申请失败：invalid loan state");
+    }
+
+    @Test
+    void shouldEnqueueCompensationWhenLoanApplyTimesOut() throws Exception {
+        when(benefitOrderService.createOrder(eq("mem-001"), any()))
+                .thenReturn(new CreateBenefitOrderResponse("BEN-TIMEOUT", "FIRST_DEDUCT_PENDING", "/redirect"));
+        when(yunkaGatewayClient.proxy(any()))
+                .thenThrow(new UpstreamTimeoutException("Yunka gateway timeout"));
+
+        LoanApplyResponse response = loanService.apply("mem-001", "user-001", buildApplyRequest());
+
+        assertThat(response.status()).isEqualTo("pending");
+        verify(asyncCompensationEnqueueService).enqueue(any());
+    }
+
+    private LoanApplicationMapping mapping(String applicationId, String loanId) {
+        LoanApplicationMapping mapping = new LoanApplicationMapping();
+        mapping.setApplicationId(applicationId);
+        mapping.setMemberId("mem-001");
+        mapping.setBenefitOrderNo("BEN-001");
+        mapping.setChannelCode("KJ");
+        mapping.setExternalUserId("user-001");
+        mapping.setUpstreamQueryType("loanId");
+        mapping.setUpstreamQueryValue(loanId);
+        mapping.setMappingStatus("ACTIVE");
+        mapping.setCreatedTs(LocalDateTime.now());
+        mapping.setUpdatedTs(LocalDateTime.now());
+        return mapping;
+    }
+
+    private LoanApplyRequest buildApplyRequest() throws Exception {
+        return new LoanApplyRequest(
                 3000L,
                 3,
                 "acc_001",
@@ -168,36 +236,6 @@ class LoanServiceTest {
                         """),
                 "PBEN-001"
         );
-
-        LoanApplyResponse response = loanService.apply("mem-001", "user-001", request);
-
-        assertThat(response.applicationId()).startsWith("APP-");
-        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> captor =
-                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
-        verify(yunkaGatewayClient).proxy(captor.capture());
-        JsonNode forwardData = objectMapper.valueToTree(captor.getValue().data());
-        assertThat(forwardData.path("purpose").asText()).isEqualTo("rent");
-        assertThat(forwardData.path("loanReason").asText()).isEqualTo("DAILY_CONSUMPTION");
-        assertThat(forwardData.path("bankCardNum").asText()).isEqualTo("6222020202028648");
-        assertThat(forwardData.path("platformBenefitOrderNo").asText()).isEqualTo("PBEN-001");
-        assertThat(forwardData.path("basicInfo").path("education").asText()).isEqualTo("BACHELOR");
-        assertThat(forwardData.path("contactInfo").isArray()).isTrue();
-        assertThat(forwardData.path("imageInfo").isArray()).isTrue();
-    }
-
-    private LoanApplicationMapping mapping(String applicationId, String loanId) {
-        LoanApplicationMapping mapping = new LoanApplicationMapping();
-        mapping.setApplicationId(applicationId);
-        mapping.setMemberId("mem-001");
-        mapping.setBenefitOrderNo("BEN-001");
-        mapping.setChannelCode("KJ");
-        mapping.setExternalUserId("user-001");
-        mapping.setUpstreamQueryType("loanId");
-        mapping.setUpstreamQueryValue(loanId);
-        mapping.setMappingStatus("ACTIVE");
-        mapping.setCreatedTs(LocalDateTime.now());
-        mapping.setUpdatedTs(LocalDateTime.now());
-        return mapping;
     }
 
     private H5LoanProperties h5LoanProperties() {

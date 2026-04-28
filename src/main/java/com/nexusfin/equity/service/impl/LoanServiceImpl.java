@@ -25,6 +25,7 @@ import com.nexusfin.equity.service.BenefitOrderService;
 import com.nexusfin.equity.service.H5I18nService;
 import com.nexusfin.equity.service.LoanService;
 import com.nexusfin.equity.service.XiaohuaGatewayService;
+import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanRequest;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import static com.nexusfin.equity.util.BizIds.next;
@@ -58,6 +59,7 @@ public class LoanServiceImpl implements LoanService {
     private final H5I18nService h5I18nService;
     private final AsyncCompensationEnqueueService asyncCompensationEnqueueService;
     private final XiaohuaGatewayService xiaohuaGatewayService;
+    private final YunkaCallTemplate yunkaCallTemplate;
 
     public LoanServiceImpl(
             H5LoanProperties h5LoanProperties,
@@ -68,7 +70,8 @@ public class LoanServiceImpl implements LoanService {
             BenefitOrderService benefitOrderService,
             H5I18nService h5I18nService,
             AsyncCompensationEnqueueService asyncCompensationEnqueueService,
-            XiaohuaGatewayService xiaohuaGatewayService
+            XiaohuaGatewayService xiaohuaGatewayService,
+            YunkaCallTemplate yunkaCallTemplate
     ) {
         this.h5LoanProperties = h5LoanProperties;
         this.h5BenefitsProperties = h5BenefitsProperties;
@@ -79,6 +82,7 @@ public class LoanServiceImpl implements LoanService {
         this.h5I18nService = h5I18nService;
         this.asyncCompensationEnqueueService = asyncCompensationEnqueueService;
         this.xiaohuaGatewayService = xiaohuaGatewayService;
+        this.yunkaCallTemplate = yunkaCallTemplate;
     }
 
     @Override
@@ -106,41 +110,15 @@ public class LoanServiceImpl implements LoanService {
     public LoanCalculateResponse calculate(String memberId, String uid, LoanCalculateRequest request) {
         validateCalculateRequest(request);
         String requestId = next("LC");
-        long startNanos = System.nanoTime();
-        YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = new YunkaGatewayClient.YunkaGatewayRequest(
-                requestId,
-                yunkaProperties.paths().loanCalculate(),
-                requestId,
-                new LoanTrailForwardData(uid, requestId, yuanToCent(request.amount()), request.term())
+        JsonNode data = yunkaCallTemplate.executeForData(
+                YunkaCallTemplate.YunkaCall.of(
+                        "loan calculate",
+                        requestId,
+                        yunkaProperties.paths().loanCalculate(),
+                        requestId,
+                        new LoanTrailForwardData(uid, requestId, yuanToCent(request.amount()), request.term())
+                ).withMemberId(memberId)
         );
-        log.info("traceId={} bizOrderNo={} requestId={} memberId={} path={} loan calculate yunka request begin",
-                TraceIdUtil.getTraceId(),
-                requestId,
-                requestId,
-                memberId,
-                gatewayRequest.path());
-        JsonNode data;
-        try {
-            data = requireSuccessfulYunkaData(yunkaGatewayClient.proxy(gatewayRequest));
-        } catch (BizException exception) {
-            log.warn("traceId={} bizOrderNo={} requestId={} memberId={} path={} elapsedMs={} errorNo={} errorMsg={}",
-                    TraceIdUtil.getTraceId(),
-                    requestId,
-                    requestId,
-                    memberId,
-                    gatewayRequest.path(),
-                    elapsedMs(startNanos),
-                    exception.getErrorNo(),
-                    exception.getErrorMsg());
-            throw exception;
-        }
-        log.info("traceId={} bizOrderNo={} requestId={} memberId={} path={} elapsedMs={} loan calculate yunka request success",
-                TraceIdUtil.getTraceId(),
-                requestId,
-                requestId,
-                memberId,
-                gatewayRequest.path(),
-                elapsedMs(startNanos));
         long receiveAmount = data.path("receiveAmount").asLong(yuanToCent(request.amount()));
         long repayAmount = data.path("repayAmount").asLong(receiveAmount);
         return new LoanCalculateResponse(
@@ -192,20 +170,16 @@ public class LoanServiceImpl implements LoanService {
                 request.imageInfo()
         );
         long startNanos = System.nanoTime();
-        log.info("traceId={} bizOrderNo={} requestId={} memberId={} benefitOrderNo={} path={} loan apply yunka request begin",
-                TraceIdUtil.getTraceId(),
-                applicationId,
-                requestId,
-                memberId,
-                benefitOrder.benefitOrderNo(),
-                yunkaProperties.paths().loanApply());
         try {
-            response = yunkaGatewayClient.proxy(new YunkaGatewayClient.YunkaGatewayRequest(
-                    requestId,
-                    yunkaProperties.paths().loanApply(),
-                    applicationId,
-                    forwardData
-            ));
+            response = yunkaCallTemplate.execute(
+                    YunkaCallTemplate.YunkaCall.of(
+                            "loan apply",
+                            requestId,
+                            yunkaProperties.paths().loanApply(),
+                            applicationId,
+                            forwardData
+                    ).withMemberId(memberId).withBenefitOrderNo(benefitOrder.benefitOrderNo())
+            );
         } catch (UpstreamTimeoutException exception) {
             log.warn("traceId={} bizOrderNo={} requestId={} memberId={} benefitOrderNo={} path={} elapsedMs={} errorNo={} errorMsg={}",
                     TraceIdUtil.getTraceId(),
@@ -214,7 +188,7 @@ public class LoanServiceImpl implements LoanService {
                     memberId,
                     benefitOrder.benefitOrderNo(),
                     yunkaProperties.paths().loanApply(),
-                    elapsedMs(startNanos),
+                    java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos),
                     ErrorCodes.YUNKA_UPSTREAM_TIMEOUT,
                     "Yunka loan apply timeout, async compensation enqueued");
             saveApplicationMapping(memberId, uid, applicationId, benefitOrder.benefitOrderNo(), loanId, request.purpose(), "PENDING_REVIEW");
@@ -249,6 +223,24 @@ public class LoanServiceImpl implements LoanService {
                     benefitOrder.benefitOrderNo(),
                     h5I18nService.text("loan.apply.pendingReview", "借款申请已提交，正在审核中")
             );
+        } catch (BizException exception) {
+            log.warn("traceId={} bizOrderNo={} requestId={} memberId={} benefitOrderNo={} path={} elapsedMs={} errorNo={} errorMsg={}",
+                    TraceIdUtil.getTraceId(),
+                    applicationId,
+                    requestId,
+                    memberId,
+                    benefitOrder.benefitOrderNo(),
+                    yunkaProperties.paths().loanApply(),
+                    java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos),
+                    exception.getErrorNo(),
+                    exception.getErrorMsg());
+            return buildLoanFailedResponse(
+                    applicationId,
+                    benefitOrder.benefitOrderNo(),
+                    ErrorCodes.YUNKA_RESPONSE_EMPTY.equals(exception.getErrorNo())
+                            ? exception.getErrorMsg()
+                            : exception.getMessage()
+            );
         } catch (RuntimeException exception) {
             log.warn("traceId={} bizOrderNo={} requestId={} memberId={} benefitOrderNo={} path={} elapsedMs={} errorNo={} errorMsg={}",
                     TraceIdUtil.getTraceId(),
@@ -257,7 +249,7 @@ public class LoanServiceImpl implements LoanService {
                     memberId,
                     benefitOrder.benefitOrderNo(),
                     yunkaProperties.paths().loanApply(),
-                    elapsedMs(startNanos),
+                    java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos),
                     exception instanceof BizException bizException
                             ? bizException.getErrorNo()
                             : ErrorCodes.YUNKA_UPSTREAM_FAILED,
@@ -266,28 +258,9 @@ public class LoanServiceImpl implements LoanService {
                             : exception.getMessage());
             return buildLoanFailedResponse(applicationId, benefitOrder.benefitOrderNo(), exception.getMessage());
         }
-        if (response == null || response.code() != 0) {
-            String message = response == null ? "Yunka gateway response is empty" : response.message();
-            log.warn("traceId={} bizOrderNo={} requestId={} memberId={} benefitOrderNo={} path={} elapsedMs={} errorNo={} errorMsg={}",
-                    TraceIdUtil.getTraceId(),
-                    applicationId,
-                    requestId,
-                    memberId,
-                    benefitOrder.benefitOrderNo(),
-                    yunkaProperties.paths().loanApply(),
-                    elapsedMs(startNanos),
-                    response == null ? ErrorCodes.YUNKA_RESPONSE_EMPTY : ErrorCodes.YUNKA_UPSTREAM_REJECTED,
-                    message);
-            return buildLoanFailedResponse(applicationId, benefitOrder.benefitOrderNo(), message);
+        if (!yunkaCallTemplate.isSuccessful(response)) {
+            return buildLoanFailedResponse(applicationId, benefitOrder.benefitOrderNo(), response.message());
         }
-        log.info("traceId={} bizOrderNo={} requestId={} memberId={} benefitOrderNo={} path={} elapsedMs={} loan apply yunka request success",
-                TraceIdUtil.getTraceId(),
-                applicationId,
-                requestId,
-                memberId,
-                benefitOrder.benefitOrderNo(),
-                yunkaProperties.paths().loanApply(),
-                elapsedMs(startNanos));
         String upstreamLoanId = readText(response.data(), "loanId", loanId);
         saveApplicationMapping(memberId, uid, applicationId, benefitOrder.benefitOrderNo(), upstreamLoanId, request.purpose(), "ACTIVE");
         return new LoanApplyResponse(
@@ -423,49 +396,15 @@ public class LoanServiceImpl implements LoanService {
 
     private JsonNode queryLoan(LoanApplicationMapping mapping) {
         String requestId = next("LQ");
-        YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = new YunkaGatewayClient.YunkaGatewayRequest(
-                requestId,
-                yunkaProperties.paths().loanQuery(),
-                mapping.getApplicationId(),
-                new LoanQueryForwardData(mapping.getExternalUserId(), mapping.getUpstreamQueryValue())
+        return yunkaCallTemplate.executeForData(
+                YunkaCallTemplate.YunkaCall.of(
+                        "loan query",
+                        requestId,
+                        yunkaProperties.paths().loanQuery(),
+                        mapping.getApplicationId(),
+                        new LoanQueryForwardData(mapping.getExternalUserId(), mapping.getUpstreamQueryValue())
+                ).withMemberId(mapping.getMemberId())
         );
-        long startNanos = System.nanoTime();
-        log.info("traceId={} bizOrderNo={} requestId={} memberId={} path={} loan query yunka request begin",
-                TraceIdUtil.getTraceId(),
-                mapping.getApplicationId(),
-                requestId,
-                mapping.getMemberId(),
-                gatewayRequest.path());
-        try {
-            JsonNode data = requireSuccessfulYunkaData(yunkaGatewayClient.proxy(gatewayRequest));
-            log.info("traceId={} bizOrderNo={} requestId={} memberId={} path={} elapsedMs={} loan query yunka request success",
-                    TraceIdUtil.getTraceId(),
-                    mapping.getApplicationId(),
-                    requestId,
-                    mapping.getMemberId(),
-                    gatewayRequest.path(),
-                    elapsedMs(startNanos));
-            return data;
-        } catch (BizException exception) {
-            log.warn("traceId={} bizOrderNo={} requestId={} memberId={} path={} elapsedMs={} errorNo={} errorMsg={}",
-                    TraceIdUtil.getTraceId(),
-                    mapping.getApplicationId(),
-                    requestId,
-                    mapping.getMemberId(),
-                    gatewayRequest.path(),
-                    elapsedMs(startNanos),
-                    exception.getErrorNo(),
-                    exception.getErrorMsg());
-            throw exception;
-        }
-    }
-
-    private JsonNode requireSuccessfulYunkaData(YunkaGatewayClient.YunkaGatewayResponse response) {
-        if (response == null || response.code() != 0) {
-            String message = response == null ? "Yunka gateway response is empty" : response.message();
-            throw new BizException(502, message);
-        }
-        return response.data();
     }
 
     private List<LoanCalculateResponse.RepaymentPlanItem> mapRepaymentPlan(JsonNode repaymentPlan) {
@@ -676,10 +615,6 @@ public class LoanServiceImpl implements LoanService {
         }
         String value = data.path(fieldName).asText();
         return value.isBlank() ? fallback : value;
-    }
-
-    private static long elapsedMs(long startNanos) {
-        return java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
     }
 
     private record LoanTrailForwardData(

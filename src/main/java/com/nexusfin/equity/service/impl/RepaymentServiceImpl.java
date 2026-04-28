@@ -18,6 +18,7 @@ import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.H5I18nService;
 import com.nexusfin.equity.service.RepaymentService;
 import com.nexusfin.equity.service.XiaohuaGatewayService;
+import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.CardSmsConfirmRequest;
 import com.nexusfin.equity.thirdparty.yunka.CardSmsSendRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserCardListRequest;
@@ -52,6 +53,7 @@ public class RepaymentServiceImpl implements RepaymentService {
     private final XiaohuaGatewayService xiaohuaGatewayService;
     private final MemberInfoRepository memberInfoRepository;
     private final SensitiveDataCipher sensitiveDataCipher;
+    private final YunkaCallTemplate yunkaCallTemplate;
 
     public RepaymentServiceImpl(
             H5LoanProperties h5LoanProperties,
@@ -60,7 +62,8 @@ public class RepaymentServiceImpl implements RepaymentService {
             H5I18nService h5I18nService,
             XiaohuaGatewayService xiaohuaGatewayService,
             MemberInfoRepository memberInfoRepository,
-            SensitiveDataCipher sensitiveDataCipher
+            SensitiveDataCipher sensitiveDataCipher,
+            YunkaCallTemplate yunkaCallTemplate
     ) {
         this.h5LoanProperties = h5LoanProperties;
         this.yunkaProperties = yunkaProperties;
@@ -69,43 +72,21 @@ public class RepaymentServiceImpl implements RepaymentService {
         this.xiaohuaGatewayService = xiaohuaGatewayService;
         this.memberInfoRepository = memberInfoRepository;
         this.sensitiveDataCipher = sensitiveDataCipher;
+        this.yunkaCallTemplate = yunkaCallTemplate;
     }
 
     @Override
     public RepaymentInfoResponse getInfo(String uid, String loanId) {
         String requestId = next("RT");
-        YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = new YunkaGatewayClient.YunkaGatewayRequest(
-                requestId,
-                yunkaProperties.paths().repayTrial(),
-                loanId,
-                new RepayTrialForwardData(uid, loanId, DEFAULT_REPAY_TYPE, List.of())
+        JsonNode data = yunkaCallTemplate.executeForData(
+                YunkaCallTemplate.YunkaCall.of(
+                        "repayment info",
+                        requestId,
+                        yunkaProperties.paths().repayTrial(),
+                        loanId,
+                        new RepayTrialForwardData(uid, loanId, DEFAULT_REPAY_TYPE, List.of())
+                )
         );
-        long startNanos = System.nanoTime();
-        log.info("traceId={} bizOrderNo={} requestId={} path={} repayment info yunka request begin",
-                TraceIdUtil.getTraceId(),
-                loanId,
-                requestId,
-                gatewayRequest.path());
-        JsonNode data;
-        try {
-            data = requireSuccessfulYunkaData(yunkaGatewayClient.proxy(gatewayRequest));
-        } catch (BizException exception) {
-            log.warn("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} errorNo={} errorMsg={}",
-                    TraceIdUtil.getTraceId(),
-                    loanId,
-                    requestId,
-                    gatewayRequest.path(),
-                    elapsedMs(startNanos),
-                    exception.getErrorNo(),
-                    exception.getErrorMsg());
-            throw exception;
-        }
-        log.info("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} repayment info yunka request success",
-                TraceIdUtil.getTraceId(),
-                loanId,
-                requestId,
-                gatewayRequest.path(),
-                elapsedMs(startNanos));
         List<BankAccountResponse> bankCards = queryRepaymentCards(uid, loanId);
         BankAccountResponse selectedCard = bankCards.stream().findFirst().orElseGet(this::fallbackBankAccount);
         return new RepaymentInfoResponse(
@@ -172,45 +153,22 @@ public class RepaymentServiceImpl implements RepaymentService {
     public RepaymentSubmitResponse submit(String uid, RepaymentSubmitRequest request) {
         String requestId = next("RS");
         String bankCardNum = resolveBankCardNumber(uid, request.loanId(), request.bankCardId());
-        YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = new YunkaGatewayClient.YunkaGatewayRequest(
-                requestId,
-                yunkaProperties.paths().repayApply(),
-                request.loanId(),
-                new RepayApplyForwardData(
-                        uid,
+        JsonNode data = yunkaCallTemplate.executeForData(
+                YunkaCallTemplate.YunkaCall.of(
+                        "repayment submit",
+                        requestId,
+                        yunkaProperties.paths().repayApply(),
                         request.loanId(),
-                        mapRepayType(request.repaymentType()),
-                        List.of(),
-                        bankCardNum,
-                        yuanToCent(request.amount())
+                        new RepayApplyForwardData(
+                                uid,
+                                request.loanId(),
+                                mapRepayType(request.repaymentType()),
+                                List.of(),
+                                bankCardNum,
+                                yuanToCent(request.amount())
+                        )
                 )
         );
-        long startNanos = System.nanoTime();
-        log.info("traceId={} bizOrderNo={} requestId={} path={} repayment submit yunka request begin",
-                TraceIdUtil.getTraceId(),
-                request.loanId(),
-                requestId,
-                gatewayRequest.path());
-        JsonNode data;
-        try {
-            data = requireSuccessfulYunkaData(yunkaGatewayClient.proxy(gatewayRequest));
-        } catch (BizException exception) {
-            log.warn("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} errorNo={} errorMsg={}",
-                    TraceIdUtil.getTraceId(),
-                    request.loanId(),
-                    requestId,
-                    gatewayRequest.path(),
-                    elapsedMs(startNanos),
-                    exception.getErrorNo(),
-                    exception.getErrorMsg());
-            throw exception;
-        }
-        log.info("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} repayment submit yunka request success",
-                TraceIdUtil.getTraceId(),
-                request.loanId(),
-                requestId,
-                gatewayRequest.path(),
-                elapsedMs(startNanos));
         String swiftNumber = readText(data, "swiftNumber", request.loanId());
         return new RepaymentSubmitResponse(
                 swiftNumber,
@@ -222,38 +180,15 @@ public class RepaymentServiceImpl implements RepaymentService {
     @Override
     public RepaymentResultResponse getResult(String uid, String repaymentId) {
         String requestId = next("RQ");
-        YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = new YunkaGatewayClient.YunkaGatewayRequest(
-                requestId,
-                yunkaProperties.paths().repayQuery(),
-                repaymentId,
-                new RepayQueryForwardData(uid, repaymentId)
+        JsonNode data = yunkaCallTemplate.executeForData(
+                YunkaCallTemplate.YunkaCall.of(
+                        "repayment result",
+                        requestId,
+                        yunkaProperties.paths().repayQuery(),
+                        repaymentId,
+                        new RepayQueryForwardData(uid, repaymentId)
+                )
         );
-        long startNanos = System.nanoTime();
-        log.info("traceId={} bizOrderNo={} requestId={} path={} repayment result yunka request begin",
-                TraceIdUtil.getTraceId(),
-                repaymentId,
-                requestId,
-                gatewayRequest.path());
-        JsonNode data;
-        try {
-            data = requireSuccessfulYunkaData(yunkaGatewayClient.proxy(gatewayRequest));
-        } catch (BizException exception) {
-            log.warn("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} errorNo={} errorMsg={}",
-                    TraceIdUtil.getTraceId(),
-                    repaymentId,
-                    requestId,
-                    gatewayRequest.path(),
-                    elapsedMs(startNanos),
-                    exception.getErrorNo(),
-                    exception.getErrorMsg());
-            throw exception;
-        }
-        log.info("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} repayment result yunka request success",
-                TraceIdUtil.getTraceId(),
-                repaymentId,
-                requestId,
-                gatewayRequest.path(),
-                elapsedMs(startNanos));
         String swiftNumber = readText(data, "swiftNumber", repaymentId);
         BankAccountResponse bankCard = resolveResultBankCard(uid, swiftNumber, data);
         return new RepaymentResultResponse(
@@ -266,14 +201,6 @@ public class RepaymentServiceImpl implements RepaymentService {
                 centsToYuan(readLong(data, "discount")),
                 repaymentTips()
         );
-    }
-
-    private JsonNode requireSuccessfulYunkaData(YunkaGatewayClient.YunkaGatewayResponse response) {
-        if (response == null || response.code() != 0) {
-            String message = response == null ? "Yunka gateway response is empty" : response.message();
-            throw new BizException(502, message);
-        }
-        return response.data();
     }
 
     private List<BankAccountResponse> queryRepaymentCards(String uid, String bizOrderNo) {
@@ -449,10 +376,6 @@ public class RepaymentServiceImpl implements RepaymentService {
             return "";
         }
         return value.length() <= 4 ? value : value.substring(value.length() - 4);
-    }
-
-    private static long elapsedMs(long startNanos) {
-        return java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
     }
 
     private record RepayTrialForwardData(
