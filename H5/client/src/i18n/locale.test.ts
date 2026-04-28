@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { detectBrowserLocale, getInitialLocale, normalizeLocale } from "./locale";
+import { messages } from "./messages/index";
+import { SUPPORTED_LOCALES, detectBrowserLocale, getInitialLocale, normalizeLocale } from "./locale";
 
 describe("i18n locale utilities", () => {
   it("normalizes supported browser language variants", () => {
@@ -17,5 +18,15 @@ describe("i18n locale utilities", () => {
   it("prefers manually persisted locale over browser locale", () => {
     const storage = { getItem: () => "vi-VN" };
     expect(getInitialLocale(storage, ["en-US"])).toBe("vi-VN");
+  });
+
+  it("keeps shared message keys available across all locales", () => {
+    for (const locale of SUPPORTED_LOCALES) {
+      expect(messages[locale]["calculator.submit"]).toBeTruthy();
+      expect(messages[locale]["approvalPending.title"]).toBeTruthy();
+      expect(messages[locale]["benefits.openNow"]).toBeTruthy();
+      expect(messages[locale]["repaymentSuccess.title"]).toBeTruthy();
+      expect(messages[locale]["jointEntry.title"]).toBeTruthy();
+    }
   });
 });

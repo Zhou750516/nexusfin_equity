@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { setApiLocale } from "@/lib/api";
-import { LOCALE_LABELS, messages } from "./messages";
+import { LOCALE_LABELS, messages } from "./messages/index";
 import { DEFAULT_LOCALE, type Locale, getInitialLocale, LOCALE_STORAGE_KEY } from "./locale";
 
 interface I18nContextValue {
