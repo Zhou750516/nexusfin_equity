@@ -80,7 +80,7 @@ cat src/main/java/com/nexusfin/equity/thirdparty/qw/AllinpayMemberSyncPayloadMap
 find src/main/java -name 'AllinpayMemberSyncRequest*.java' -o -name 'MemberSyncRequest*.java' | xargs cat
 
 # 4. 看 4-21 齐为会员同步收口方案（在根目录还没归档）
-cat docs/plan/20260421_齐为会员同步字段升级收口方案.md
+cat docs/plan/topics/齐为/20260421_齐为会员同步字段升级收口方案.md
 ```
 
 **判断点**：
