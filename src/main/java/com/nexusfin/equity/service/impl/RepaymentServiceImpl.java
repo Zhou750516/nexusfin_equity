@@ -23,6 +23,7 @@ import com.nexusfin.equity.thirdparty.yunka.CardSmsSendRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserCardListRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserCardSummary;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
+import static com.nexusfin.equity.util.BizIds.next;
 import static com.nexusfin.equity.util.MoneyUnits.centsToYuan;
 import static com.nexusfin.equity.util.MoneyUnits.yuanToCent;
 import com.nexusfin.equity.util.SensitiveDataCipher;
@@ -33,7 +34,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -73,7 +73,7 @@ public class RepaymentServiceImpl implements RepaymentService {
 
     @Override
     public RepaymentInfoResponse getInfo(String uid, String loanId) {
-        String requestId = "RT-" + newCompactUuid();
+        String requestId = next("RT");
         YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = new YunkaGatewayClient.YunkaGatewayRequest(
                 requestId,
                 yunkaProperties.paths().repayTrial(),
@@ -126,7 +126,7 @@ public class RepaymentServiceImpl implements RepaymentService {
     public RepaymentSmsSendResponse sendSms(String uid, RepaymentSmsSendRequest request) {
         MemberProfile memberProfile = loadMemberProfile(uid);
         String bankCardNum = resolveBankCardNumber(uid, request.loanId(), request.bankCardId());
-        String requestId = "RSS-" + newCompactUuid();
+        String requestId = next("RSS");
         var response = xiaohuaGatewayService.sendCardSms(
                 requestId,
                 request.loanId(),
@@ -150,7 +150,7 @@ public class RepaymentServiceImpl implements RepaymentService {
     @Override
     public RepaymentSmsConfirmResponse confirmSms(String uid, RepaymentSmsConfirmRequest request) {
         MemberProfile memberProfile = loadMemberProfile(uid);
-        String requestId = "RSC-" + newCompactUuid();
+        String requestId = next("RSC");
         var response = xiaohuaGatewayService.confirmCardSms(
                 requestId,
                 request.loanId(),
@@ -170,7 +170,7 @@ public class RepaymentServiceImpl implements RepaymentService {
 
     @Override
     public RepaymentSubmitResponse submit(String uid, RepaymentSubmitRequest request) {
-        String requestId = "RS-" + newCompactUuid();
+        String requestId = next("RS");
         String bankCardNum = resolveBankCardNumber(uid, request.loanId(), request.bankCardId());
         YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = new YunkaGatewayClient.YunkaGatewayRequest(
                 requestId,
@@ -221,7 +221,7 @@ public class RepaymentServiceImpl implements RepaymentService {
 
     @Override
     public RepaymentResultResponse getResult(String uid, String repaymentId) {
-        String requestId = "RQ-" + newCompactUuid();
+        String requestId = next("RQ");
         YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = new YunkaGatewayClient.YunkaGatewayRequest(
                 requestId,
                 yunkaProperties.paths().repayQuery(),
@@ -279,7 +279,7 @@ public class RepaymentServiceImpl implements RepaymentService {
     private List<BankAccountResponse> queryRepaymentCards(String uid, String bizOrderNo) {
         try {
             var response = xiaohuaGatewayService.queryUserCards(
-                    "RUC-" + newCompactUuid(),
+                    next("RUC"),
                     bizOrderNo,
                     new UserCardListRequest(uid)
             );
@@ -449,10 +449,6 @@ public class RepaymentServiceImpl implements RepaymentService {
             return "";
         }
         return value.length() <= 4 ? value : value.substring(value.length() - 4);
-    }
-
-    private static String newCompactUuid() {
-        return UUID.randomUUID().toString().replace("-", "");
     }
 
     private static long elapsedMs(long startNanos) {

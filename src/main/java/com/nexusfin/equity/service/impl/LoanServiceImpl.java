@@ -27,6 +27,7 @@ import com.nexusfin.equity.service.LoanService;
 import com.nexusfin.equity.service.XiaohuaGatewayService;
 import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanRequest;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
+import static com.nexusfin.equity.util.BizIds.next;
 import static com.nexusfin.equity.util.MoneyUnits.centsToYuan;
 import static com.nexusfin.equity.util.MoneyUnits.yuanToCent;
 import com.nexusfin.equity.util.TraceIdUtil;
@@ -34,7 +35,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -105,7 +105,7 @@ public class LoanServiceImpl implements LoanService {
     @Override
     public LoanCalculateResponse calculate(String memberId, String uid, LoanCalculateRequest request) {
         validateCalculateRequest(request);
-        String requestId = "LC-" + newCompactUuid();
+        String requestId = next("LC");
         long startNanos = System.nanoTime();
         YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = new YunkaGatewayClient.YunkaGatewayRequest(
                 requestId,
@@ -154,8 +154,8 @@ public class LoanServiceImpl implements LoanService {
     @Transactional(noRollbackFor = BenefitPurchaseSyncTimeoutCompensationException.class)
     public LoanApplyResponse apply(String memberId, String uid, LoanApplyRequest request) {
         validateApplyRequest(request);
-        String applicationId = "APP-" + newCompactUuid();
-        String loanId = "LN-" + newCompactUuid();
+        String applicationId = next("APP");
+        String loanId = next("LN");
         CreateBenefitOrderResponse benefitOrder = benefitOrderService.createOrder(
                 memberId,
                 new CreateBenefitOrderRequest(
@@ -166,7 +166,7 @@ public class LoanServiceImpl implements LoanService {
                 )
         );
         YunkaGatewayClient.YunkaGatewayResponse response;
-        String requestId = "LA-" + newCompactUuid();
+        String requestId = next("LA");
         String upstreamBankCardNum = resolveBankCardNum(request);
         String platformBenefitOrderNo = resolvePlatformBenefitOrderNo(
                 benefitOrder.benefitOrderNo(),
@@ -422,7 +422,7 @@ public class LoanServiceImpl implements LoanService {
     }
 
     private JsonNode queryLoan(LoanApplicationMapping mapping) {
-        String requestId = "LQ-" + newCompactUuid();
+        String requestId = next("LQ");
         YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = new YunkaGatewayClient.YunkaGatewayRequest(
                 requestId,
                 yunkaProperties.paths().loanQuery(),
@@ -605,7 +605,7 @@ public class LoanServiceImpl implements LoanService {
     }
 
     private List<LoanApprovalResultResponse.RepaymentPlanItem> queryRepayPlan(LoanApplicationMapping mapping) {
-        String requestId = "LRP-" + newCompactUuid();
+        String requestId = next("LRP");
         try {
             var response = xiaohuaGatewayService.queryLoanRepayPlan(
                     requestId,
@@ -676,10 +676,6 @@ public class LoanServiceImpl implements LoanService {
         }
         String value = data.path(fieldName).asText();
         return value.isBlank() ? fallback : value;
-    }
-
-    private static String newCompactUuid() {
-        return UUID.randomUUID().toString().replace("-", "");
     }
 
     private static long elapsedMs(long startNanos) {
