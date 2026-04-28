@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -54,5 +55,22 @@ class JointLoginControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.scene").value("push"))
                 .andExpect(jsonPath("$.data.targetPage").value("joint-dispatch"))
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("NEXUSFIN_AUTH=")));
+    }
+
+    @Test
+    void shouldRejectUnsupportedSceneBeforeCallingService() throws Exception {
+        mockMvc.perform(post("/api/auth/joint-login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "token": "joint-token-002",
+                                  "scene": "unknown_scene"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("scene must be one of [push, exercise, refund]"));
+
+        verifyNoInteractions(jointLoginService);
     }
 }

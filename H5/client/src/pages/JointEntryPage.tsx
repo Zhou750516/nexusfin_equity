@@ -2,16 +2,13 @@ import MobileLayout from "@/components/MobileLayout";
 import { PageError, PageLoading } from "@/components/PageFeedback";
 import { useI18n } from "@/i18n/I18nProvider";
 import { jointLogin } from "@/lib/auth-api";
+import { persistJointLoginParams } from "@/lib/joint-session";
 import type { JointLoginParams } from "@/types/loan.types";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { resolveJointEntryTarget } from "./joint-entry.logic";
+import { parseJointLoginParams, resolveJointEntryErrorKey, resolveJointEntryTarget } from "./joint-entry.logic";
 
 type JointEntryStatus = "loading" | "error";
-
-function isSupportedScene(scene: string | null): scene is JointLoginParams["scene"] {
-  return scene === "push" || scene === "exercise" || scene === "refund";
-}
 
 export default function JointEntryPage() {
   const [, navigate] = useLocation();
@@ -23,19 +20,7 @@ export default function JointEntryPage() {
     if (typeof window === "undefined") {
       return null;
     }
-    const searchParams = new URLSearchParams(window.location.search);
-    const token = searchParams.get("token");
-    const scene = searchParams.get("scene");
-    if (!token || !isSupportedScene(scene)) {
-      return null;
-    }
-    return {
-      token,
-      scene,
-      orderNo: searchParams.get("orderNo") ?? undefined,
-      benefitOrderNo: searchParams.get("benefitOrderNo") ?? undefined,
-      productCode: searchParams.get("productCode") ?? undefined,
-    };
+    return parseJointLoginParams(window.location.search);
   }, []);
 
   useEffect(() => {
@@ -44,6 +29,8 @@ export default function JointEntryPage() {
       setError(t("jointEntry.missingParams"));
       return;
     }
+
+    persistJointLoginParams(requestPayload);
 
     let active = true;
     void (async () => {
@@ -58,7 +45,11 @@ export default function JointEntryPage() {
           return;
         }
         setStatus("error");
-        setError(loadError instanceof Error ? loadError.message : t("jointEntry.systemBusy"));
+        if (loadError instanceof Error) {
+          setError(t(resolveJointEntryErrorKey(loadError.message)));
+          return;
+        }
+        setError(t("jointEntry.systemBusy"));
       }
     })();
 

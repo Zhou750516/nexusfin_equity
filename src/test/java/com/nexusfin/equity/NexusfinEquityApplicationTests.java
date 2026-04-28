@@ -7,7 +7,9 @@ import com.nexusfin.equity.entity.MemberPaymentProtocol;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.service.ReconciliationService;
 import com.nexusfin.equity.service.TechPlatformUserClient;
-import com.nexusfin.equity.service.XiaohuaAuthClient;
+import com.nexusfin.equity.service.XiaohuaGatewayService;
+import com.nexusfin.equity.thirdparty.yunka.UserQueryResponse;
+import com.nexusfin.equity.thirdparty.yunka.UserTokenResponse;
 import com.nexusfin.equity.util.SignatureUtil;
 import java.time.LocalDateTime;
 import java.time.Instant;
@@ -51,7 +53,7 @@ class NexusfinEquityApplicationTests {
     private TechPlatformUserClient techPlatformUserClient;
 
     @MockBean
-    private XiaohuaAuthClient xiaohuaAuthClient;
+    private XiaohuaGatewayService xiaohuaGatewayService;
 
     @Test
     void shouldCompleteQuickstartSmokeFlow() throws Exception {
@@ -133,15 +135,16 @@ class NexusfinEquityApplicationTests {
 
     @Test
     void shouldCompleteJointLoginSmokeFlow() throws Exception {
-        when(xiaohuaAuthClient.exchange("joint-token-quickstart")).thenReturn(
-                new XiaohuaAuthClient.JointIdentity(
-                        "xh-quickstart-001",
-                        "13800138001",
-                        "王五",
-                        "310101199001011112",
-                        "KJ"
-                )
-        );
+        when(xiaohuaGatewayService.validateUserToken(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new UserTokenResponse("xh-cid-quickstart-001", "王五", "13800138001"));
+        when(xiaohuaGatewayService.queryUser(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new UserQueryResponse(objectMapper.readTree("""
+                        {
+                          "idInfo": {
+                            "idno": "310101199001011112"
+                          }
+                        }
+                        """)));
 
         MvcResult loginResult = mockMvc.perform(post("/api/auth/joint-login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -163,7 +166,7 @@ class NexusfinEquityApplicationTests {
         mockMvc.perform(get("/api/users/me").cookie(authCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.techPlatformUserId").value("xh-quickstart-001"));
+                .andExpect(jsonPath("$.data.techPlatformUserId").value("xh-cid-quickstart-001"));
     }
 
     private HttpHeaders signatureHeaders(String nonce) {

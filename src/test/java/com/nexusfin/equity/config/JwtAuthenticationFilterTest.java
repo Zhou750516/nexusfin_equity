@@ -28,6 +28,7 @@ class JwtAuthenticationFilterTest {
 
         assertThat(response.getStatus()).isEqualTo(401);
         assertThat(response.getContentAsString()).contains("Missing auth cookie");
+        assertThat(response.getContentAsString()).contains("\"redirectHint\":\"joint-entry\"");
     }
 
     @Test

@@ -1,5 +1,7 @@
 import axios, { AxiosError, AxiosHeaders, type AxiosRequestConfig } from "axios";
 import { toast } from "sonner";
+import { shouldRecoverJointSession } from "@/lib/api.logic";
+import { recoverJointLoginSession } from "@/lib/joint-session";
 import { DEFAULT_LOCALE, normalizeLocale, type Locale } from "@/i18n/locale";
 import type { ApiResponse } from "@/types/loan.types";
 
@@ -71,6 +73,14 @@ export async function apiRequest<T>(config: AxiosRequestConfig): Promise<T> {
 
     return payload.data;
   } catch (error) {
+    if (
+      axios.isAxiosError(error)
+      && shouldRecoverJointSession(error.response?.status, error.response?.data)
+      && recoverJointLoginSession()
+    ) {
+      return new Promise<T>(() => {});
+    }
+
     const message = extractMessage(error);
     toast.error(message);
     throw new Error(message);

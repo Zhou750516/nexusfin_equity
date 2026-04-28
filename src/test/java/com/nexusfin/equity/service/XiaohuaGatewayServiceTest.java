@@ -11,6 +11,10 @@ import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryRequest;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryResponse;
 import com.nexusfin.equity.thirdparty.yunka.UserCardListRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserCardListResponse;
+import com.nexusfin.equity.thirdparty.yunka.UserQueryRequest;
+import com.nexusfin.equity.thirdparty.yunka.UserQueryResponse;
+import com.nexusfin.equity.thirdparty.yunka.UserTokenRequest;
+import com.nexusfin.equity.thirdparty.yunka.UserTokenResponse;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -99,6 +103,58 @@ class XiaohuaGatewayServiceTest {
                 ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
         verify(yunkaGatewayClient).proxy(captor.capture());
         assertThat(captor.getValue().path()).isEqualTo("/card/userCards");
+    }
+
+    @Test
+    void shouldMapUserTokenResponseFields() throws Exception {
+        JsonNode data = objectMapper.readTree("""
+                {
+                  "cid": "cid-001",
+                  "name": "张三",
+                  "phone": "13800138000"
+                }
+                """);
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", data));
+
+        UserTokenResponse response = gatewayService.validateUserToken(
+                "REQ-TOKEN-001",
+                "BIZ-TOKEN-001",
+                new UserTokenRequest(null, "joint-token-001")
+        );
+
+        assertThat(response.cid()).isEqualTo("cid-001");
+        assertThat(response.name()).isEqualTo("张三");
+        assertThat(response.phone()).isEqualTo("13800138000");
+    }
+
+    @Test
+    void shouldForwardCidWhenQueryingUser() throws Exception {
+        JsonNode data = objectMapper.readTree("""
+                {
+                  "idInfo": {
+                    "idno": "310101199001011111"
+                  }
+                }
+                """);
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", data));
+
+        UserQueryResponse response = gatewayService.queryUser(
+                "REQ-USER-001",
+                "BIZ-USER-001",
+                new UserQueryRequest("mem-001", "cid-001")
+        );
+
+        assertThat(response.payload().path("idInfo").path("idno").asText()).isEqualTo("310101199001011111");
+
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> captor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(captor.capture());
+        assertThat(captor.getValue().path()).isEqualTo("/user/query");
+        JsonNode forwarded = objectMapper.valueToTree(captor.getValue().data());
+        assertThat(forwarded.path("userId").asText()).isEqualTo("mem-001");
+        assertThat(forwarded.path("cid").asText()).isEqualTo("cid-001");
     }
 
     @Test

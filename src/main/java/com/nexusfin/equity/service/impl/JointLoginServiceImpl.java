@@ -6,15 +6,22 @@ import com.nexusfin.equity.entity.MemberChannel;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.enums.MemberStatusEnum;
 import com.nexusfin.equity.exception.BizException;
+import com.nexusfin.equity.exception.ErrorCodes;
+import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.JointLoginService;
-import com.nexusfin.equity.service.XiaohuaAuthClient;
+import com.nexusfin.equity.service.XiaohuaGatewayService;
+import com.nexusfin.equity.thirdparty.yunka.UserQueryRequest;
+import com.nexusfin.equity.thirdparty.yunka.UserQueryResponse;
+import com.nexusfin.equity.thirdparty.yunka.UserTokenRequest;
+import com.nexusfin.equity.thirdparty.yunka.UserTokenResponse;
 import com.nexusfin.equity.util.JointLoginTargetPageResolver;
 import com.nexusfin.equity.util.JwtUtil;
 import com.nexusfin.equity.util.RequestIdUtil;
 import com.nexusfin.equity.util.SensitiveDataCipher;
 import com.nexusfin.equity.util.SensitiveDataUtil;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.regex.Pattern;
@@ -27,7 +34,7 @@ public class JointLoginServiceImpl implements JointLoginService {
     private static final Pattern PHONE_PATTERN = Pattern.compile("^1\\d{10}$");
     private static final Pattern ID_CARD_PATTERN = Pattern.compile("^[1-9]\\d{16}[\\dX]$");
 
-    private final XiaohuaAuthClient xiaohuaAuthClient;
+    private final XiaohuaGatewayService xiaohuaGatewayService;
     private final MemberInfoRepository memberInfoRepository;
     private final MemberChannelRepository memberChannelRepository;
     private final JwtUtil jwtUtil;
@@ -36,7 +43,7 @@ public class JointLoginServiceImpl implements JointLoginService {
     private final JointLoginTargetPageResolver targetPageResolver;
 
     public JointLoginServiceImpl(
-            XiaohuaAuthClient xiaohuaAuthClient,
+            XiaohuaGatewayService xiaohuaGatewayService,
             MemberInfoRepository memberInfoRepository,
             MemberChannelRepository memberChannelRepository,
             JwtUtil jwtUtil,
@@ -44,7 +51,7 @@ public class JointLoginServiceImpl implements JointLoginService {
             SensitiveDataCipher sensitiveDataCipher,
             JointLoginTargetPageResolver targetPageResolver
     ) {
-        this.xiaohuaAuthClient = xiaohuaAuthClient;
+        this.xiaohuaGatewayService = xiaohuaGatewayService;
         this.memberInfoRepository = memberInfoRepository;
         this.memberChannelRepository = memberChannelRepository;
         this.jwtUtil = jwtUtil;
@@ -59,11 +66,17 @@ public class JointLoginServiceImpl implements JointLoginService {
         if (request.token() == null || request.token().isBlank()) {
             throw new BizException("JOINT_LOGIN_TOKEN_REQUIRED", "Joint login token is required");
         }
-        XiaohuaAuthClient.JointIdentity identity = xiaohuaAuthClient.exchange(request.token());
-        MemberInfo memberInfo = findOrCreateMember(identity);
+        String benefitOrderNo = firstNonBlank(request.benefitOrderNo(), request.orderNo());
+        String requestId = RequestIdUtil.nextId("xa");
+        UserTokenResponse tokenResponse = validateJointToken(requestId, benefitOrderNo, request.token());
+        String externalUserId = requiredValue(tokenResponse.cid(), "JOINT_LOGIN_CID_REQUIRED", "Xiaohua cid is required");
+        MemberInfo existingMember = memberInfoRepository.selectByExternalUserId(externalUserId);
+        String memberId = existingMember != null ? existingMember.getMemberId() : RequestIdUtil.nextId("mem");
+        UserQueryResponse userQueryResponse = queryJointUser(requestId, benefitOrderNo, memberId, externalUserId);
+        JointIdentity identity = mapToIdentity(tokenResponse, userQueryResponse);
+        MemberInfo memberInfo = findOrCreateMember(existingMember, memberId, identity);
         ensureChannelBinding(memberInfo, identity.externalUserId(), resolveChannelCode(identity.channelCode()));
         String jwtToken = jwtUtil.generateToken(memberInfo.getMemberId(), identity.externalUserId());
-        String benefitOrderNo = firstNonBlank(request.benefitOrderNo(), request.orderNo());
         return new JointLoginResult(
                 jwtToken,
                 normalizeScene(request.scene()),
@@ -73,15 +86,50 @@ public class JointLoginServiceImpl implements JointLoginService {
         );
     }
 
-    private MemberInfo findOrCreateMember(XiaohuaAuthClient.JointIdentity identity) {
-        MemberInfo existing = memberInfoRepository.selectByExternalUserId(identity.externalUserId());
+    private UserTokenResponse validateJointToken(String requestId, String benefitOrderNo, String token) {
+        try {
+            return xiaohuaGatewayService.validateUserToken(
+                    requestId,
+                    benefitOrderNo,
+                    new UserTokenRequest(null, token)
+            );
+        } catch (UpstreamTimeoutException exception) {
+            throw new BizException("JOINT_LOGIN_UPSTREAM_TIMEOUT", "Joint login temporarily unavailable");
+        } catch (BizException exception) {
+            if (ErrorCodes.YUNKA_UPSTREAM_REJECTED.equals(exception.getErrorNo())) {
+                throw new BizException("JOINT_LOGIN_TOKEN_INVALID", "Joint login session expired");
+            }
+            throw new BizException("JOINT_LOGIN_UPSTREAM_FAILED", "Joint login temporarily unavailable");
+        }
+    }
+
+    private UserQueryResponse queryJointUser(
+            String requestId,
+            String benefitOrderNo,
+            String memberId,
+            String externalUserId
+    ) {
+        try {
+            return xiaohuaGatewayService.queryUser(
+                    requestId,
+                    benefitOrderNo,
+                    new UserQueryRequest(memberId, externalUserId)
+            );
+        } catch (UpstreamTimeoutException exception) {
+            throw new BizException("JOINT_LOGIN_UPSTREAM_TIMEOUT", "Joint login temporarily unavailable");
+        } catch (BizException exception) {
+            throw new BizException("JOINT_LOGIN_UPSTREAM_FAILED", "Joint login temporarily unavailable");
+        }
+    }
+
+    private MemberInfo findOrCreateMember(MemberInfo existing, String memberId, JointIdentity identity) {
         if (existing != null) {
             syncMemberInfo(existing, identity);
             memberInfoRepository.updateById(existing);
             return existing;
         }
         MemberInfo memberInfo = new MemberInfo();
-        memberInfo.setMemberId(RequestIdUtil.nextId("mem"));
+        memberInfo.setMemberId(memberId);
         syncMemberInfo(memberInfo, identity);
         memberInfo.setMemberStatus(MemberStatusEnum.ACTIVE.name());
         memberInfo.setCreatedTs(LocalDateTime.now());
@@ -90,7 +138,7 @@ public class JointLoginServiceImpl implements JointLoginService {
         return memberInfo;
     }
 
-    private void syncMemberInfo(MemberInfo memberInfo, XiaohuaAuthClient.JointIdentity identity) {
+    private void syncMemberInfo(MemberInfo memberInfo, JointIdentity identity) {
         boolean newMember = memberInfo.getCreatedTs() == null;
         String channelCode = resolveChannelCode(identity.channelCode());
         String phone = normalizePhone(identity.phone(), newMember);
@@ -113,6 +161,23 @@ public class JointLoginServiceImpl implements JointLoginService {
             memberInfo.setCreatedTs(LocalDateTime.now());
         }
         memberInfo.setUpdatedTs(LocalDateTime.now());
+    }
+
+    private JointIdentity mapToIdentity(UserTokenResponse tokenResponse, UserQueryResponse userQueryResponse) {
+        JsonNode payload = userQueryResponse.payload();
+        JsonNode idInfo = payload.path("idInfo");
+        return new JointIdentity(
+                requiredValue(tokenResponse.cid(), "JOINT_LOGIN_CID_REQUIRED", "Xiaohua cid is required"),
+                firstNonBlank(tokenResponse.phone(), text(payload, "phone"), text(payload.path("basicInfo"), "phone")),
+                firstNonBlank(tokenResponse.name(), text(idInfo, "name"), text(payload, "name")),
+                firstNonBlank(
+                        text(idInfo, "idno"),
+                        text(idInfo, "idCard"),
+                        text(idInfo, "idCardNo"),
+                        text(payload, "idno")
+                ),
+                authProperties.getDefaultChannelCode()
+        );
     }
 
     private void ensureChannelBinding(MemberInfo memberInfo, String externalUserId, String channelCode) {
@@ -183,5 +248,34 @@ public class JointLoginServiceImpl implements JointLoginService {
 
     private String firstNonBlank(String preferred, String fallback) {
         return preferred == null || preferred.isBlank() ? fallback : preferred;
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private String requiredValue(String value, String errorNo, String errorMsg) {
+        if (value == null || value.isBlank()) {
+            throw new BizException(errorNo, errorMsg);
+        }
+        return value;
+    }
+
+    private String text(JsonNode node, String fieldName) {
+        return node.path(fieldName).asText("");
+    }
+
+    private record JointIdentity(
+            String externalUserId,
+            String phone,
+            String realName,
+            String idCard,
+            String channelCode
+    ) {
     }
 }
