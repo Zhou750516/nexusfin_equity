@@ -68,4 +68,13 @@
 - [x] 更新当天计划执行结果
 - [x] 如形成结论，补 `日报/20260426.md`
 - [x] 如形成结论，补 `decision-review/DAILY_DECISION_20260426.md`
-- [ ] 如需承接下周工作，生成下一版计划或 checklist
+- [x] 如需承接下周工作，生成下一版计划或 checklist
+
+## Checklist 完成情况
+
+- [x] 今日 checklist 已全部收口
+- [x] 已完成项：40 / 40
+- [x] 完成率：100%
+- [x] 下一版承接文档已生成：
+  - `docs/plan/20260427.md`
+  - `docs/plan/20260427_checklist.md`
