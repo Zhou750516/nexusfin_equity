@@ -55,7 +55,6 @@ public class AllinpayDirectQwBenefitClient implements QwBenefitClient {
         this.responseParser = responseParser;
     }
 
-    @Autowired
     public AllinpayDirectQwBenefitClient(
             QwProperties properties,
             ObjectMapper objectMapper,

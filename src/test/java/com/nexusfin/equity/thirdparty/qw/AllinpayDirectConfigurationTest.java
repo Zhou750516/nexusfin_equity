@@ -5,6 +5,7 @@ import com.nexusfin.equity.config.AllinpayDirectConfiguration;
 import com.nexusfin.equity.config.QwProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -73,6 +74,20 @@ class AllinpayDirectConfigurationTest {
                     assertThat(context.getBean(AllinpayDirectRequestBuilder.class))
                             .isSameAs(CustomFactoryConfiguration.REQUEST_BUILDER);
                 });
+    }
+
+    @Test
+    void shouldAllowSpringToInstantiateDirectClientWithSingleAutowiredConstructor() {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.register(BaseConfiguration.class, AllinpayDirectConfiguration.class);
+            context.registerBean(AllinpayCertificateLoader.class, AllinpayCertificateLoader::new);
+            context.registerBean(AllinpayDirectQwBenefitClient.class);
+
+            context.refresh();
+
+            assertThat(context.getBeanNamesForType(AllinpayDirectQwBenefitClient.class)).hasSize(1);
+            assertThat(context.getBean(AllinpayDirectQwBenefitClient.class)).isNotNull();
+        }
     }
 
     @Configuration
