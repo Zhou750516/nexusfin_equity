@@ -23,16 +23,14 @@ import com.nexusfin.equity.service.AsyncCompensationEnqueueService;
 import com.nexusfin.equity.service.BenefitOrderService;
 import com.nexusfin.equity.service.H5I18nService;
 import com.nexusfin.equity.service.LoanApprovalQueryService;
+import com.nexusfin.equity.service.LoanCalculatorService;
 import com.nexusfin.equity.service.LoanService;
 import com.nexusfin.equity.service.XiaohuaGatewayService;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import static com.nexusfin.equity.util.BizIds.next;
-import static com.nexusfin.equity.util.MoneyUnits.centsToYuan;
 import static com.nexusfin.equity.util.MoneyUnits.yuanToCent;
 import com.nexusfin.equity.util.TraceIdUtil;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.slf4j.Logger;
@@ -56,6 +54,7 @@ public class LoanServiceImpl implements LoanService {
     private final AsyncCompensationEnqueueService asyncCompensationEnqueueService;
     private final YunkaCallTemplate yunkaCallTemplate;
     private final LoanApprovalQueryService loanApprovalQueryService;
+    private final LoanCalculatorService loanCalculatorService;
 
     public LoanServiceImpl(
             H5LoanProperties h5LoanProperties,
@@ -68,7 +67,8 @@ public class LoanServiceImpl implements LoanService {
             AsyncCompensationEnqueueService asyncCompensationEnqueueService,
             XiaohuaGatewayService xiaohuaGatewayService,
             YunkaCallTemplate yunkaCallTemplate,
-            LoanApprovalQueryService loanApprovalQueryService
+            LoanApprovalQueryService loanApprovalQueryService,
+            LoanCalculatorService loanCalculatorService
     ) {
         this.h5LoanProperties = h5LoanProperties;
         this.h5BenefitsProperties = h5BenefitsProperties;
@@ -80,49 +80,17 @@ public class LoanServiceImpl implements LoanService {
         this.asyncCompensationEnqueueService = asyncCompensationEnqueueService;
         this.yunkaCallTemplate = yunkaCallTemplate;
         this.loanApprovalQueryService = loanApprovalQueryService;
+        this.loanCalculatorService = loanCalculatorService;
     }
 
     @Override
     public LoanCalculatorConfigResponse getCalculatorConfig() {
-        H5LoanProperties.ReceivingAccount receivingAccount = h5LoanProperties.receivingAccount();
-        return new LoanCalculatorConfigResponse(
-                new LoanCalculatorConfigResponse.AmountRange(
-                        h5LoanProperties.amountRange().min(),
-                        h5LoanProperties.amountRange().max(),
-                        h5LoanProperties.amountRange().step(),
-                        h5LoanProperties.amountRange().defaultAmount()
-                ),
-                mapTermOptions(h5LoanProperties.termOptions()),
-                h5LoanProperties.annualRate(),
-                h5I18nService.text("loan.lender", h5LoanProperties.lender()),
-                new LoanCalculatorConfigResponse.ReceivingAccount(
-                        h5I18nService.text("loan.receivingAccount.bankName", receivingAccount.bankName()),
-                        receivingAccount.lastFour(),
-                        receivingAccount.accountId()
-                )
-        );
+        return loanCalculatorService.getCalculatorConfig();
     }
 
     @Override
     public LoanCalculateResponse calculate(String memberId, String uid, LoanCalculateRequest request) {
-        validateCalculateRequest(request);
-        String requestId = next("LC");
-        JsonNode data = yunkaCallTemplate.executeForData(
-                YunkaCallTemplate.YunkaCall.of(
-                        "loan calculate",
-                        requestId,
-                        yunkaProperties.paths().loanCalculate(),
-                        requestId,
-                        new LoanTrailForwardData(uid, requestId, yuanToCent(request.amount()), request.term())
-                ).withMemberId(memberId)
-        );
-        long receiveAmount = data.path("receiveAmount").asLong(yuanToCent(request.amount()));
-        long repayAmount = data.path("repayAmount").asLong(receiveAmount);
-        return new LoanCalculateResponse(
-                centsToYuan(repayAmount - receiveAmount),
-                readAnnualRate(data),
-                mapRepaymentPlan(data.path("repayPlan"))
-        );
+        return loanCalculatorService.calculate(memberId, uid, request);
     }
 
     @Override
@@ -286,19 +254,6 @@ public class LoanServiceImpl implements LoanService {
         return loanApprovalQueryService.getApprovalResult(memberId, applicationId);
     }
 
-    private List<LoanCalculatorConfigResponse.TermOption> mapTermOptions(List<H5LoanProperties.TermOption> termOptions) {
-        return termOptions.stream()
-                .map(termOption -> new LoanCalculatorConfigResponse.TermOption(
-                        h5I18nService.text("loan.term." + termOption.value(), termOption.label()),
-                        termOption.value()
-                ))
-                .toList();
-    }
-
-    private void validateCalculateRequest(LoanCalculateRequest request) {
-        validateAmountAndTerm(request.amount(), request.term());
-    }
-
     private void validateApplyRequest(LoanApplyRequest request) {
         validateAmountAndTerm(request.amount(), request.term());
         String accountId = h5LoanProperties.receivingAccount().accountId();
@@ -358,33 +313,6 @@ public class LoanServiceImpl implements LoanService {
         loanApplicationMappingRepository.insert(mapping);
     }
 
-    private List<LoanCalculateResponse.RepaymentPlanItem> mapRepaymentPlan(JsonNode repaymentPlan) {
-        if (!repaymentPlan.isArray()) {
-            return List.of();
-        }
-        return java.util.stream.StreamSupport.stream(repaymentPlan.spliterator(), false)
-                .map(item -> new LoanCalculateResponse.RepaymentPlanItem(
-                        item.path("period").asInt(),
-                        item.path("date").asText(),
-                        centsToYuan(item.path("principal").asLong()),
-                        centsToYuan(item.path("interest").asLong()),
-                        centsToYuan(item.path("total").asLong())
-                ))
-                .toList();
-    }
-
-    private String readAnnualRate(JsonNode data) {
-        JsonNode yearRate = data.path("yearRate");
-        if (yearRate.isTextual()) {
-            return yearRate.asText();
-        }
-        if (yearRate.isNumber()) {
-            return yearRate.decimalValue().setScale(1, RoundingMode.HALF_UP) + "%";
-        }
-        return h5LoanProperties.annualRate().multiply(BigDecimal.valueOf(100L))
-                .setScale(1, RoundingMode.HALF_UP) + "%";
-    }
-
     private String readRemark(JsonNode data) {
         return readRemark(data, "借款申请未通过，权益已购买成功。");
     }
@@ -418,14 +346,6 @@ public class LoanServiceImpl implements LoanService {
         }
         String value = data.path(fieldName).asText();
         return value.isBlank() ? fallback : value;
-    }
-
-    private record LoanTrailForwardData(
-            String uid,
-            String applyId,
-            Long loanAmount,
-            Integer loanPeriod
-    ) {
     }
 
     private record LoanApplyForwardData(

@@ -6,10 +6,13 @@ import com.nexusfin.equity.config.H5BenefitsProperties;
 import com.nexusfin.equity.config.H5LoanProperties;
 import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.dto.request.LoanApplyRequest;
+import com.nexusfin.equity.dto.request.LoanCalculateRequest;
 import com.nexusfin.equity.dto.response.LoanApprovalStatusResponse;
 import com.nexusfin.equity.dto.response.CreateBenefitOrderResponse;
 import com.nexusfin.equity.dto.response.LoanApprovalResultResponse;
 import com.nexusfin.equity.dto.response.LoanApplyResponse;
+import com.nexusfin.equity.dto.response.LoanCalculateResponse;
+import com.nexusfin.equity.dto.response.LoanCalculatorConfigResponse;
 import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
@@ -61,6 +64,9 @@ class LoanServiceTest {
     @Mock
     private LoanApprovalQueryService loanApprovalQueryService;
 
+    @Mock
+    private LoanCalculatorService loanCalculatorService;
+
     private LoanService loanService;
 
     @BeforeEach
@@ -77,8 +83,42 @@ class LoanServiceTest {
                 asyncCompensationEnqueueService,
                 xiaohuaGatewayService,
                 new YunkaCallTemplate(yunkaGatewayClient),
-                loanApprovalQueryService
+                loanApprovalQueryService,
+                loanCalculatorService
         );
+    }
+
+    @Test
+    void shouldDelegateCalculatorConfigToLoanCalculatorService() {
+        LoanCalculatorConfigResponse delegated = new LoanCalculatorConfigResponse(
+                new LoanCalculatorConfigResponse.AmountRange(100L, 5000L, 100L, 3000L),
+                List.of(new LoanCalculatorConfigResponse.TermOption("3期", 3)),
+                new BigDecimal("0.18"),
+                "XX商业银行",
+                new LoanCalculatorConfigResponse.ReceivingAccount("招商银行", "8648", "acc_001")
+        );
+        when(loanCalculatorService.getCalculatorConfig()).thenReturn(delegated);
+
+        LoanCalculatorConfigResponse response = loanService.getCalculatorConfig();
+
+        assertThat(response).isSameAs(delegated);
+        verify(loanCalculatorService).getCalculatorConfig();
+    }
+
+    @Test
+    void shouldDelegateCalculateToLoanCalculatorService() {
+        LoanCalculateRequest request = new LoanCalculateRequest(3000L, 3);
+        LoanCalculateResponse delegated = new LoanCalculateResponse(
+                new BigDecimal("123.45"),
+                "18.0%",
+                List.of()
+        );
+        when(loanCalculatorService.calculate("mem-001", "user-001", request)).thenReturn(delegated);
+
+        LoanCalculateResponse response = loanService.calculate("mem-001", "user-001", request);
+
+        assertThat(response).isSameAs(delegated);
+        verify(loanCalculatorService).calculate("mem-001", "user-001", request);
     }
 
     @Test
