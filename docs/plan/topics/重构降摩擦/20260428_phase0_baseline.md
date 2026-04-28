@@ -22,3 +22,12 @@
 
 - This file captures the repository surface before Phase 0 moves.
 - Later phases should append delta snapshots instead of overwriting this baseline.
+
+## 4. Post-Phase-0 Snapshot
+
+- `docs/plan` root file count: `5`
+- root `AGENTS.md` line count: `28`
+- `specs/004-benefit-loan-flow/` present: `no`
+- `src/main/java/com/nexusfin/equity/thirdparty/qw/demo/` present: `no`
+- `.codexignore` present: `yes`
+- `.aiignore` present: `yes`
