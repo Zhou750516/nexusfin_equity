@@ -1,4 +1,8 @@
 package com.nexusfin.equity.thirdparty.yunka;
 
-public record UserTokenResponse(String cid) {
+public record UserTokenResponse(
+        String cid,
+        String name,
+        String phone
+) {
 }

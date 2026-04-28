@@ -1,4 +1,7 @@
 package com.nexusfin.equity.thirdparty.yunka;
 
-public record UserQueryRequest(String userId) {
+public record UserQueryRequest(
+        String userId,
+        String cid
+) {
 }

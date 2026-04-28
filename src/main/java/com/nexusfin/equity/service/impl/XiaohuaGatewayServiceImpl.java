@@ -71,7 +71,11 @@ public class XiaohuaGatewayServiceImpl implements XiaohuaGatewayService {
     @Override
     public UserTokenResponse validateUserToken(String requestId, String bizOrderNo, UserTokenRequest request) {
         JsonNode data = execute(requestId, yunkaProperties.paths().userToken(), bizOrderNo, request);
-        return new UserTokenResponse(text(data, "cid"));
+        return new UserTokenResponse(
+                text(data, "cid"),
+                text(data, "name"),
+                text(data, "phone")
+        );
     }
 
     @Override
