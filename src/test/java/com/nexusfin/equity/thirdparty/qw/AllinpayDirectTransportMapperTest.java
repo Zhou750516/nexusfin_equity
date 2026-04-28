@@ -10,8 +10,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AllinpayDirectTransportMapperTest {
 
     @Test
-    void shouldMapPreparedRequestIntoSkeletonTransportRequest() {
-        AllinpayDirectTransportMapper mapper = new AllinpayDirectSkeletonTransportMapper();
+    void shouldMapPreparedRequestIntoSignatureTransportRequest() {
+        AllinpayDirectTransportMapper mapper = new AllinpayDirectSignatureTransportMapper();
 
         AllinpayDirectTransportRequest transportRequest = mapper.map(new AllinpayDirectPreparedRequest(
                 URI.create("https://tlt-test.allinpay.com/aipg/ProcessServlet"),

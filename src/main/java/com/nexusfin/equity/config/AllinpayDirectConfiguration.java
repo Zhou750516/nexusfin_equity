@@ -4,15 +4,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.config.QwProperties;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.thirdparty.qw.AllinpayDirectHttpExecutor;
+import com.nexusfin.equity.thirdparty.qw.AllinpayDirectJsonProtocolSerializer;
 import com.nexusfin.equity.thirdparty.qw.AllinpayDirectProtocolSerializer;
 import com.nexusfin.equity.thirdparty.qw.AllinpayDirectRequestBuilder;
 import com.nexusfin.equity.thirdparty.qw.AllinpayDirectResponseParser;
 import com.nexusfin.equity.thirdparty.qw.AllinpayDirectResponseVerificationStage;
+import com.nexusfin.equity.thirdparty.qw.AllinpayDirectSignatureTransportMapper;
 import com.nexusfin.equity.thirdparty.qw.AllinpayExerciseUrlPayloadMapper;
 import com.nexusfin.equity.thirdparty.qw.AllinpayLendingNotifyPayloadMapper;
 import com.nexusfin.equity.thirdparty.qw.AllinpayMemberSyncPayloadMapper;
-import com.nexusfin.equity.thirdparty.qw.AllinpayDirectSkeletonProtocolSerializer;
-import com.nexusfin.equity.thirdparty.qw.AllinpayDirectSkeletonTransportMapper;
 import com.nexusfin.equity.thirdparty.qw.AllinpayDirectTransportMapper;
 import com.nexusfin.equity.thirdparty.qw.AllinpayDirectUnsupportedProtocolHandler;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -48,13 +48,13 @@ public class AllinpayDirectConfiguration {
     @Bean
     @ConditionalOnMissingBean(AllinpayDirectProtocolSerializer.class)
     public AllinpayDirectProtocolSerializer allinpayDirectProtocolSerializer(ObjectMapper objectMapper) {
-        return new AllinpayDirectSkeletonProtocolSerializer(objectMapper);
+        return new AllinpayDirectJsonProtocolSerializer(objectMapper);
     }
 
     @Bean
     @ConditionalOnMissingBean(AllinpayDirectTransportMapper.class)
     public AllinpayDirectTransportMapper allinpayDirectTransportMapper() {
-        return new AllinpayDirectSkeletonTransportMapper();
+        return new AllinpayDirectSignatureTransportMapper();
     }
 
     @Bean

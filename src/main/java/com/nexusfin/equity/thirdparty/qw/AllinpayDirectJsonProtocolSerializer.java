@@ -7,11 +7,11 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.http.MediaType;
 
-public class AllinpayDirectSkeletonProtocolSerializer implements AllinpayDirectProtocolSerializer {
+public class AllinpayDirectJsonProtocolSerializer implements AllinpayDirectProtocolSerializer {
 
     private final ObjectMapper objectMapper;
 
-    public AllinpayDirectSkeletonProtocolSerializer(ObjectMapper objectMapper) {
+    public AllinpayDirectJsonProtocolSerializer(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 

@@ -9,7 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AllinpayDirectProtocolSerializerTest {
 
     @Test
-    void shouldSerializeEnvelopeIntoSkeletonRequest() {
+    void shouldSerializeEnvelopeIntoJsonRequest() {
         ObjectMapper objectMapper = new ObjectMapper();
         AllinpayDirectEnvelope envelope = new AllinpayDirectEnvelope(
                 AllinpayDirectOperation.MEMBER_SYNC,
@@ -30,7 +30,7 @@ class AllinpayDirectProtocolSerializerTest {
                 )
         );
 
-        AllinpayDirectProtocolSerializer serializer = new AllinpayDirectSkeletonProtocolSerializer(objectMapper);
+        AllinpayDirectProtocolSerializer serializer = new AllinpayDirectJsonProtocolSerializer(objectMapper);
 
         AllinpayDirectSerializedRequest serializedRequest = serializer.serialize(envelope);
 

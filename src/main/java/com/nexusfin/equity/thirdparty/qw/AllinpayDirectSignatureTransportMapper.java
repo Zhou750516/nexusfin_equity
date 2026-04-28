@@ -3,7 +3,7 @@ package com.nexusfin.equity.thirdparty.qw;
 import java.util.Map;
 import org.springframework.http.HttpMethod;
 
-public class AllinpayDirectSkeletonTransportMapper implements AllinpayDirectTransportMapper {
+public class AllinpayDirectSignatureTransportMapper implements AllinpayDirectTransportMapper {
 
     @Override
     public AllinpayDirectTransportRequest map(AllinpayDirectPreparedRequest preparedRequest) {

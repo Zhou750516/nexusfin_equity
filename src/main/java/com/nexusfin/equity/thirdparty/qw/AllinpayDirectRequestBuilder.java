@@ -46,7 +46,7 @@ public class AllinpayDirectRequestBuilder {
                 properties,
                 objectMapper,
                 requestSigner::sign,
-                new AllinpayDirectSkeletonProtocolSerializer(objectMapper),
+                new AllinpayDirectJsonProtocolSerializer(objectMapper),
                 mappers
         );
     }

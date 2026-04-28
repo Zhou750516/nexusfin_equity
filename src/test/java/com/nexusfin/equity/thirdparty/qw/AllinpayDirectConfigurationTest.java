@@ -27,9 +27,9 @@ class AllinpayDirectConfigurationTest {
 
             assertThat(context.getBean(AllinpayDirectRequestBuilder.class)).isNotNull();
             assertThat(context.getBean(AllinpayDirectProtocolSerializer.class))
-                    .isInstanceOf(AllinpayDirectSkeletonProtocolSerializer.class);
+                    .isInstanceOf(AllinpayDirectJsonProtocolSerializer.class);
             assertThat(context.getBean(AllinpayDirectTransportMapper.class))
-                    .isInstanceOf(AllinpayDirectSkeletonTransportMapper.class);
+                    .isInstanceOf(AllinpayDirectSignatureTransportMapper.class);
             assertThat(context.getBean(AllinpayDirectHttpExecutor.class))
                     .isInstanceOf(AllinpayDirectUnsupportedProtocolHandler.class);
             assertThat(context.getBean(AllinpayDirectResponseVerificationStage.class))

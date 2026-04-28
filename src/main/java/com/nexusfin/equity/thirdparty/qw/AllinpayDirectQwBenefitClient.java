@@ -88,8 +88,8 @@ public class AllinpayDirectQwBenefitClient implements QwBenefitClient {
                 properties,
                 objectMapper,
                 certificateLoader,
-                new AllinpayDirectSkeletonProtocolSerializer(objectMapper),
-                new AllinpayDirectSkeletonTransportMapper(),
+                new AllinpayDirectJsonProtocolSerializer(objectMapper),
+                new AllinpayDirectSignatureTransportMapper(),
                 new AllinpayDirectUnsupportedProtocolHandler(),
                 new AllinpayDirectUnsupportedProtocolHandler(),
                 new AllinpayDirectUnsupportedProtocolHandler()
