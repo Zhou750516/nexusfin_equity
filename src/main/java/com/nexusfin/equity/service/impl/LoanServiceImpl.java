@@ -27,6 +27,8 @@ import com.nexusfin.equity.service.LoanService;
 import com.nexusfin.equity.service.XiaohuaGatewayService;
 import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanRequest;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
+import static com.nexusfin.equity.util.MoneyUnits.centsToYuan;
+import static com.nexusfin.equity.util.MoneyUnits.yuanToCent;
 import com.nexusfin.equity.util.TraceIdUtil;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -42,7 +44,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class LoanServiceImpl implements LoanService {
 
     private static final Logger log = LoggerFactory.getLogger(LoanServiceImpl.class);
-    private static final BigDecimal CENTS_PER_YUAN = BigDecimal.valueOf(100L);
     private static final String LOAN_STATUS_SUCCESS = "7001";
     private static final String LOAN_STATUS_PROCESSING = "7002";
     private static final String LOAN_STATUS_FAILURE = "7003";
@@ -679,14 +680,6 @@ public class LoanServiceImpl implements LoanService {
 
     private static String newCompactUuid() {
         return UUID.randomUUID().toString().replace("-", "");
-    }
-
-    private static Long yuanToCent(Long yuanAmount) {
-        return Math.multiplyExact(yuanAmount, 100L);
-    }
-
-    private static BigDecimal centsToYuan(long cents) {
-        return BigDecimal.valueOf(cents).divide(CENTS_PER_YUAN, 2, RoundingMode.UNNECESSARY);
     }
 
     private static long elapsedMs(long startNanos) {

@@ -23,6 +23,8 @@ import com.nexusfin.equity.thirdparty.yunka.CardSmsSendRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserCardListRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserCardSummary;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
+import static com.nexusfin.equity.util.MoneyUnits.centsToYuan;
+import static com.nexusfin.equity.util.MoneyUnits.yuanToCent;
 import com.nexusfin.equity.util.SensitiveDataCipher;
 import com.nexusfin.equity.util.TraceIdUtil;
 import java.math.BigDecimal;
@@ -40,7 +42,6 @@ import org.springframework.stereotype.Service;
 public class RepaymentServiceImpl implements RepaymentService {
 
     private static final Logger log = LoggerFactory.getLogger(RepaymentServiceImpl.class);
-    private static final BigDecimal CENTS_PER_YUAN = BigDecimal.valueOf(100L);
     private static final String DEFAULT_REPAY_TYPE = "EARLY";
     private static final int REPAYMENT_SMS_TYPE = 2;
 
@@ -452,14 +453,6 @@ public class RepaymentServiceImpl implements RepaymentService {
 
     private static String newCompactUuid() {
         return UUID.randomUUID().toString().replace("-", "");
-    }
-
-    private static Long yuanToCent(BigDecimal yuanAmount) {
-        return yuanAmount.multiply(CENTS_PER_YUAN).setScale(0, RoundingMode.HALF_UP).longValueExact();
-    }
-
-    private static BigDecimal centsToYuan(long cents) {
-        return BigDecimal.valueOf(cents).divide(CENTS_PER_YUAN, 2, RoundingMode.UNNECESSARY);
     }
 
     private static long elapsedMs(long startNanos) {
