@@ -68,7 +68,7 @@
 
 - [x] 补 `docs/日报/20260427.md`
 - [x] 重写 `docs/decision-review/DAILY_DECISION_20260427.md`
-- [x] 更新 `docs/plan/20260427_checklist.md`
+- [x] 更新 `docs/plan/archive/202604/20260427_checklist.md`
 - [x] 新增 `docs/plan/20260428.md`
 - [x] 新增 `docs/plan/20260428_checklist.md`
 
