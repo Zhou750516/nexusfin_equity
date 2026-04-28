@@ -6,8 +6,10 @@ import com.nexusfin.equity.entity.AsyncCompensationTask;
 import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.exception.BizException;
+import com.nexusfin.equity.exception.ErrorCodes;
 import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.service.impl.YunkaLoanApplyCompensationExecutor;
+import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,7 +37,7 @@ class YunkaLoanApplyCompensationExecutorTest {
         YunkaProperties yunkaProperties = buildYunkaProperties();
         YunkaLoanApplyCompensationExecutor executor =
                 new YunkaLoanApplyCompensationExecutor(
-                        yunkaGatewayClient,
+                        new YunkaCallTemplate(yunkaGatewayClient),
                         loanApplicationMappingRepository,
                         yunkaProperties,
                         new ObjectMapper()
@@ -90,7 +92,7 @@ class YunkaLoanApplyCompensationExecutorTest {
         YunkaProperties yunkaProperties = buildYunkaProperties();
         YunkaLoanApplyCompensationExecutor executor =
                 new YunkaLoanApplyCompensationExecutor(
-                        yunkaGatewayClient,
+                        new YunkaCallTemplate(yunkaGatewayClient),
                         loanApplicationMappingRepository,
                         yunkaProperties,
                         new ObjectMapper()
@@ -128,7 +130,7 @@ class YunkaLoanApplyCompensationExecutorTest {
         YunkaProperties yunkaProperties = buildYunkaProperties();
         YunkaLoanApplyCompensationExecutor executor =
                 new YunkaLoanApplyCompensationExecutor(
-                        yunkaGatewayClient,
+                        new YunkaCallTemplate(yunkaGatewayClient),
                         loanApplicationMappingRepository,
                         yunkaProperties,
                         new ObjectMapper()
@@ -177,7 +179,7 @@ class YunkaLoanApplyCompensationExecutorTest {
         YunkaProperties yunkaProperties = buildYunkaProperties();
         YunkaLoanApplyCompensationExecutor executor =
                 new YunkaLoanApplyCompensationExecutor(
-                        yunkaGatewayClient,
+                        new YunkaCallTemplate(yunkaGatewayClient),
                         loanApplicationMappingRepository,
                         yunkaProperties,
                         new ObjectMapper()
@@ -208,7 +210,59 @@ class YunkaLoanApplyCompensationExecutorTest {
 
         assertThatThrownBy(() -> executor.execute(task))
                 .isInstanceOf(BizException.class)
-                .hasMessageContaining("YUNKA_COMPENSATION_FAILED");
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo(ErrorCodes.YUNKA_UPSTREAM_REJECTED);
+    }
+
+    @Test
+    void shouldCallLoanApplyWhenPendingReviewQueryHasNoUsableData() {
+        YunkaProperties yunkaProperties = buildYunkaProperties();
+        YunkaLoanApplyCompensationExecutor executor =
+                new YunkaLoanApplyCompensationExecutor(
+                        new YunkaCallTemplate(yunkaGatewayClient),
+                        loanApplicationMappingRepository,
+                        yunkaProperties,
+                        new ObjectMapper()
+                );
+        AsyncCompensationTask task = new AsyncCompensationTask();
+        task.setTaskId("task-yunka-fallback");
+        task.setTaskType("YUNKA_LOAN_APPLY_RETRY");
+        task.setRequestPayload("""
+                {
+                  "requestId": "LA-005",
+                  "path": "/loan/apply",
+                  "bizOrderNo": "APP-005",
+                  "uid": "tech-user-005",
+                  "benefitOrderNo": "ord-005",
+                  "applyId": "APP-005",
+                  "loanId": "LN-005",
+                  "loanAmount": 300000,
+                  "loanPeriod": 3,
+                  "bankCardNo": "acc_005"
+                }
+                """);
+        LoanApplicationMapping mapping = new LoanApplicationMapping();
+        mapping.setApplicationId("APP-005");
+        mapping.setExternalUserId("tech-user-005");
+        mapping.setUpstreamQueryValue("LN-005");
+        mapping.setMappingStatus("PENDING_REVIEW");
+        when(loanApplicationMappingRepository.selectById("APP-005")).thenReturn(mapping);
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", null))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                        0,
+                        "SUCCESS",
+                        JsonNodeFactory.instance.objectNode().put("loanId", "LN-005")
+                ));
+
+        AsyncCompensationExecutor.ExecutionResult result = executor.execute(task);
+
+        assertThat(result.responsePayload()).contains("LN-005");
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> requestCaptor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient, org.mockito.Mockito.times(2)).proxy(requestCaptor.capture());
+        assertThat(requestCaptor.getAllValues().get(0).path()).isEqualTo("/loan/query");
+        assertThat(requestCaptor.getAllValues().get(1).path()).isEqualTo("/loan/apply");
     }
 
     private YunkaProperties buildYunkaProperties() {

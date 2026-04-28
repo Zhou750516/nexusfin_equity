@@ -7,26 +7,28 @@ import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.entity.AsyncCompensationTask;
 import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.exception.BizException;
+import com.nexusfin.equity.exception.ErrorCodes;
 import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.service.AsyncCompensationExecutor;
+import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import org.springframework.stereotype.Component;
 
 @Component
 public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExecutor {
 
-    private final YunkaGatewayClient yunkaGatewayClient;
+    private final YunkaCallTemplate yunkaCallTemplate;
     private final LoanApplicationMappingRepository loanApplicationMappingRepository;
     private final YunkaProperties yunkaProperties;
     private final ObjectMapper objectMapper;
 
     public YunkaLoanApplyCompensationExecutor(
-            YunkaGatewayClient yunkaGatewayClient,
+            YunkaCallTemplate yunkaCallTemplate,
             LoanApplicationMappingRepository loanApplicationMappingRepository,
             YunkaProperties yunkaProperties,
             ObjectMapper objectMapper
     ) {
-        this.yunkaGatewayClient = yunkaGatewayClient;
+        this.yunkaCallTemplate = yunkaCallTemplate;
         this.loanApplicationMappingRepository = loanApplicationMappingRepository;
         this.yunkaProperties = yunkaProperties;
         this.objectMapper = objectMapper;
@@ -49,30 +51,31 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
             }
             if ("PENDING_REVIEW".equals(mapping.getMappingStatus())) {
                 YunkaGatewayClient.YunkaGatewayResponse queryResponse = queryExisting(mapping, payload);
-                if (queryResponse != null && queryResponse.code() == 0 && queryResponse.data() != null
-                        && !queryResponse.data().isMissingNode() && !queryResponse.data().isNull()) {
+                if (yunkaCallTemplate.hasData(queryResponse)) {
                     markMappingActive(payload.applyId(), queryResponse);
                     return new ExecutionResult(writeResponse(queryResponse));
                 }
             }
         }
-        YunkaGatewayClient.YunkaGatewayResponse response = yunkaGatewayClient.proxy(new YunkaGatewayClient.YunkaGatewayRequest(
-                payload.requestId(),
-                payload.path(),
-                payload.bizOrderNo(),
-                new YunkaLoanApplyForwardData(
-                        payload.uid(),
-                        payload.benefitOrderNo(),
-                        payload.applyId(),
-                        payload.loanId(),
-                        payload.loanAmount(),
-                        payload.loanPeriod(),
-                        payload.bankCardNo()
+        YunkaGatewayClient.YunkaGatewayResponse response = yunkaCallTemplate.execute(
+                YunkaCallTemplate.YunkaCall.of(
+                        "yunka loan apply retry apply",
+                        payload.requestId(),
+                        payload.path(),
+                        payload.bizOrderNo(),
+                        new YunkaLoanApplyForwardData(
+                                payload.uid(),
+                                payload.benefitOrderNo(),
+                                payload.applyId(),
+                                payload.loanId(),
+                                payload.loanAmount(),
+                                payload.loanPeriod(),
+                                payload.bankCardNo()
+                        )
                 )
-        ));
-        if (response == null || response.code() != 0) {
-            String message = response == null ? "Yunka gateway response is empty" : response.message();
-            throw new BizException("YUNKA_COMPENSATION_FAILED", message);
+        );
+        if (!yunkaCallTemplate.isSuccessful(response)) {
+            throw new BizException(ErrorCodes.YUNKA_UPSTREAM_REJECTED, response.message());
         }
         markMappingActive(payload.applyId(), response);
         return new ExecutionResult(writeResponse(response));
@@ -104,12 +107,15 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
         ObjectNode queryData = objectMapper.createObjectNode();
         queryData.put("uid", externalUserId);
         queryData.put("loanId", upstreamQueryValue);
-        return yunkaGatewayClient.proxy(new YunkaGatewayClient.YunkaGatewayRequest(
-                payload.requestId(),
-                yunkaProperties.paths().loanQuery(),
-                payload.applyId(),
-                queryData
-        ));
+        return yunkaCallTemplate.execute(
+                YunkaCallTemplate.YunkaCall.of(
+                        "yunka loan apply retry query",
+                        payload.requestId(),
+                        yunkaProperties.paths().loanQuery(),
+                        payload.applyId(),
+                        queryData
+                )
+        );
     }
 
     private YunkaLoanApplyPayload readPayload(AsyncCompensationTask task) {

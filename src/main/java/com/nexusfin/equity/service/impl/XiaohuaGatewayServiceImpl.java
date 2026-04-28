@@ -2,11 +2,9 @@ package com.nexusfin.equity.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.nexusfin.equity.config.YunkaProperties;
-import com.nexusfin.equity.exception.BizException;
-import com.nexusfin.equity.exception.ErrorCodes;
 import com.nexusfin.equity.service.XiaohuaGatewayService;
+import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncRequest;
 import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncResponse;
 import com.nexusfin.equity.thirdparty.yunka.CardSmsConfirmRequest;
@@ -29,7 +27,6 @@ import com.nexusfin.equity.thirdparty.yunka.UserQueryRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserQueryResponse;
 import com.nexusfin.equity.thirdparty.yunka.UserTokenRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserTokenResponse;
-import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -37,16 +34,16 @@ import org.springframework.stereotype.Service;
 @Service
 public class XiaohuaGatewayServiceImpl implements XiaohuaGatewayService {
 
-    private final YunkaGatewayClient yunkaGatewayClient;
+    private final YunkaCallTemplate yunkaCallTemplate;
     private final YunkaProperties yunkaProperties;
     private final ObjectMapper objectMapper;
 
     public XiaohuaGatewayServiceImpl(
-            YunkaGatewayClient yunkaGatewayClient,
+            YunkaCallTemplate yunkaCallTemplate,
             YunkaProperties yunkaProperties,
             ObjectMapper objectMapper
     ) {
-        this.yunkaGatewayClient = yunkaGatewayClient;
+        this.yunkaCallTemplate = yunkaCallTemplate;
         this.yunkaProperties = yunkaProperties;
         this.objectMapper = objectMapper;
     }
@@ -179,16 +176,9 @@ public class XiaohuaGatewayServiceImpl implements XiaohuaGatewayService {
     }
 
     private JsonNode execute(String requestId, String path, String bizOrderNo, Object payload) {
-        YunkaGatewayClient.YunkaGatewayResponse response = yunkaGatewayClient.proxy(
-                new YunkaGatewayClient.YunkaGatewayRequest(requestId, path, bizOrderNo, payload)
+        return yunkaCallTemplate.executeForData(
+                YunkaCallTemplate.YunkaCall.of("xiaohua gateway", requestId, path, bizOrderNo, payload)
         );
-        if (response == null) {
-            throw new BizException(ErrorCodes.YUNKA_RESPONSE_EMPTY, "Yunka gateway response is empty");
-        }
-        if (response.code() != 0) {
-            throw new BizException(ErrorCodes.YUNKA_UPSTREAM_REJECTED, response.message());
-        }
-        return response.data() == null ? JsonNodeFactory.instance.objectNode() : response.data();
     }
 
     private String text(JsonNode node, String fieldName) {

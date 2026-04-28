@@ -6,6 +6,7 @@ import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.ErrorCodes;
 import com.nexusfin.equity.service.impl.XiaohuaGatewayServiceImpl;
+import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncRequest;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryRequest;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryResponse;
@@ -41,7 +42,11 @@ class XiaohuaGatewayServiceTest {
 
     @BeforeEach
     void setUp() {
-        gatewayService = new XiaohuaGatewayServiceImpl(yunkaGatewayClient, yunkaProperties(), objectMapper);
+        gatewayService = new XiaohuaGatewayServiceImpl(
+                new YunkaCallTemplate(yunkaGatewayClient),
+                yunkaProperties(),
+                objectMapper
+        );
     }
 
     @Test
