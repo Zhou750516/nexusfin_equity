@@ -40,6 +40,16 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-h5-page: var(--background);
+  --color-h5-surface: var(--secondary);
+  --color-h5-surface-strong: var(--card);
+  --color-h5-border-soft: var(--border);
+  --color-h5-text-primary: var(--foreground);
+  --color-h5-text-secondary: var(--muted-foreground);
+  --color-h5-brand: var(--primary);
+  --color-h5-brand-strong: var(--chart-2);
+  --color-h5-brand-warm: oklch(0.79 0.16 75);
+  --color-h5-brand-warm-foreground: oklch(0.98 0.01 90);
 }
 
 :root {
@@ -111,6 +121,30 @@
   .flex {
     min-height: 0;
     min-width: 0;
+  }
+
+  .h5-page-shell {
+    @apply flex-1 overflow-y-auto bg-h5-page;
+  }
+
+  .h5-card {
+    @apply rounded-2xl border border-h5-border-soft bg-h5-surface-strong p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)];
+  }
+
+  .h5-card-title {
+    @apply text-h5-text-primary text-base font-semibold leading-6 tracking-tight;
+  }
+
+  .h5-card-subtitle {
+    @apply text-h5-text-secondary text-sm leading-6 tracking-tight;
+  }
+
+  .h5-sticky-bar {
+    @apply fixed bottom-0 left-1/2 z-20 flex w-full max-w-[440px] -translate-x-1/2 flex-col gap-3 border-t border-h5-border-soft bg-white/95 px-5 py-4 backdrop-blur-sm;
+  }
+
+  .h5-primary-button {
+    @apply inline-flex min-h-12 items-center justify-center rounded-full bg-gradient-to-r from-h5-brand to-h5-brand-strong px-5 text-sm font-semibold text-white shadow-[0_20px_25px_rgba(22,93,255,0.28),0_8px_10px_rgba(22,93,255,0.2)] transition-opacity active:opacity-90;
   }
 
   @media (min-width: 640px) {

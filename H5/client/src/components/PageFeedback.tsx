@@ -35,8 +35,8 @@ export function PageLoading({ lines = 4 }: PageLoadingProps) {
 
   return (
     <div className="px-4 pt-4 space-y-4">
-      <div className="bg-white rounded-2xl border border-[#f2f3f5] p-5 space-y-3">
-        <p className="text-[#86909c] text-sm">{copy.loading}</p>
+      <div className="h5-card space-y-3">
+        <p className="text-sm text-h5-text-secondary">{copy.loading}</p>
         {Array.from({ length: lines }, (_, index) => (
           <Skeleton key={index} className="h-5 w-full rounded-xl" />
         ))}
@@ -57,14 +57,11 @@ export function PageError({ message, onAction, actionLabel }: PageErrorProps) {
 
   return (
     <div className="px-4 pt-4">
-      <div className="bg-white rounded-2xl border border-[#f2f3f5] p-5 text-center">
-        <p className="text-[#1d2129] text-base font-semibold mb-2">{copy.failedTitle}</p>
-        <p className="text-[#86909c] text-sm leading-6 mb-4">{message}</p>
+      <div className="h5-card text-center">
+        <p className="mb-2 text-base font-semibold text-h5-text-primary">{copy.failedTitle}</p>
+        <p className="mb-4 text-sm leading-6 text-h5-text-secondary">{message}</p>
         {onAction ? (
-          <button
-            onClick={onAction}
-            className="inline-flex items-center justify-center h-11 min-w-[120px] px-5 rounded-full bg-[#165dff] text-white text-sm font-medium"
-          >
+          <button onClick={onAction} className="h5-primary-button min-w-[120px]">
             {actionLabel ?? copy.retry}
           </button>
         ) : null}
