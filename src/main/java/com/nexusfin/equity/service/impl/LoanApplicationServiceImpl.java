@@ -13,6 +13,7 @@ import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.ErrorCodes;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.service.AsyncCompensationEnqueueService;
+import com.nexusfin.equity.service.AsyncCompensationEnqueuePayload;
 import com.nexusfin.equity.service.BenefitOrderService;
 import com.nexusfin.equity.service.H5I18nService;
 import com.nexusfin.equity.service.LoanApplicationGateway;
@@ -150,9 +151,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                     yunkaProperties.gatewayPath(),
                     "POST",
                     null,
-                    """
-                    {"requestId":"%s","path":"%s","bizOrderNo":"%s","uid":"%s","benefitOrderNo":"%s","applyId":"%s","loanId":"%s","loanAmount":%d,"loanPeriod":%d,"bankCardNo":"%s"}
-                    """.formatted(
+                    new AsyncCompensationEnqueuePayload.YunkaLoanApplyRetry(
                             requestId,
                             yunkaProperties.paths().loanApply(),
                             applicationId,
@@ -163,10 +162,10 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                             yuanToCent(request.amount()),
                             request.term(),
                             upstreamBankCardNum
-                    ).replace("\n", "").trim()
+                    )
             ));
             return new LoanApplyResponse(
-                    applicationId,
+                applicationId,
                     "pending",
                     h5I18nService.text("loan.approval.arrivalTime", "30分钟"),
                     true,

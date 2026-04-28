@@ -1,10 +1,14 @@
 package com.nexusfin.equity.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.config.AsyncCompensationProperties;
 import com.nexusfin.equity.entity.AsyncCompensationTask;
 import com.nexusfin.equity.enums.AsyncCompensationTaskStatusEnum;
+import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.ErrorCodes;
 import com.nexusfin.equity.repository.AsyncCompensationTaskRepository;
+import com.nexusfin.equity.service.AsyncCompensationEnqueuePayload;
 import com.nexusfin.equity.service.AsyncCompensationEnqueueService;
 import com.nexusfin.equity.util.AsyncCompensationPartitioner;
 import com.nexusfin.equity.util.RequestIdUtil;
@@ -23,15 +27,18 @@ public class AsyncCompensationEnqueueServiceImpl implements AsyncCompensationEnq
     private final AsyncCompensationTaskRepository taskRepository;
     private final AsyncCompensationPartitioner partitioner;
     private final AsyncCompensationProperties properties;
+    private final ObjectMapper objectMapper;
 
     public AsyncCompensationEnqueueServiceImpl(
             AsyncCompensationTaskRepository taskRepository,
             AsyncCompensationPartitioner partitioner,
-            AsyncCompensationProperties properties
+            AsyncCompensationProperties properties,
+            ObjectMapper objectMapper
     ) {
         this.taskRepository = taskRepository;
         this.partitioner = partitioner;
         this.properties = properties;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -48,7 +55,7 @@ public class AsyncCompensationEnqueueServiceImpl implements AsyncCompensationEnq
         task.setRequestPath(command.requestPath());
         task.setHttpMethod(command.httpMethod());
         task.setRequestHeaders(command.requestHeaders());
-        task.setRequestPayload(command.requestPayload());
+        task.setRequestPayload(serializePayload(command.requestPayload()));
         task.setRetryCount(0);
         task.setMaxRetryCount(properties.getMaxRetryCount());
         task.setCreatedTs(now);
@@ -78,6 +85,17 @@ public class AsyncCompensationEnqueueServiceImpl implements AsyncCompensationEnq
                     task.getRequestPath(),
                     ErrorCodes.ASYNC_COMPENSATION_DUPLICATED,
                     "Async compensation task duplicated");
+        }
+    }
+
+    private String serializePayload(AsyncCompensationEnqueuePayload payload) {
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException exception) {
+            throw new BizException(
+                    "ASYNC_COMPENSATION_PAYLOAD_SERIALIZE_FAILED",
+                    "Failed to serialize async compensation payload"
+            );
         }
     }
 }

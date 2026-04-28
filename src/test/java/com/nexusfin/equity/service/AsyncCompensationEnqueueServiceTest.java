@@ -1,5 +1,6 @@
 package com.nexusfin.equity.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.config.AsyncCompensationProperties;
 import com.nexusfin.equity.entity.AsyncCompensationTask;
 import com.nexusfin.equity.repository.AsyncCompensationTaskRepository;
@@ -34,7 +35,8 @@ class AsyncCompensationEnqueueServiceTest {
         AsyncCompensationEnqueueService service = new AsyncCompensationEnqueueServiceImpl(
                 taskRepository,
                 new AsyncCompensationPartitioner(properties),
-                properties
+                properties,
+                new ObjectMapper()
         );
 
         service.enqueue(new AsyncCompensationEnqueueService.EnqueueCommand(
@@ -90,7 +92,8 @@ class AsyncCompensationEnqueueServiceTest {
         AsyncCompensationEnqueueService service = new AsyncCompensationEnqueueServiceImpl(
                 taskRepository,
                 new AsyncCompensationPartitioner(properties),
-                properties
+                properties,
+                new ObjectMapper()
         );
         doThrow(new DuplicateKeyException("duplicate task")).when(taskRepository).insert(any());
 

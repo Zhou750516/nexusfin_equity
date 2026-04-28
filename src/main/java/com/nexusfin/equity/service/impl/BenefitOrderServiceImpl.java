@@ -21,6 +21,7 @@ import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.AgreementService;
 import com.nexusfin.equity.service.AsyncCompensationEnqueueService;
+import com.nexusfin.equity.service.AsyncCompensationEnqueuePayload;
 import com.nexusfin.equity.service.BenefitOrderService;
 import com.nexusfin.equity.service.IdempotencyService;
 import com.nexusfin.equity.service.PaymentProtocolService;
@@ -176,14 +177,12 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
                     "/api/abs/method",
                     "POST",
                     null,
-                    """
-                    {"externalUserId":"%s","benefitOrderNo":"%s","productCode":"%s","loanAmount":%d}
-                    """.formatted(
+                    new AsyncCompensationEnqueuePayload.QwBenefitPurchaseRetry(
                             benefitOrder.getExternalUserId(),
                             benefitOrder.getBenefitOrderNo(),
                             product.getProductCode(),
                             benefitOrder.getLoanAmount()
-                    ).replace("\n", "").trim()
+                    )
             ));
             throw new BenefitPurchaseSyncTimeoutCompensationException("QW_SYNC_TIMEOUT:" + exception.getMessage());
         }

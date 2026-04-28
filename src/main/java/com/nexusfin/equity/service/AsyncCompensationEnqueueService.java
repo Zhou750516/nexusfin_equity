@@ -12,7 +12,7 @@ public interface AsyncCompensationEnqueueService {
             String requestPath,
             String httpMethod,
             String requestHeaders,
-            String requestPayload
+            AsyncCompensationEnqueuePayload requestPayload
     ) {
     }
 }
