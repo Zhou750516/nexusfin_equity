@@ -47,7 +47,7 @@ class AllinpayDirectRequestBuilderTest {
         assertThat(prepared.targetUri().toString()).isEqualTo("https://tlt-test.allinpay.com/aipg/ProcessServlet");
         assertThat(prepared.signature()).isEqualTo("signed-payload");
         assertThat(prepared.requestBody()).contains("\"serviceCode\":\"SYNC001\"");
-        assertThat(prepared.requestBody()).contains("\"memberId\":\"uid-001\"");
+        assertThat(prepared.requestBody()).contains("\"uniqueId\":\"uid-001\"");
     }
 
     @Test

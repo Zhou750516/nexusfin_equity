@@ -1,7 +1,6 @@
 package com.nexusfin.equity.thirdparty.qw;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nexusfin.equity.config.QwProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
@@ -11,31 +10,27 @@ class AllinpayDirectProtocolSerializerTest {
 
     @Test
     void shouldSerializeEnvelopeIntoSkeletonRequest() {
-        QwProperties properties = new QwProperties();
-        properties.getDirect().setBaseUrl("https://tlt-test.allinpay.com");
-        properties.getDirect().setProcessPath("/aipg/ProcessServlet");
-        properties.getDirect().setMerchantId("200000000007804");
-        properties.getDirect().setUserName("20000000000780404");
-        properties.getDirect().setUserPassword("111111");
-        properties.getDirect().setMemberSyncServiceCode("SYNC001");
-        AllinpayDirectRequestFactory requestFactory = new AllinpayDirectRequestFactory(properties);
-        AllinpayDirectInvocation invocation = requestFactory.prepareMemberSync(new QwMemberSyncRequest(
-                "user-1", "ord-1", 680000L, "P-1", "权益产品", "13800138000", "张三", "proto-1",
-                null, 0, null, null, null, null
-        ));
-        AllinpayDirectPayloadMapperRegistry registry = new AllinpayDirectPayloadMapperRegistry(
-                new ObjectMapper(),
-                new AllinpayMemberSyncPayloadMapper(),
-                new AllinpayExerciseUrlPayloadMapper(),
-                new AllinpayLendingNotifyPayloadMapper()
-        );
-        AllinpayDirectEnvelope envelope = new AllinpayDirectEnvelopeFactory().create(
-                invocation,
-                registry.map(invocation.operation(), invocation.businessRequest()),
-                "2026-03-31 22:00:00"
+        ObjectMapper objectMapper = new ObjectMapper();
+        AllinpayDirectEnvelope envelope = new AllinpayDirectEnvelope(
+                AllinpayDirectOperation.MEMBER_SYNC,
+                java.net.URI.create("https://tlt-test.allinpay.com/aipg/ProcessServlet"),
+                new AllinpayDirectEnvelopeHead(
+                        "SYNC001",
+                        "200000000007804",
+                        "20000000000780404",
+                        "111111",
+                        "2026-03-31 22:00:00"
+                ),
+                new AllinpayMemberSyncPayloadMapper().map(
+                        new QwMemberSyncRequest(
+                                "user-1", "ord-1", 680000L, "P-1", "权益产品", "13800138000", "张三", "proto-1",
+                                null, 0, null, null, null, null
+                        ),
+                        objectMapper
+                )
         );
 
-        AllinpayDirectProtocolSerializer serializer = new AllinpayDirectSkeletonProtocolSerializer(new ObjectMapper());
+        AllinpayDirectProtocolSerializer serializer = new AllinpayDirectSkeletonProtocolSerializer(objectMapper);
 
         AllinpayDirectSerializedRequest serializedRequest = serializer.serialize(envelope);
 

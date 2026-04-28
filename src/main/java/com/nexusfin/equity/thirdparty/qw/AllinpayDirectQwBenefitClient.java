@@ -3,8 +3,6 @@ package com.nexusfin.equity.thirdparty.qw;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.config.QwProperties;
 import com.nexusfin.equity.exception.BizException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.security.KeyStore;
 import java.security.cert.X509Certificate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,26 +12,21 @@ import org.springframework.web.client.RestClient;
 @Service
 public class AllinpayDirectQwBenefitClient implements QwBenefitClient {
 
-    private static final DateTimeFormatter REQUEST_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
     @SuppressWarnings("unused")
     private final ObjectMapper objectMapper;
     private final QwProperties properties;
     private final AllinpayCertificateLoader certificateLoader;
-    private final AllinpayDirectRequestFactory requestFactory;
-    private final AllinpayDirectPayloadMapperRegistry payloadMapperRegistry;
     private final AllinpayDirectProtocolSerializer protocolSerializer;
     private final AllinpayDirectTransportMapper transportMapper;
     private final AllinpayDirectHttpExecutor httpExecutor;
     private final AllinpayDirectResponseVerificationStage responseVerificationStage;
     private final AllinpayDirectResponseParser responseParser;
-    private final AllinpayDirectEnvelopeFactory envelopeFactory;
     private final AllinpaySslContextFactory sslContextFactory = new AllinpaySslContextFactory();
     private final AllinpayRestClientFactory restClientFactory = new AllinpayRestClientFactory();
     private volatile KeyStore merchantKeyStore;
     private volatile X509Certificate verifyCertificate;
     private volatile AllinpayRequestSigner requestSigner;
-    private volatile AllinpayDirectRequestPreparer requestPreparer;
+    private volatile AllinpayDirectRequestBuilder requestBuilder;
     @SuppressWarnings("unused")
     private volatile AllinpayResponseVerifier responseVerifier;
     @SuppressWarnings("unused")
@@ -44,9 +37,7 @@ public class AllinpayDirectQwBenefitClient implements QwBenefitClient {
             QwProperties properties,
             ObjectMapper objectMapper,
             AllinpayCertificateLoader certificateLoader,
-            AllinpayDirectRequestFactory requestFactory,
-            AllinpayDirectPayloadMapperRegistry payloadMapperRegistry,
-            AllinpayDirectEnvelopeFactory envelopeFactory,
+            AllinpayDirectRequestBuilder requestBuilder,
             AllinpayDirectProtocolSerializer protocolSerializer,
             AllinpayDirectTransportMapper transportMapper,
             AllinpayDirectHttpExecutor httpExecutor,
@@ -56,14 +47,36 @@ public class AllinpayDirectQwBenefitClient implements QwBenefitClient {
         this.properties = properties;
         this.objectMapper = objectMapper;
         this.certificateLoader = certificateLoader;
-        this.requestFactory = requestFactory;
-        this.payloadMapperRegistry = payloadMapperRegistry;
-        this.envelopeFactory = envelopeFactory;
+        this.requestBuilder = requestBuilder;
         this.protocolSerializer = protocolSerializer;
         this.transportMapper = transportMapper;
         this.httpExecutor = httpExecutor;
         this.responseVerificationStage = responseVerificationStage;
         this.responseParser = responseParser;
+    }
+
+    @Autowired
+    public AllinpayDirectQwBenefitClient(
+            QwProperties properties,
+            ObjectMapper objectMapper,
+            AllinpayCertificateLoader certificateLoader,
+            AllinpayDirectProtocolSerializer protocolSerializer,
+            AllinpayDirectTransportMapper transportMapper,
+            AllinpayDirectHttpExecutor httpExecutor,
+            AllinpayDirectResponseVerificationStage responseVerificationStage,
+            AllinpayDirectResponseParser responseParser
+    ) {
+        this(
+                properties,
+                objectMapper,
+                certificateLoader,
+                null,
+                protocolSerializer,
+                transportMapper,
+                httpExecutor,
+                responseVerificationStage,
+                responseParser
+        );
     }
 
     public AllinpayDirectQwBenefitClient(
@@ -75,45 +88,48 @@ public class AllinpayDirectQwBenefitClient implements QwBenefitClient {
                 properties,
                 objectMapper,
                 certificateLoader,
-                new AllinpayDirectRequestFactory(properties),
-                defaultPayloadMapperRegistry(objectMapper),
-                new AllinpayDirectEnvelopeFactory(),
                 new AllinpayDirectSkeletonProtocolSerializer(objectMapper),
                 new AllinpayDirectSkeletonTransportMapper(),
-                new AllinpayDirectSkeletonHttpExecutor(),
-                new AllinpayDirectSkeletonResponseVerificationStage(),
-                new AllinpayDirectSkeletonResponseParser()
-        );
-    }
-
-    private static AllinpayDirectPayloadMapperRegistry defaultPayloadMapperRegistry(ObjectMapper objectMapper) {
-        return new AllinpayDirectPayloadMapperRegistry(
-                objectMapper,
-                new AllinpayMemberSyncPayloadMapper(),
-                new AllinpayExerciseUrlPayloadMapper(),
-                new AllinpayLendingNotifyPayloadMapper()
+                new AllinpayDirectUnsupportedProtocolHandler(),
+                new AllinpayDirectUnsupportedProtocolHandler(),
+                new AllinpayDirectUnsupportedProtocolHandler()
         );
     }
 
     @Override
     public QwMemberSyncResponse syncMemberOrder(QwMemberSyncRequest request) {
         ensureReady("memberSync", properties.getDirect().getMemberSyncServiceCode());
-        AllinpayDirectInvocation invocation = requestFactory.prepareMemberSync(request);
-        return execute(invocation, QwMemberSyncResponse.class);
+        AllinpayDirectPreparedRequest preparedRequest = requestBuilder.prepareMemberSync(request);
+        return execute(
+                AllinpayDirectOperation.MEMBER_SYNC,
+                properties.getDirect().getMemberSyncServiceCode(),
+                preparedRequest,
+                QwMemberSyncResponse.class
+        );
     }
 
     @Override
     public QwExerciseUrlResponse getExerciseUrl(QwExerciseUrlRequest request) {
         ensureReady("exerciseUrl", properties.getDirect().getExerciseUrlServiceCode());
-        AllinpayDirectInvocation invocation = requestFactory.prepareExerciseUrl(request);
-        return execute(invocation, QwExerciseUrlResponse.class);
+        AllinpayDirectPreparedRequest preparedRequest = requestBuilder.prepareExerciseUrl(request);
+        return execute(
+                AllinpayDirectOperation.EXERCISE_URL,
+                properties.getDirect().getExerciseUrlServiceCode(),
+                preparedRequest,
+                QwExerciseUrlResponse.class
+        );
     }
 
     @Override
     public QwLendingNotifyResponse notifyLending(QwLendingNotifyRequest request) {
         ensureReady("lendingNotify", properties.getDirect().getLendingNotifyServiceCode());
-        AllinpayDirectInvocation invocation = requestFactory.prepareLendingNotify(request);
-        return execute(invocation, QwLendingNotifyResponse.class);
+        AllinpayDirectPreparedRequest preparedRequest = requestBuilder.prepareLendingNotify(request);
+        return execute(
+                AllinpayDirectOperation.LENDING_NOTIFY,
+                properties.getDirect().getLendingNotifyServiceCode(),
+                preparedRequest,
+                QwLendingNotifyResponse.class
+        );
     }
 
     @Override
@@ -161,8 +177,16 @@ public class AllinpayDirectQwBenefitClient implements QwBenefitClient {
             if (requestSigner == null) {
                 requestSigner = new AllinpayRequestSigner(merchantKeyStore, properties.getDirect().getPkcs12Password());
             }
-            if (requestPreparer == null) {
-                requestPreparer = new AllinpayDirectRequestPreparer(protocolSerializer, requestSigner);
+            if (requestBuilder == null) {
+                requestBuilder = new AllinpayDirectRequestBuilder(
+                        properties,
+                        objectMapper,
+                        requestSigner::sign,
+                        protocolSerializer,
+                        new AllinpayMemberSyncPayloadMapper(),
+                        new AllinpayExerciseUrlPayloadMapper(),
+                        new AllinpayLendingNotifyPayloadMapper()
+                );
             }
             if (responseVerifier == null) {
                 responseVerifier = new AllinpayResponseVerifier(verifyCertificate);
@@ -190,40 +214,36 @@ public class AllinpayDirectQwBenefitClient implements QwBenefitClient {
         }
     }
 
-    private AllinpayDirectEnvelope buildEnvelope(AllinpayDirectInvocation invocation) {
-        return envelopeFactory.create(
-                invocation,
-                payloadMapperRegistry.map(invocation.operation(), invocation.businessRequest()),
-                REQUEST_TIME_FORMATTER.format(LocalDateTime.now())
-        );
-    }
-
-    private <T> T execute(AllinpayDirectInvocation invocation, Class<T> responseType) {
-        AllinpayDirectEnvelope envelope = buildEnvelope(invocation);
-        AllinpayDirectPreparedRequest preparedRequest = requestPreparer.prepare(envelope);
+    private <T> T execute(
+            AllinpayDirectOperation operation,
+            String serviceCode,
+            AllinpayDirectPreparedRequest preparedRequest,
+            Class<T> responseType
+    ) {
         AllinpayDirectTransportRequest transportRequest = transportMapper.map(preparedRequest);
         AllinpayDirectRawResponse rawResponse;
         try {
             rawResponse = httpExecutor.execute(transportRequest);
         } catch (BizException exception) {
-            throw enrichProtocolBoundary(invocation, preparedRequest, exception);
+            throw enrichProtocolBoundary(operation, serviceCode, preparedRequest, exception);
         }
         AllinpayDirectVerifiedResponse verifiedResponse;
         try {
             verifiedResponse = responseVerificationStage.verify(rawResponse);
         } catch (BizException exception) {
-            throw enrichProtocolBoundary(invocation, preparedRequest, exception);
+            throw enrichProtocolBoundary(operation, serviceCode, preparedRequest, exception);
         }
         return responseParser.parse(
-                invocation.operation(),
-                invocation.serviceCode(),
+                operation,
+                serviceCode,
                 verifiedResponse,
                 responseType
         );
     }
 
     private BizException enrichProtocolBoundary(
-            AllinpayDirectInvocation invocation,
+            AllinpayDirectOperation operation,
+            String serviceCode,
             AllinpayDirectPreparedRequest preparedRequest,
             BizException exception
     ) {
@@ -233,9 +253,9 @@ public class AllinpayDirectQwBenefitClient implements QwBenefitClient {
         return new BizException(
                 "ALLINPAY_DIRECT_PROTOCOL_UNIMPLEMENTED",
                 "Allinpay direct signed request is prepared for "
-                        + invocation.operation()
+                        + operation
                         + " with serviceCode="
-                        + invocation.serviceCode()
+                        + serviceCode
                         + " to "
                         + preparedRequest.targetUri()
                         + " but real protocol request/response mapping is not implemented"

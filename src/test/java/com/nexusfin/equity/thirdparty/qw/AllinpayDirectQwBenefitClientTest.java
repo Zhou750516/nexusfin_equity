@@ -14,8 +14,10 @@ import org.springframework.http.MediaType;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AllinpayDirectQwBenefitClientTest {
@@ -122,19 +124,23 @@ class AllinpayDirectQwBenefitClientTest {
                 ));
             }
         };
+        AllinpayRequestSigner requestSigner = mock(AllinpayRequestSigner.class);
+        when(requestSigner.sign(anyString())).thenReturn("request-signature");
+        AllinpayDirectRequestBuilder requestBuilder = new AllinpayDirectRequestBuilder(
+                properties,
+                new ObjectMapper(),
+                requestSigner,
+                serializer,
+                new AllinpayMemberSyncPayloadMapper(),
+                new AllinpayExerciseUrlPayloadMapper(),
+                new AllinpayLendingNotifyPayloadMapper()
+        );
 
         AllinpayDirectQwBenefitClient client = new AllinpayDirectQwBenefitClient(
                 properties,
                 new ObjectMapper(),
                 new AllinpayCertificateLoader(),
-                new AllinpayDirectRequestFactory(properties),
-                new AllinpayDirectPayloadMapperRegistry(
-                        new ObjectMapper(),
-                        new AllinpayMemberSyncPayloadMapper(),
-                        new AllinpayExerciseUrlPayloadMapper(),
-                        new AllinpayLendingNotifyPayloadMapper()
-                ),
-                new AllinpayDirectEnvelopeFactory(),
+                requestBuilder,
                 serializer,
                 transportMapper,
                 httpExecutor,
