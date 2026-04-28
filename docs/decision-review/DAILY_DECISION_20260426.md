@@ -85,9 +85,9 @@
 
 #### 实施结果
 
-- [x] 更新 `specs/004-benefit-loan-flow/contracts/page-flow-api.md`
-- [x] 更新 `specs/004-benefit-loan-flow/contracts/tech-platform-outbound.md`
-- [x] 更新 `specs/004-benefit-loan-flow/quickstart.md`
+- [x] 更新 `docs/_archive/specs-004/contracts/page-flow-api.md`
+- [x] 更新 `docs/_archive/specs-004/contracts/tech-platform-outbound.md`
+- [x] 更新 `docs/_archive/specs-004/quickstart.md`
 - [x] 执行 `mvn -q test`
 - [x] 执行 `mvn -q clean package -DskipTests`
 - [x] 执行 `mvn -q checkstyle:check`

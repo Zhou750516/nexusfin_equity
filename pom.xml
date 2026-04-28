@@ -77,7 +77,6 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
                     <excludes>
-                        <exclude>com/nexusfin/equity/thirdparty/qw/demo/**</exclude>
                         <exclude>com/nexusfin/equity/thirdparty/techplatform/EncryptDemo.java</exclude>
                     </excludes>
                 </configuration>

@@ -241,7 +241,7 @@ worker 失败日志此前存在 `error=` 这样的非标准字段，和当前主
 2. 复核齐为绑卡接口真实字段和本地协议记录闭环
 3. 跟进小花科技正式联合登录文档与接口文档
 4. 优先输出“用信新链路改造方案”“云卡状态查询与 H5 状态映射方案”“H5 自动埋点方案”
-5. 结合 `specs/004-benefit-loan-flow/tasks.md` 的 `T013-T033` 做一轮任务重排
+5. 结合 `docs/_archive/specs-004/tasks.md` 的 `T013-T033` 做一轮任务重排
 6. 收尾时继续固定完成日报、decision-review、次日 plan 和 checklist
 
 ---
