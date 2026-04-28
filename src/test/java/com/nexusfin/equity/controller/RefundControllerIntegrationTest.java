@@ -1,18 +1,25 @@
 package com.nexusfin.equity.controller;
 
-import com.nexusfin.equity.dto.response.RefundInfoResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexusfin.equity.config.AuthProperties;
+import com.nexusfin.equity.config.JwtAuthenticationFilter;
 import com.nexusfin.equity.dto.response.RefundApplyResponse;
+import com.nexusfin.equity.dto.response.RefundInfoResponse;
 import com.nexusfin.equity.dto.response.RefundResultResponse;
+import com.nexusfin.equity.exception.GlobalExceptionHandler;
 import com.nexusfin.equity.service.RefundService;
 import com.nexusfin.equity.util.JwtUtil;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -20,18 +27,34 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
-@AutoConfigureMockMvc
+@ExtendWith(MockitoExtension.class)
 class RefundControllerIntegrationTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+    @Mock
+    private RefundService refundService;
 
-    @Autowired
+    private MockMvc mockMvc;
     private JwtUtil jwtUtil;
 
-    @MockBean
-    private RefundService refundService;
+    @BeforeEach
+    void setUp() {
+        AuthProperties authProperties = authProperties("/api/refund");
+        jwtUtil = new JwtUtil(authProperties);
+        JwtAuthenticationFilter jwtAuthenticationFilter = new JwtAuthenticationFilter(
+                authProperties,
+                jwtUtil,
+                new ObjectMapper()
+        );
+        LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
+        validator.afterPropertiesSet();
+        mockMvc = MockMvcBuilders
+                .standaloneSetup(new RefundController(refundService))
+                .addFilters(jwtAuthenticationFilter)
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(new ObjectMapper()))
+                .setValidator(validator)
+                .build();
+    }
 
     @Test
     void shouldReturnRefundInfoForBenefitOrder() throws Exception {
@@ -95,5 +118,19 @@ class RefundControllerIntegrationTest {
 
     private Cookie authCookie() {
         return new Cookie("NEXUSFIN_AUTH", jwtUtil.generateToken("mem-refund-001", "external-refund-001"));
+    }
+
+    private AuthProperties authProperties(String protectedPathPrefix) {
+        AuthProperties authProperties = new AuthProperties();
+        AuthProperties.Jwt jwt = new AuthProperties.Jwt();
+        jwt.setCookieName("NEXUSFIN_AUTH");
+        jwt.setSecret("secret-key-1234567890secret-key-1234567890");
+        jwt.setIssuer("nexusfin-equity");
+        jwt.setTtlSeconds(7200L);
+        jwt.setCookieSecure(true);
+        authProperties.setJwt(jwt);
+        authProperties.setProtectedPathPrefixes(java.util.List.of(protectedPathPrefix));
+        authProperties.setExcludedPathPrefixes(java.util.List.of());
+        return authProperties;
     }
 }

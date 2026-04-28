@@ -1,14 +1,21 @@
 package com.nexusfin.equity.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexusfin.equity.config.AuthProperties;
+import com.nexusfin.equity.exception.GlobalExceptionHandler;
 import com.nexusfin.equity.service.JointLoginService;
+import com.nexusfin.equity.util.CookieUtil;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
@@ -19,15 +26,29 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
-@AutoConfigureMockMvc
+@ExtendWith(MockitoExtension.class)
 class JointLoginControllerIntegrationTest {
 
-    @Autowired
+    @Mock
+    private JointLoginService jointLoginService;
+
     private MockMvc mockMvc;
 
-    @MockBean
-    private JointLoginService jointLoginService;
+    @BeforeEach
+    void setUp() {
+        AuthProperties authProperties = authProperties();
+        LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
+        validator.afterPropertiesSet();
+        mockMvc = MockMvcBuilders
+                .standaloneSetup(new JointLoginController(
+                        jointLoginService,
+                        new CookieUtil(authProperties)
+                ))
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(new ObjectMapper()))
+                .setValidator(validator)
+                .build();
+    }
 
     @Test
     void shouldCreateCookieAndReturnTargetPageForJointLogin() throws Exception {
@@ -72,5 +93,17 @@ class JointLoginControllerIntegrationTest {
                 .andExpect(jsonPath("$.message").value("scene must be one of [push, exercise, refund]"));
 
         verifyNoInteractions(jointLoginService);
+    }
+
+    private AuthProperties authProperties() {
+        AuthProperties authProperties = new AuthProperties();
+        AuthProperties.Jwt jwt = new AuthProperties.Jwt();
+        jwt.setCookieName("NEXUSFIN_AUTH");
+        jwt.setSecret("secret-key-1234567890secret-key-1234567890");
+        jwt.setIssuer("nexusfin-equity");
+        jwt.setTtlSeconds(7200L);
+        jwt.setCookieSecure(true);
+        authProperties.setJwt(jwt);
+        return authProperties;
     }
 }
