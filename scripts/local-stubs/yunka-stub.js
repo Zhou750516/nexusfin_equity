@@ -5,6 +5,10 @@ const http = require("node:http");
 const host = process.env.HOST ?? "127.0.0.1";
 const port = Number(process.env.PORT ?? 18081);
 const reviewToApprovalCalls = Number(process.env.YUNKA_APPROVE_AFTER_QUERY_COUNT ?? 2);
+const timeoutDelayMs = Number(process.env.YUNKA_FAULT_TIMEOUT_DELAY_MS ?? 6500);
+
+const REJECT_PATTERN = /.*_FAULT_REJECT_(\d+)$/;
+const DELAY_PATTERN = /.*_FAULT_DELAY_(\d+)$/;
 
 const queryCounts = new Map();
 
@@ -183,76 +187,191 @@ function handleGatewayRequest(payload) {
         code: 10004,
         message: `unsupported path: ${path}`,
         data: {
-          supportedPaths: [
-            "/loan/trail",
-            "/loan/apply",
-            "/loan/query",
-            "/loan/repayPlan",
-            "/repay/trial",
-            "/repay/apply",
-            "/repay/query",
-            "/card/userCards",
-            "/card/smsSend",
-            "/card/smsConfirm",
-          ],
+          supportedPaths: supportedPaths(),
         },
       };
   }
 }
 
-const server = http.createServer(async (request, response) => {
-  if (request.url !== "/api/gateway/proxy") {
-    writeJson(response, 404, {
-      code: 404,
-      message: "not found",
-      data: {
-        method: request.method,
-        path: request.url,
+function supportedPaths() {
+  return [
+    "/loan/trail",
+    "/loan/apply",
+    "/loan/query",
+    "/loan/repayPlan",
+    "/repay/trial",
+    "/repay/apply",
+    "/repay/query",
+    "/card/userCards",
+    "/card/smsSend",
+    "/card/smsConfirm",
+  ];
+}
+
+function collectFaultCandidates(payload) {
+  const values = [];
+  collectStrings(payload.requestId, values);
+  collectStrings(payload.bizOrderNo, values);
+  collectStrings(payload.path, values);
+  collectStrings(payload.data, values);
+  return values;
+}
+
+function collectStrings(value, values) {
+  if (value == null) {
+    return;
+  }
+  if (typeof value === "string") {
+    values.push(value);
+    return;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    values.push(String(value));
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectStrings(item, values));
+    return;
+  }
+  if (typeof value === "object") {
+    Object.values(value).forEach((item) => collectStrings(item, values));
+  }
+}
+
+function resolveFaultDirective(payload) {
+  const candidates = collectFaultCandidates(payload);
+  for (const candidate of candidates) {
+    if (candidate.includes("_FAULT_TIMEOUT")) {
+      return { type: "timeout", marker: candidate, delayMs: timeoutDelayMs };
+    }
+  }
+  for (const candidate of candidates) {
+    const match = candidate.match(REJECT_PATTERN);
+    if (match) {
+      return {
+        type: "reject",
+        marker: candidate,
+        code: Number(match[1]),
+      };
+    }
+  }
+  for (const candidate of candidates) {
+    const match = candidate.match(DELAY_PATTERN);
+    if (match) {
+      return {
+        type: "delay",
+        marker: candidate,
+        delayMs: Number(match[1]),
+      };
+    }
+  }
+  return null;
+}
+
+function createGatewayPlan(payload) {
+  const fault = resolveFaultDirective(payload);
+  const body = handleGatewayRequest(payload);
+  if (!fault) {
+    return {
+      statusCode: 200,
+      body,
+    };
+  }
+  if (fault.type === "reject") {
+    return {
+      statusCode: 200,
+      body: {
+        code: fault.code,
+        message: `Mock Yunka rejection code=${fault.code}`,
+        data: null,
       },
-    });
-    return;
+    };
   }
-
-  if (request.method === "GET") {
-    writeJson(response, 200, gatewaySuccess({
-      gatewayPath: "/api/gateway/proxy",
-      supportedPaths: [
-        "/loan/trail",
-        "/loan/apply",
-        "/loan/query",
-        "/loan/repayPlan",
-        "/repay/trial",
-        "/repay/apply",
-        "/repay/query",
-        "/card/userCards",
-        "/card/smsSend",
-        "/card/smsConfirm",
-      ],
-    }, "Yunka stub is running"));
-    return;
+  if (fault.type === "timeout") {
+    return {
+      statusCode: 200,
+      body,
+      delayMs: Math.max(timeoutDelayMs, fault.delayMs),
+    };
   }
-
-  if (request.method !== "POST") {
-    writeJson(response, 405, {
-      code: 405,
-      message: "method not allowed",
-      data: null,
-    });
-    return;
+  if (fault.type === "delay") {
+    return {
+      statusCode: 200,
+      body,
+      delayMs: Math.max(0, fault.delayMs),
+    };
   }
+  return {
+    statusCode: 200,
+    body,
+  };
+}
 
-  try {
-    const payload = await parseBody(request);
-    writeJson(response, 200, handleGatewayRequest(payload));
-  } catch (error) {
-    writeJson(response, 400, {
-      code: 400,
-      message: `invalid request payload: ${error.message}`,
-      data: null,
-    });
-  }
-});
+function createServer() {
+  return http.createServer(async (request, response) => {
+    if (request.url !== "/api/gateway/proxy") {
+      writeJson(response, 404, {
+        code: 404,
+        message: "not found",
+        data: {
+          method: request.method,
+          path: request.url,
+        },
+      });
+      return;
+    }
 
-server.listen(port, host, () => {
-  console.log(`[yunka-stub] listening on http://${host}:${port}`);
-});
+    if (request.method === "GET") {
+      writeJson(response, 200, gatewaySuccess({
+        gatewayPath: "/api/gateway/proxy",
+        supportedPaths: supportedPaths(),
+      }, "Yunka stub is running"));
+      return;
+    }
+
+    if (request.method !== "POST") {
+      writeJson(response, 405, {
+        code: 405,
+        message: "method not allowed",
+        data: null,
+      });
+      return;
+    }
+
+    try {
+      const payload = await parseBody(request);
+      const plan = createGatewayPlan(payload);
+      if (plan.delayMs && plan.delayMs > 0) {
+        setTimeout(() => {
+          if (!response.writableEnded) {
+            writeJson(response, plan.statusCode, plan.body);
+          }
+        }, plan.delayMs);
+        return;
+      }
+      writeJson(response, plan.statusCode, plan.body);
+    } catch (error) {
+      writeJson(response, 400, {
+        code: 400,
+        message: `invalid request payload: ${error.message}`,
+        data: null,
+      });
+    }
+  });
+}
+
+if (require.main === module) {
+  const server = createServer();
+  server.listen(port, host, () => {
+    console.log(`[yunka-stub] listening on http://${host}:${port}`);
+  });
+}
+
+module.exports = {
+  createGatewayPlan,
+  createServer,
+  gatewaySuccess,
+  handleGatewayRequest,
+  resolveFaultDirective,
+  supportedPaths,
+};

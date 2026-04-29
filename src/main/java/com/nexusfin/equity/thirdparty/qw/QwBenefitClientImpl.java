@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.config.QwProperties;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
+import com.nexusfin.equity.util.TraceIdUtil;
 import com.nexusfin.equity.util.UpstreamTimeoutDetector;
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -17,6 +18,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
@@ -31,6 +34,9 @@ import org.springframework.web.client.RestClientException;
 public class QwBenefitClientImpl implements QwBenefitClient {
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final String QW_UPSTREAM_REJECTED = "QW_UPSTREAM_REJECTED";
+    private static final Pattern REJECT_PATTERN = Pattern.compile(".*_FAULT_REJECT_(\\d+)$");
+    private static final Pattern DELAY_PATTERN = Pattern.compile(".*_FAULT_DELAY_(\\d+)$");
 
     private final QwProperties qwProperties;
     private final ObjectMapper objectMapper;
@@ -289,6 +295,13 @@ public class QwBenefitClientImpl implements QwBenefitClient {
     }
 
     private QwMemberSyncResponse mockMemberSync(QwMemberSyncRequest request) {
+        applyMockFault(
+                request.partnerOrderNo(),
+                request.uniqueId(),
+                request.cardNo(),
+                request.productCode(),
+                TraceIdUtil.getTraceId()
+        );
         String now = DATE_TIME_FORMATTER.format(LocalDateTime.now());
         return new QwMemberSyncResponse(
                 "qw-order-" + request.partnerOrderNo(),
@@ -304,6 +317,7 @@ public class QwBenefitClientImpl implements QwBenefitClient {
     }
 
     private QwExerciseUrlResponse mockExerciseUrl(QwExerciseUrlRequest request) {
+        applyMockFault(request.partnerOrderNo(), request.uniqueId(), TraceIdUtil.getTraceId());
         String redirectUrl = qwProperties.getHttp().getMockExerciseBaseUrl()
                 + "?partnerOrderNo=" + request.partnerOrderNo()
                 + "&uniqueId=" + request.uniqueId()
@@ -318,22 +332,65 @@ public class QwBenefitClientImpl implements QwBenefitClient {
     }
 
     private QwLendingNotifyResponse mockLendingNotify(QwLendingNotifyRequest request) {
+        applyMockFault(request.partnerOrderNo(), request.uniqueId(), TraceIdUtil.getTraceId());
         return new QwLendingNotifyResponse("qw-order-" + request.partnerOrderNo());
     }
 
     private QwSignStatusResponse mockSignStatus(QwSignStatusRequest request) {
+        applyMockFault(request.accountNo(), request.phone(), request.merchantId(), TraceIdUtil.getTraceId());
         return new QwSignStatusResponse(request.accountNo() != null && request.accountNo().endsWith("8") ? 1 : 0);
     }
 
     private QwSignApplyResponse mockSignApply(QwSignApplyRequest request) {
+        applyMockFault(request.accountNo(), request.phone(), request.merchantId(), TraceIdUtil.getTraceId());
         return new QwSignApplyResponse(mockUserSignId(request.accountNo()), "2026-04-29 10:00:00");
     }
 
     private QwSignConfirmResponse mockSignConfirm(QwSignConfirmRequest request) {
+        applyMockFault(
+                String.valueOf(request.userSignId()),
+                request.verCode(),
+                TraceIdUtil.getTraceId()
+        );
         return new QwSignConfirmResponse(
                 request.userSignId(),
                 "mock-agreement-" + request.userSignId()
         );
+    }
+
+    private void applyMockFault(String... candidates) {
+        String rejectSource = null;
+        String delaySource = null;
+        for (String candidate : candidates) {
+            if (candidate == null || candidate.isBlank()) {
+                continue;
+            }
+            if (candidate.contains("_FAULT_TIMEOUT")) {
+                throw new UpstreamTimeoutException("Mock QW timeout: " + candidate);
+            }
+            if (rejectSource == null && REJECT_PATTERN.matcher(candidate).matches()) {
+                rejectSource = candidate;
+            }
+            if (delaySource == null && DELAY_PATTERN.matcher(candidate).matches()) {
+                delaySource = candidate;
+            }
+        }
+        if (rejectSource != null) {
+            Matcher matcher = REJECT_PATTERN.matcher(rejectSource);
+            matcher.matches();
+            int code = Integer.parseInt(matcher.group(1));
+            throw new BizException(code, QW_UPSTREAM_REJECTED, "Mock QW rejection code=" + code);
+        }
+        if (delaySource != null) {
+            Matcher matcher = DELAY_PATTERN.matcher(delaySource);
+            matcher.matches();
+            long delayMs = Long.parseLong(matcher.group(1));
+            try {
+                Thread.sleep(Math.max(0L, delayMs));
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
     private Long mockUserSignId(String accountNo) {

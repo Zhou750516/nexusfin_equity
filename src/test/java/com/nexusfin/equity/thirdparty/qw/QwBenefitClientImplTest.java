@@ -2,6 +2,9 @@ package com.nexusfin.equity.thirdparty.qw;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.config.QwProperties;
+import com.nexusfin.equity.exception.BizException;
+import com.nexusfin.equity.exception.UpstreamTimeoutException;
+import com.nexusfin.equity.util.TraceIdUtil;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
@@ -12,6 +15,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class QwBenefitClientImplTest {
 
@@ -123,6 +127,84 @@ class QwBenefitClientImplTest {
 
         assertThat(response.userSignId()).isEqualTo(5678L);
         assertThat(response.agreementNo()).isEqualTo("mock-agreement-5678");
+    }
+
+    @Test
+    void shouldInjectTimeoutForMockSignConfirmViaTraceId() {
+        QwProperties properties = qwProperties();
+        properties.setMode(QwProperties.Mode.MOCK);
+        QwBenefitClientImpl client = new QwBenefitClientImpl(properties, objectMapper);
+        TraceIdUtil.bindTraceId("REQ_EX_QW_CONFIRM_FAULT_TIMEOUT");
+
+        try {
+            assertThatThrownBy(() -> client.confirmSign(new QwSignConfirmRequest(5678L, "123456")))
+                    .isInstanceOf(UpstreamTimeoutException.class)
+                    .hasMessageContaining("Mock QW timeout");
+        } finally {
+            TraceIdUtil.clear();
+        }
+    }
+
+    @Test
+    void shouldInjectRejectForMockSignConfirmViaVerificationCode() {
+        QwProperties properties = qwProperties();
+        properties.setMode(QwProperties.Mode.MOCK);
+        QwBenefitClientImpl client = new QwBenefitClientImpl(properties, objectMapper);
+
+        assertThatThrownBy(() -> client.confirmSign(new QwSignConfirmRequest(5678L, "123456_FAULT_REJECT_503")))
+                .isInstanceOf(BizException.class)
+                .extracting(error -> ((BizException) error).getCode(), error -> ((BizException) error).getErrorNo())
+                .containsExactly(503, "QW_UPSTREAM_REJECTED");
+    }
+
+    @Test
+    void shouldInjectRejectForMockMemberSyncViaPartnerOrderNo() {
+        QwProperties properties = qwProperties();
+        properties.setMode(QwProperties.Mode.MOCK);
+        QwBenefitClientImpl client = new QwBenefitClientImpl(properties, objectMapper);
+
+        assertThatThrownBy(() -> client.syncMemberOrder(new QwMemberSyncRequest(
+                "user-1",
+                "ord-1_FAULT_REJECT_502",
+                680000L,
+                "P-1",
+                "权益产品",
+                99887766L,
+                null,
+                0,
+                null,
+                null,
+                null,
+                null
+        ))).isInstanceOf(BizException.class)
+                .extracting(error -> ((BizException) error).getCode(), error -> ((BizException) error).getErrorNo())
+                .containsExactly(502, "QW_UPSTREAM_REJECTED");
+    }
+
+    @Test
+    void shouldInjectDelayForMockMemberSync() {
+        QwProperties properties = qwProperties();
+        properties.setMode(QwProperties.Mode.MOCK);
+        QwBenefitClientImpl client = new QwBenefitClientImpl(properties, objectMapper);
+        long startNanos = System.nanoTime();
+
+        QwMemberSyncResponse response = client.syncMemberOrder(new QwMemberSyncRequest(
+                "user-1",
+                "ord-1_FAULT_DELAY_25",
+                680000L,
+                "P-1",
+                "权益产品",
+                99887766L,
+                null,
+                0,
+                null,
+                null,
+                null,
+                null
+        ));
+
+        assertThat(response.orderNo()).isEqualTo("qw-order-ord-1_FAULT_DELAY_25");
+        assertThat((System.nanoTime() - startNanos) / 1_000_000L).isGreaterThanOrEqualTo(20L);
     }
 
     @Test
