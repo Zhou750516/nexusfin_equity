@@ -55,7 +55,8 @@ public class AsyncCompensationEnqueueServiceImpl implements AsyncCompensationEnq
         task.setRequestPath(command.requestPath());
         task.setHttpMethod(command.httpMethod());
         task.setRequestHeaders(command.requestHeaders());
-        task.setRequestPayload(serializePayload(command.requestPayload()));
+        String requestPayload = serializePayload(command.requestPayload());
+        task.setRequestPayload(requestPayload);
         task.setRetryCount(0);
         task.setMaxRetryCount(properties.getMaxRetryCount());
         task.setCreatedTs(now);
@@ -63,18 +64,7 @@ public class AsyncCompensationEnqueueServiceImpl implements AsyncCompensationEnq
         try {
             taskRepository.insert(task);
             log.info("traceId={} bizOrderNo={} taskId={} taskType={} bizKey={} partitionNo={} targetCode={} "
-                            + "requestPath={} async compensation task enqueued",
-                    TraceIdUtil.getTraceId(),
-                    task.getBizOrderNo(),
-                    task.getTaskId(),
-                    task.getTaskType(),
-                    task.getBizKey(),
-                    task.getPartitionNo(),
-                    task.getTargetCode(),
-                    task.getRequestPath());
-        } catch (DuplicateKeyException exception) {
-            log.warn("traceId={} bizOrderNo={} taskId={} taskType={} bizKey={} partitionNo={} targetCode={} "
-                            + "requestPath={} errorNo={} errorMsg={} async compensation task duplicated, ignored",
+                            + "requestPath={} requestPayload={} async compensation task enqueued",
                     TraceIdUtil.getTraceId(),
                     task.getBizOrderNo(),
                     task.getTaskId(),
@@ -83,6 +73,19 @@ public class AsyncCompensationEnqueueServiceImpl implements AsyncCompensationEnq
                     task.getPartitionNo(),
                     task.getTargetCode(),
                     task.getRequestPath(),
+                    task.getRequestPayload());
+        } catch (DuplicateKeyException exception) {
+            log.warn("traceId={} bizOrderNo={} taskId={} taskType={} bizKey={} partitionNo={} targetCode={} "
+                            + "requestPath={} requestPayload={} errorNo={} errorMsg={} async compensation task duplicated, ignored",
+                    TraceIdUtil.getTraceId(),
+                    task.getBizOrderNo(),
+                    task.getTaskId(),
+                    task.getTaskType(),
+                    task.getBizKey(),
+                    task.getPartitionNo(),
+                    task.getTargetCode(),
+                    task.getRequestPath(),
+                    task.getRequestPayload(),
                     ErrorCodes.ASYNC_COMPENSATION_DUPLICATED,
                     "Async compensation task duplicated");
         }

@@ -158,6 +158,12 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         agreementService.ensureAgreementArtifacts(benefitOrder);
         QwMemberSyncResponse syncResponse;
         try {
+            log.info("traceId={} bizOrderNo={} externalUserId={} productCode={} userSignId={} qw member sync requested",
+                    com.nexusfin.equity.util.TraceIdUtil.getTraceId(),
+                    benefitOrder.getBenefitOrderNo(),
+                    benefitOrder.getExternalUserId(),
+                    product.getProductCode(),
+                    userSignId);
             syncResponse = qwBenefitClient.syncMemberOrder(buildQwMemberSyncRequest(benefitOrder, product, userSignId));
             benefitOrder.setSyncStatus(BenefitOrderStatusEnum.SYNC_SUCCESS.name());
             benefitOrder.setUpdatedTs(LocalDateTime.now());
@@ -190,9 +196,11 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
                 benefitOrder.getBenefitOrderNo(),
                 benefitOrder.getOrderStatus()
         );
-        log.info("traceId={} bizOrderNo={} order created and synced qwOrderNo={}",
+        log.info("traceId={} bizOrderNo={} payProtocolSource={} payProtocolNoSnapshot={} order created and synced qwOrderNo={}",
                 com.nexusfin.equity.util.TraceIdUtil.getTraceId(),
                 benefitOrder.getBenefitOrderNo(),
+                benefitOrder.getPayProtocolSource(),
+                benefitOrder.getPayProtocolNoSnapshot(),
                 syncResponse.orderNo());
         return buildCreateOrderResponse(benefitOrder);
     }

@@ -47,8 +47,8 @@ public class AuthController {
     @GetMapping("/api/users/me")
     public Result<CurrentUserResponse> getCurrentUser() {
         CurrentUserResponse response = authService.getCurrentUser();
-        log.info("traceId={} bizOrderNo={} current user resolved",
-                TraceIdUtil.getTraceId(), response.memberId());
+        log.info("traceId={} bizOrderNo={} externalUserId={} current user resolved",
+                TraceIdUtil.getTraceId(), response.memberId(), response.externalUserId());
         return Result.success(response);
     }
 }

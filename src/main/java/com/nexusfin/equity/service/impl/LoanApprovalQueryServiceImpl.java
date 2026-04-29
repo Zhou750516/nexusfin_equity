@@ -73,6 +73,11 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
     public LoanApprovalResultResponse getApprovalResult(String memberId, String applicationId) {
         LoanApplicationMapping mapping = findMapping(memberId, applicationId);
         JsonNode data = queryLoan(mapping);
+        log.info("traceId={} bizOrderNo={} loanId={} upstreamStatus={} approval result resolved",
+                TraceIdUtil.getTraceId(),
+                applicationId,
+                mapping.getUpstreamQueryValue(),
+                data.path("status").asText());
         String h5Status = mapApprovalStatus(data.path("status").asText());
         boolean approved = "approved".equals(h5Status);
         boolean reviewing = "reviewing".equals(h5Status);

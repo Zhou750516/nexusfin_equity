@@ -44,7 +44,7 @@ start_tmux_service \
 start_tmux_service \
   "backend" \
   "$ROOT_DIR" \
-  "mvn -Dspring-boot.run.arguments=--spring.datasource.username=root\\ --spring.datasource.password=\\ --nexusfin.auth.jwt.cookie-secure=false\\ --nexusfin.third-party.yunka.mode=REST\\ --nexusfin.third-party.yunka.base-url=http://127.0.0.1:18081\\ --nexusfin.auth.tech-platform-base-url=http://127.0.0.1:18080 spring-boot:run"
+  "mvn -Dspring-boot.run.arguments=--spring.datasource.username=root\\ --spring.datasource.password=\\ --nexusfin.auth.jwt.cookie-secure=false\\ --nexusfin.third-party.yunka.mode=REST\\ --nexusfin.third-party.yunka.base-url=http://127.0.0.1:18081\\ --nexusfin.third-party.qw.mode=MOCK\\ --nexusfin.auth.tech-platform-base-url=http://127.0.0.1:18080 spring-boot:run"
 
 start_tmux_service \
   "h5" \

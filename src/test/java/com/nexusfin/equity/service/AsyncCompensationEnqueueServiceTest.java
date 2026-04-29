@@ -81,6 +81,7 @@ class AsyncCompensationEnqueueServiceTest {
                 .contains("bizKey=LOAN_APPLY:APP-20260418-001")
                 .contains("targetCode=YUNKA")
                 .contains("requestPath=/api/gateway/proxy")
+                .contains("requestPayload={\"requestId\":\"LA-001\"")
                 .contains("async compensation task enqueued");
     }
 
@@ -127,6 +128,7 @@ class AsyncCompensationEnqueueServiceTest {
                 .contains("bizKey=LOAN_APPLY:APP-20260418-duplicate")
                 .contains("targetCode=YUNKA")
                 .contains("requestPath=/api/gateway/proxy")
+                .contains("requestPayload={\"requestId\":\"LA-002\"")
                 .contains("errorNo=ASYNC_COMPENSATION_DUPLICATED")
                 .contains("errorMsg=Async compensation task duplicated")
                 .contains("async compensation task duplicated, ignored");
