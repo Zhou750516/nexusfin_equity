@@ -1,7 +1,8 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { useEffect } from "react";
+import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { LoanProvider } from "./contexts/LoanContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -18,9 +19,20 @@ import JointUnsupportedPage from "./pages/JointUnsupportedPage";
 import LandingPage from "./pages/LandingPage";
 import RepaymentSuccessPage from "./pages/RepaymentSuccessPage";
 
+function RootEntryRedirect() {
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    navigate("/landing");
+  }, [navigate]);
+
+  return null;
+}
+
 function Router() {
   return (
     <Switch>
+      <Route path={"/"} component={RootEntryRedirect} />
       <Route path={"/joint-entry"} component={JointEntryPage} />
       <Route path={"/joint-dispatch"} component={JointDispatchPage} />
       <Route path={"/joint-refund-entry"} component={JointRefundEntryPage} />

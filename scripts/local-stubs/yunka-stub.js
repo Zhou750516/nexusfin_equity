@@ -167,6 +167,17 @@ function handleGatewayRequest(payload) {
           },
         ],
       });
+    case "/card/smsSend":
+      return gatewaySuccess({
+        smsSeq: "sms-stub-001",
+        status: "11001",
+        msg: "验证码已发送",
+      });
+    case "/card/smsConfirm":
+      return gatewaySuccess({
+        status: "11002",
+        msg: "验证码校验成功",
+      });
     default:
       return {
         code: 10004,
@@ -181,6 +192,8 @@ function handleGatewayRequest(payload) {
             "/repay/apply",
             "/repay/query",
             "/card/userCards",
+            "/card/smsSend",
+            "/card/smsConfirm",
           ],
         },
       };
@@ -212,6 +225,8 @@ const server = http.createServer(async (request, response) => {
         "/repay/apply",
         "/repay/query",
         "/card/userCards",
+        "/card/smsSend",
+        "/card/smsConfirm",
       ],
     }, "Yunka stub is running"));
     return;
@@ -241,4 +256,3 @@ const server = http.createServer(async (request, response) => {
 server.listen(port, host, () => {
   console.log(`[yunka-stub] listening on http://${host}:${port}`);
 });
-
