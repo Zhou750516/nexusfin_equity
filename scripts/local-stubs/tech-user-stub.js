@@ -34,6 +34,16 @@ function defaultProfiles() {
         channelCode: "KJ",
       },
     ],
+    [
+      process.env.MOCK_TECH_TOKEN_CLEAN ?? "mock-tech-token-clean",
+      {
+        userId: "tech-user-local-clean-001",
+        phone: "13800138002",
+        realName: "干净链路测试用户",
+        idCard: "310101199001011113",
+        channelCode: "KJ",
+      },
+    ],
   ]);
 }
 
