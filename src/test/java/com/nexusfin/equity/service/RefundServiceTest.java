@@ -86,7 +86,7 @@ class RefundServiceTest {
     }
 
     @Test
-    void shouldReturnPlaceholderResponsesFromSkeletonRefundClient() {
+    void shouldReturnPlaceholderResponsesFromSkeletonRefundClientWhileRealRefundIntegrationIsPending() {
         SkeletonRefundClient refundClient = new SkeletonRefundClient();
 
         RefundApplyResponse applyResponse = refundClient.apply(new RefundClient.RefundApplyCommand(
@@ -97,7 +97,9 @@ class RefundServiceTest {
 
         assertThat(applyResponse.refundId()).isEqualTo("REFUND-BEN-20260418-001");
         assertThat(applyResponse.status()).isEqualTo("processing");
+        assertThat(applyResponse.message()).isEqualTo("refund submitted");
         assertThat(resultResponse.refundId()).isEqualTo("REFUND-BEN-20260418-001");
         assertThat(resultResponse.status()).isEqualTo("processing");
+        assertThat(resultResponse.message()).isEqualTo("refund still processing");
     }
 }

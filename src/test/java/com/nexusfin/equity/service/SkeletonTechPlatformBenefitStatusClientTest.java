@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class SkeletonTechPlatformBenefitStatusClientTest {
 
     @Test
-    void shouldAcceptPushInMockMode() {
+    void shouldAcceptPushAsPlaceholderImplementationInMockMode() {
         TechPlatformProperties properties = new TechPlatformProperties();
         properties.setEnabled(true);
         properties.setMode(TechPlatformProperties.Mode.MOCK);
@@ -28,7 +28,7 @@ class SkeletonTechPlatformBenefitStatusClientTest {
     }
 
     @Test
-    void shouldRejectPushInHttpModeBeforeContractReady() {
+    void shouldRejectPushOutsideMockModeUntilRealContractIsReady() {
         TechPlatformProperties properties = new TechPlatformProperties();
         properties.setEnabled(true);
         properties.setMode(TechPlatformProperties.Mode.HTTP);

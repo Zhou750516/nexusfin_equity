@@ -32,7 +32,7 @@
 | **Phase 2D loan application gateway** | ✅ | 已完成，不再重做 |
 | **Phase 2E async compensation typed payload** | ✅ | 已完成，不再重做 |
 | **Phase 5 test context convergence** | ✅ | `@SpringBootTest` 已从 18 收敛到 15，`mvn test` wall-clock 从 14.544s 降到 13.582s |
-| **Phase 3 QW convergence** | ✅ | Allinpay request flow 与 `QwProperties` 已收敛，`Skeleton*` 已清空 |
+| **Phase 3 QW convergence** | ✅ | Allinpay request flow 与 `QwProperties` 已收敛，`Skeleton*` 已收敛为占位实现并保留当前注入边界 |
 | **Phase 4 H5 decomposition** | ✅ | `CalculatorPage`、i18n catalog 与 `components/ui` 已收敛，路由边界保留 |
 
 ## 3. 当前阻塞与边界
