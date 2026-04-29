@@ -8,6 +8,8 @@ import java.util.HexFormat;
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -97,6 +99,17 @@ class QwBenefitClientImplTest {
         assertThat(response.protocolStatus()).isEqualTo("ACTIVE");
     }
 
+    @Test
+    void shouldPrepareReusableRestInfrastructureAtConstructionTime() throws Exception {
+        QwBenefitClientImpl client = new QwBenefitClientImpl(qwProperties(), objectMapper);
+
+        Object requestFactory = readField(client, "requestFactory");
+        Object restClient = readField(client, "restClient");
+
+        assertThat(requestFactory).isInstanceOf(SimpleClientHttpRequestFactory.class);
+        assertThat(restClient).isInstanceOf(RestClient.class);
+    }
+
     private QwProperties qwProperties() {
         QwProperties properties = new QwProperties();
         properties.setEnabled(true);
@@ -129,5 +142,11 @@ class QwBenefitClientImplTest {
         Method method = target.getClass().getDeclaredMethod(methodName, parameterTypes);
         method.setAccessible(true);
         return method.invoke(target, args);
+    }
+
+    private Object readField(Object target, String fieldName) throws Exception {
+        var field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.get(target);
     }
 }

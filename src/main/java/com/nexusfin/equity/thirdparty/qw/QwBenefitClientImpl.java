@@ -36,11 +36,17 @@ public class QwBenefitClientImpl implements QwBenefitClient {
     private final ObjectMapper objectMapper;
     private final SecureRandom secureRandom = new SecureRandom();
     private final SecretKey secretKey;
+    private final SimpleClientHttpRequestFactory requestFactory;
+    private final RestClient restClient;
 
     public QwBenefitClientImpl(QwProperties qwProperties, ObjectMapper objectMapper) {
         this.qwProperties = qwProperties;
         this.objectMapper = objectMapper;
         this.secretKey = buildSecretKey();
+        this.requestFactory = buildRequestFactory();
+        this.restClient = RestClient.builder()
+                .requestFactory(requestFactory)
+                .build();
     }
 
     @Override
@@ -110,9 +116,6 @@ public class QwBenefitClientImpl implements QwBenefitClient {
                 encodeBusinessData(businessRequest)
         );
         try {
-            RestClient restClient = RestClient.builder()
-                    .requestFactory(requestFactory())
-                    .build();
             String rawResponse = restClient.post()
                     .uri(URI.create(qwProperties.getHttp().getBaseUrl() + qwProperties.getHttp().getMethodPath()))
                     .contentType(MediaType.APPLICATION_JSON)
@@ -224,7 +227,7 @@ public class QwBenefitClientImpl implements QwBenefitClient {
         }
     }
 
-    private SimpleClientHttpRequestFactory requestFactory() {
+    private SimpleClientHttpRequestFactory buildRequestFactory() {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(qwProperties.getHttp().getConnectTimeoutMs());
         requestFactory.setReadTimeout(qwProperties.getHttp().getReadTimeoutMs());
