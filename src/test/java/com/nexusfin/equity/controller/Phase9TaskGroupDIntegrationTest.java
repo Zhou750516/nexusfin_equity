@@ -2,6 +2,7 @@ package com.nexusfin.equity.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.enums.MemberStatusEnum;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
@@ -91,6 +92,7 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
     @Test
     void shouldForwardRepaymentInfoToYunkaRepayTrial(CapturedOutput output) throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-info", "user-repay-info");
+        createApplicationMapping(memberInfo, "APP-REPAY-INFO-001", "LOAN202604130001");
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "repayAmount": 101850,
@@ -122,7 +124,8 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         assertThat(data.get("loanId").asText()).isEqualTo("LOAN202604130001");
         assertThat(data.get("repayType").asText()).isEqualTo("EARLY");
         assertThat(output).contains("repayment info yunka request begin");
-        assertThat(output).contains("repayment info yunka request success");
+        assertThat(output).contains("scene=repayment info elapsedMs=");
+        assertThat(output).contains("yunka request success");
         assertThat(output).contains("path=/repay/trial");
         assertThat(output).contains("bizOrderNo=LOAN202604130001");
     }
@@ -171,22 +174,24 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
     @Test
     void shouldForwardRepaymentResultToYunkaRepayQuery() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-result", "user-repay-result");
+        createApplicationMapping(memberInfo, "APP-REPAY-RESULT-001", "LOAN202604130002");
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "status": "SUCCESS",
                   "amount": 101850,
                   "successTime": "2026-04-13T14:32:00+08:00",
-                  "remark": "还款成功"
+                  "remark": "还款成功",
+                  "swiftNumber": "RP-LOAN202604130002"
                 }
                 """);
         when(yunkaGatewayClient.proxy(any()))
                 .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", yunkaData));
 
-        mockMvc.perform(get("/api/repayment/result/REP202604130002")
+        mockMvc.perform(get("/api/repayment/result/RP-LOAN202604130002")
                         .cookie(authCookie(memberInfo)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.repaymentId").value("REP202604130002"))
+                .andExpect(jsonPath("$.data.repaymentId").value("RP-LOAN202604130002"))
                 .andExpect(jsonPath("$.data.status").value("success"))
                 .andExpect(jsonPath("$.data.amount").value(1018.5))
                 .andExpect(jsonPath("$.data.repaymentTime").value("2026-04-13T14:32:00+08:00"))
@@ -198,12 +203,13 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         JsonNode data = objectMapper.valueToTree(requestCaptor.getValue().data());
         assertThat(requestCaptor.getValue().path()).isEqualTo("/repay/query");
         assertThat(data.get("uid").asText()).isEqualTo("user-repay-result");
-        assertThat(data.get("swiftNumber").asText()).isEqualTo("REP202604130002");
+        assertThat(data.get("swiftNumber").asText()).isEqualTo("RP-LOAN202604130002");
     }
 
     @Test
     void shouldReturnRepaymentInfoInEnglishWhenAcceptLanguageProvided() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-info-en", "user-repay-info-en");
+        createApplicationMapping(memberInfo, "APP-REPAY-INFO-EN-001", "LOAN202604130009");
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "repayAmount": 101850,
@@ -225,6 +231,21 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(jsonPath("$.data.repaymentType").value("Early repayment"))
                 .andExpect(jsonPath("$.data.tip").value("Repayment takes effect immediately, and interest for the remaining terms will no longer be charged. Please make sure your bank card has sufficient balance."))
                 .andExpect(header().string("Content-Language", "en-US"));
+    }
+
+    private void createApplicationMapping(MemberInfo memberInfo, String applicationId, String loanId) {
+        LoanApplicationMapping mapping = new LoanApplicationMapping();
+        mapping.setApplicationId(applicationId);
+        mapping.setMemberId(memberInfo.getMemberId());
+        mapping.setChannelCode("KJ");
+        mapping.setExternalUserId(memberInfo.getExternalUserId());
+        mapping.setUpstreamQueryType("loanId");
+        mapping.setUpstreamQueryValue(loanId);
+        mapping.setPurpose("rent");
+        mapping.setMappingStatus("ACTIVE");
+        mapping.setCreatedTs(LocalDateTime.now());
+        mapping.setUpdatedTs(LocalDateTime.now());
+        loanApplicationMappingRepository.insert(mapping);
     }
 
     private MemberInfo createMember(String memberId, String externalUserId) {

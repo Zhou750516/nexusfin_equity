@@ -1,5 +1,6 @@
 package com.nexusfin.equity.service.impl;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.nexusfin.equity.config.H5LoanProperties;
 import com.nexusfin.equity.config.YunkaProperties;
@@ -12,8 +13,10 @@ import com.nexusfin.equity.dto.response.RepaymentResultResponse;
 import com.nexusfin.equity.dto.response.RepaymentSmsConfirmResponse;
 import com.nexusfin.equity.dto.response.RepaymentSmsSendResponse;
 import com.nexusfin.equity.dto.response.RepaymentSubmitResponse;
+import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.exception.BizException;
+import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.H5I18nService;
 import com.nexusfin.equity.service.RepaymentService;
@@ -53,6 +56,7 @@ public class RepaymentServiceImpl implements RepaymentService {
     private final H5I18nService h5I18nService;
     private final XiaohuaGatewayService xiaohuaGatewayService;
     private final MemberInfoRepository memberInfoRepository;
+    private final LoanApplicationMappingRepository loanApplicationMappingRepository;
     private final SensitiveDataCipher sensitiveDataCipher;
     private final YunkaCallTemplate yunkaCallTemplate;
 
@@ -63,6 +67,7 @@ public class RepaymentServiceImpl implements RepaymentService {
             H5I18nService h5I18nService,
             XiaohuaGatewayService xiaohuaGatewayService,
             MemberInfoRepository memberInfoRepository,
+            LoanApplicationMappingRepository loanApplicationMappingRepository,
             SensitiveDataCipher sensitiveDataCipher,
             YunkaCallTemplate yunkaCallTemplate
     ) {
@@ -72,12 +77,14 @@ public class RepaymentServiceImpl implements RepaymentService {
         this.h5I18nService = h5I18nService;
         this.xiaohuaGatewayService = xiaohuaGatewayService;
         this.memberInfoRepository = memberInfoRepository;
+        this.loanApplicationMappingRepository = loanApplicationMappingRepository;
         this.sensitiveDataCipher = sensitiveDataCipher;
         this.yunkaCallTemplate = yunkaCallTemplate;
     }
 
     @Override
     public RepaymentInfoResponse getInfo(String uid, String loanId) {
+        validateKnownLoanId(uid, loanId);
         String requestId = next("RT");
         JsonNode data = yunkaCallTemplate.executeForData(
                 YunkaCallTemplate.YunkaCall.of(
@@ -180,6 +187,7 @@ public class RepaymentServiceImpl implements RepaymentService {
 
     @Override
     public RepaymentResultResponse getResult(String uid, String repaymentId) {
+        validateKnownRepaymentId(uid, repaymentId);
         String requestId = next("RQ");
         JsonNode data = yunkaCallTemplate.executeForData(
                 YunkaCallTemplate.YunkaCall.of(
@@ -267,6 +275,43 @@ public class RepaymentServiceImpl implements RepaymentService {
                 .findFirst()
                 .map(BankAccountResponse::accountId)
                 .orElse(bankCardId);
+    }
+
+    private void validateKnownLoanId(String uid, String loanId) {
+        if (findLoanMapping(uid, loanId) == null) {
+            throw new BizException(404, "repayment loan reference not found");
+        }
+    }
+
+    private void validateKnownRepaymentId(String uid, String repaymentId) {
+        if (findLoanMapping(uid, repaymentId) != null) {
+            return;
+        }
+        String loanId = extractLoanId(repaymentId);
+        if (loanId != null && findLoanMapping(uid, loanId) != null) {
+            return;
+        }
+        throw new BizException(404, "repayment reference not found");
+    }
+
+    private LoanApplicationMapping findLoanMapping(String uid, String loanId) {
+        return loanApplicationMappingRepository.selectOne(
+                Wrappers.<LoanApplicationMapping>lambdaQuery()
+                        .eq(LoanApplicationMapping::getExternalUserId, uid)
+                        .eq(LoanApplicationMapping::getUpstreamQueryType, "loanId")
+                        .eq(LoanApplicationMapping::getUpstreamQueryValue, loanId)
+                        .last("limit 1")
+        );
+    }
+
+    private String extractLoanId(String repaymentId) {
+        if (repaymentId == null || repaymentId.isBlank()) {
+            return null;
+        }
+        if (repaymentId.startsWith("RP-") && repaymentId.length() > 3) {
+            return repaymentId.substring(3);
+        }
+        return null;
     }
 
     private MemberProfile loadMemberProfile(String uid) {

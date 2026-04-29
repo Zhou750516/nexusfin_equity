@@ -9,7 +9,10 @@ import com.nexusfin.equity.dto.response.RepaymentInfoResponse;
 import com.nexusfin.equity.dto.response.RepaymentResultResponse;
 import com.nexusfin.equity.dto.response.RepaymentSmsConfirmResponse;
 import com.nexusfin.equity.dto.response.RepaymentSmsSendResponse;
+import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.entity.MemberInfo;
+import com.nexusfin.equity.exception.BizException;
+import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.impl.RepaymentServiceImpl;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
@@ -29,10 +32,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -53,6 +59,9 @@ class RepaymentServiceTest {
     private MemberInfoRepository memberInfoRepository;
 
     @Mock
+    private LoanApplicationMappingRepository loanApplicationMappingRepository;
+
+    @Mock
     private SensitiveDataCipher sensitiveDataCipher;
 
     private RepaymentService repaymentService;
@@ -67,6 +76,7 @@ class RepaymentServiceTest {
                 h5I18nService,
                 xiaohuaGatewayService,
                 memberInfoRepository,
+                loanApplicationMappingRepository,
                 sensitiveDataCipher,
                 new YunkaCallTemplate(yunkaGatewayClient)
         );
@@ -74,6 +84,7 @@ class RepaymentServiceTest {
 
     @Test
     void shouldReturnBoundCardsAndDefaultCardInRepaymentInfo() throws Exception {
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("user-001", "LN-001"));
         when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
                 0,
                 "SUCCESS",
@@ -93,6 +104,20 @@ class RepaymentServiceTest {
         assertThat(response.bankCard().accountId()).isEqualTo("card-001");
         assertThat(response.bankCards()).hasSize(2);
         assertThat(response.smsRequired()).isTrue();
+    }
+
+    @Test
+    void shouldRejectUnknownLoanIdBeforeCallingYunka() {
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(null);
+
+        assertThatThrownBy(() -> repaymentService.getInfo("user-001", "LN-FAKE-001"))
+                .isInstanceOf(BizException.class)
+                .extracting(throwable -> ((BizException) throwable).getCode(),
+                        throwable -> ((BizException) throwable).getErrorMsg())
+                .containsExactly(404, "repayment loan reference not found");
+
+        verifyNoInteractions(yunkaGatewayClient);
+        verify(xiaohuaGatewayService, never()).queryUserCards(any(), any(), any());
     }
 
     @Test
@@ -141,6 +166,7 @@ class RepaymentServiceTest {
 
     @Test
     void shouldMapLatestRepaymentQueryStatuses() throws Exception {
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("user-001", "LN-001"));
         when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
                 0,
                 "SUCCESS",
@@ -148,23 +174,46 @@ class RepaymentServiceTest {
                         {
                           "status": "8004",
                           "amount": 101850,
-                          "swiftNumber": "RP-001",
+                          "swiftNumber": "RP-LN-001",
                           "discount": 2650,
                           "bankCardNum": "6222020202028648"
                         }
                         """)
         ));
-        when(xiaohuaGatewayService.queryUserCards(any(), eq("RP-001"), any()))
+        when(xiaohuaGatewayService.queryUserCards(any(), eq("RP-LN-001"), any()))
                 .thenReturn(new UserCardListResponse(List.of(
                         new UserCardSummary("6222020202028648", "招商银行", "8648", 1)
                 )));
 
-        RepaymentResultResponse response = repaymentService.getResult("user-001", "RP-001");
+        RepaymentResultResponse response = repaymentService.getResult("user-001", "RP-LN-001");
 
         assertThat(response.status()).isEqualTo("processing");
-        assertThat(response.swiftNumber()).isEqualTo("RP-001");
+        assertThat(response.swiftNumber()).isEqualTo("RP-LN-001");
         assertThat(response.interestSaved()).isEqualByComparingTo("26.50");
         assertThat(response.bankCard().lastFour()).isEqualTo("8648");
+    }
+
+    @Test
+    void shouldRejectUnknownRepaymentIdBeforeCallingYunka() {
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(null);
+
+        assertThatThrownBy(() -> repaymentService.getResult("user-001", "RP-LN-FAKE-001"))
+                .isInstanceOf(BizException.class)
+                .extracting(throwable -> ((BizException) throwable).getCode(),
+                        throwable -> ((BizException) throwable).getErrorMsg())
+                .containsExactly(404, "repayment reference not found");
+
+        verifyNoInteractions(yunkaGatewayClient);
+        verify(xiaohuaGatewayService, never()).queryUserCards(any(), any(), any());
+    }
+
+    private LoanApplicationMapping loanMapping(String externalUserId, String loanId) {
+        LoanApplicationMapping mapping = new LoanApplicationMapping();
+        mapping.setApplicationId("APP-" + loanId);
+        mapping.setExternalUserId(externalUserId);
+        mapping.setUpstreamQueryValue(loanId);
+        mapping.setMappingStatus("ACTIVE");
+        return mapping;
     }
 
     private MemberInfo memberInfo() {

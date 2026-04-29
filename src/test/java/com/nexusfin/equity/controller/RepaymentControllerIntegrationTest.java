@@ -2,6 +2,7 @@ package com.nexusfin.equity.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.enums.MemberStatusEnum;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
@@ -91,6 +92,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     @Test
     void shouldReturnRepaymentCardsAndSelectedCard() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-cards", "user-repay-cards");
+        createApplicationMapping(memberInfo, "APP-REPAY-001", "LN-REPAY-001");
         JsonNode yunkaData = objectMapper.readTree("""
                 {"repayAmount":101850}
                 """);
@@ -109,6 +111,17 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(jsonPath("$.data.bankCard.accountId").value("card-001"))
                 .andExpect(jsonPath("$.data.bankCards[1].bankName").value("建设银行"))
                 .andExpect(jsonPath("$.data.smsRequired").value(true));
+    }
+
+    @Test
+    void shouldReturnControlledErrorWhenLoanIdIsUnknown() throws Exception {
+        MemberInfo memberInfo = createMember("mem-repay-unknown-loan", "user-repay-unknown-loan");
+
+        mockMvc.perform(get("/api/repayment/info/LN-FAKE-20260429-001")
+                        .cookie(authCookie(memberInfo)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message").value("repayment loan reference not found"));
     }
 
     @Test
@@ -154,28 +167,55 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     @Test
     void shouldExposeProcessingRepaymentResultWithSwiftNumber() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-result", "user-repay-result");
+        createApplicationMapping(memberInfo, "APP-REPAY-003", "LN-REPAY-003");
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "status": "8004",
                   "amount": 101850,
-                  "swiftNumber": "RP-REPAY-003",
+                  "swiftNumber": "RP-LN-REPAY-003",
                   "discount": 2650
                 }
                 """);
         when(yunkaGatewayClient.proxy(any()))
                 .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", yunkaData));
-        when(xiaohuaGatewayService.queryUserCards(any(), eq("RP-REPAY-003"), any()))
+        when(xiaohuaGatewayService.queryUserCards(any(), eq("RP-LN-REPAY-003"), any()))
                 .thenReturn(new UserCardListResponse(List.of(
                         new UserCardSummary("card-001", "招商银行", "8648", 1)
                 )));
 
-        mockMvc.perform(get("/api/repayment/result/RP-REPAY-003")
+        mockMvc.perform(get("/api/repayment/result/RP-LN-REPAY-003")
                         .cookie(authCookie(memberInfo)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.status").value("processing"))
-                .andExpect(jsonPath("$.data.swiftNumber").value("RP-REPAY-003"))
+                .andExpect(jsonPath("$.data.swiftNumber").value("RP-LN-REPAY-003"))
                 .andExpect(jsonPath("$.data.interestSaved").value(26.5));
+    }
+
+    @Test
+    void shouldReturnControlledErrorWhenRepaymentIdIsUnknown() throws Exception {
+        MemberInfo memberInfo = createMember("mem-repay-unknown-result", "user-repay-unknown-result");
+
+        mockMvc.perform(get("/api/repayment/result/RP-FAKE-20260429-001")
+                        .cookie(authCookie(memberInfo)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message").value("repayment reference not found"));
+    }
+
+    private void createApplicationMapping(MemberInfo memberInfo, String applicationId, String loanId) {
+        LoanApplicationMapping mapping = new LoanApplicationMapping();
+        mapping.setApplicationId(applicationId);
+        mapping.setMemberId(memberInfo.getMemberId());
+        mapping.setChannelCode("KJ");
+        mapping.setExternalUserId(memberInfo.getExternalUserId());
+        mapping.setUpstreamQueryType("loanId");
+        mapping.setUpstreamQueryValue(loanId);
+        mapping.setPurpose("rent");
+        mapping.setMappingStatus("ACTIVE");
+        mapping.setCreatedTs(LocalDateTime.now());
+        mapping.setUpdatedTs(LocalDateTime.now());
+        loanApplicationMappingRepository.insert(mapping);
     }
 
     private MemberInfo createMember(String memberId, String externalUserId) {
