@@ -217,6 +217,35 @@ class BenefitOrderServiceTest {
     }
 
     @Test
+    void shouldRejectOrderCreationWhenNoActiveQwSignProtocolExists() {
+        BenefitProduct product = new BenefitProduct();
+        product.setProductCode("P-QW-SIGN");
+        product.setProductName("权益产品");
+        product.setStatus("ACTIVE");
+        MemberInfo memberInfo = new MemberInfo();
+        memberInfo.setMemberId("mem-qw-sign");
+        MemberChannel memberChannel = new MemberChannel();
+        memberChannel.setChannelCode("KJ");
+        memberChannel.setExternalUserId("user-qw-sign");
+        when(benefitProductRepository.selectById("P-QW-SIGN")).thenReturn(product);
+        when(memberInfoRepository.selectById("mem-qw-sign")).thenReturn(memberInfo);
+        when(memberChannelRepository.selectOne(any())).thenReturn(memberChannel);
+        when(idempotencyService.isProcessed("req-order-qw-sign")).thenReturn(false);
+        when(paymentProtocolService.resolveForBenefitOrder(any(BenefitOrder.class)))
+                .thenThrow(new BizException("QW_SIGN_REQUIRED", "QW sign confirmation required before benefit order"));
+
+        assertThatThrownBy(() -> benefitOrderService.createOrder(
+                "mem-qw-sign",
+                new CreateBenefitOrderRequest("req-order-qw-sign", "P-QW-SIGN", 680000L, true)))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("QW_SIGN_REQUIRED")
+                .hasMessageContaining("QW sign confirmation required before benefit order");
+
+        verify(qwBenefitClient, never()).syncMemberOrder(any());
+        verify(asyncCompensationEnqueueService, never()).enqueue(any());
+    }
+
+    @Test
     void shouldGetExerciseUrlFromQwClient() {
         BenefitOrder order = new BenefitOrder();
         order.setBenefitOrderNo("ord-ex-1");
@@ -272,6 +301,7 @@ class BenefitOrderServiceTest {
         AsyncCompensationEnqueuePayload.QwBenefitPurchaseRetry payload =
                 (AsyncCompensationEnqueuePayload.QwBenefitPurchaseRetry) enqueueCaptor.getValue().requestPayload();
         assertThat(payload.externalUserId()).isEqualTo("user-4");
+        assertThat(payload.userSignId()).isEqualTo(10004L);
         assertThat(payload.productCode()).isEqualTo("P-4");
         assertThat(payload.loanAmount()).isEqualTo(680000L);
     }

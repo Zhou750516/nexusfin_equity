@@ -31,13 +31,10 @@ class QwBenefitPurchaseCompensationExecutorTest {
     @Mock
     private BenefitOrderRepository benefitOrderRepository;
 
-    @Mock
-    private PaymentProtocolService paymentProtocolService;
-
     @Test
     void shouldBuildQwRequestFromTaskPayload() {
         QwBenefitPurchaseCompensationExecutor executor =
-                new QwBenefitPurchaseCompensationExecutor(qwBenefitClient, benefitOrderRepository, paymentProtocolService, new ObjectMapper());
+                new QwBenefitPurchaseCompensationExecutor(qwBenefitClient, benefitOrderRepository, new ObjectMapper());
         AsyncCompensationTask task = new AsyncCompensationTask();
         task.setTaskId("task-qw-1");
         task.setTaskType("QW_BENEFIT_PURCHASE_RETRY");
@@ -46,7 +43,8 @@ class QwBenefitPurchaseCompensationExecutorTest {
                   "externalUserId": "user-001",
                   "benefitOrderNo": "ord-001",
                   "productCode": "HUXUAN_CARD",
-                  "loanAmount": 300000
+                  "loanAmount": 300000,
+                  "userSignId": 998877
                 }
                 """);
         BenefitOrder benefitOrder = new BenefitOrder();
@@ -55,8 +53,6 @@ class QwBenefitPurchaseCompensationExecutorTest {
         benefitOrder.setExternalUserId("user-001");
         benefitOrder.setSyncStatus(BenefitOrderStatusEnum.SYNC_FAIL.name());
         when(benefitOrderRepository.selectById("ord-001")).thenReturn(benefitOrder);
-        when(paymentProtocolService.resolveForBenefitOrder(benefitOrder))
-                .thenReturn(new PaymentProtocolService.ResolvedPaymentProtocol("AGRM-001", "998877", "QW_SIGN"));
         when(qwBenefitClient.syncMemberOrder(any())).thenReturn(new QwMemberSyncResponse(
                 "qw-order-001",
                 "card-001",
@@ -86,9 +82,51 @@ class QwBenefitPurchaseCompensationExecutorTest {
     }
 
     @Test
+    void shouldUseUserSignIdFromPayloadEvenWhenBenefitOrderStateChanges() {
+        QwBenefitPurchaseCompensationExecutor executor =
+                new QwBenefitPurchaseCompensationExecutor(qwBenefitClient, benefitOrderRepository, new ObjectMapper());
+        AsyncCompensationTask task = new AsyncCompensationTask();
+        task.setTaskId("task-qw-payload-sign");
+        task.setTaskType("QW_BENEFIT_PURCHASE_RETRY");
+        task.setRequestPayload("""
+                {
+                  "externalUserId": "user-002",
+                  "benefitOrderNo": "ord-002",
+                  "productCode": "HUXUAN_CARD",
+                  "loanAmount": 500000,
+                  "userSignId": 11223344
+                }
+                """);
+        BenefitOrder benefitOrder = new BenefitOrder();
+        benefitOrder.setBenefitOrderNo("ord-002");
+        benefitOrder.setMemberId("mem-002");
+        benefitOrder.setExternalUserId("user-002");
+        benefitOrder.setPayProtocolNoSnapshot("AGRM-SNAPSHOT-002");
+        benefitOrder.setSyncStatus(BenefitOrderStatusEnum.SYNC_FAIL.name());
+        when(benefitOrderRepository.selectById("ord-002")).thenReturn(benefitOrder);
+        when(qwBenefitClient.syncMemberOrder(any())).thenReturn(new QwMemberSyncResponse(
+                "qw-order-002",
+                "card-002",
+                "1710000000001",
+                0,
+                "HUXUAN_CARD",
+                "惠选卡",
+                "independence",
+                "2026-04-18 12:00:00",
+                "2027-04-18 12:00:00"
+        ));
+
+        executor.execute(task);
+
+        ArgumentCaptor<QwMemberSyncRequest> requestCaptor = ArgumentCaptor.forClass(QwMemberSyncRequest.class);
+        verify(qwBenefitClient).syncMemberOrder(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().userSignId()).isEqualTo(11223344L);
+    }
+
+    @Test
     void shouldSkipRemoteCallWhenBenefitOrderAlreadySynced() {
         QwBenefitPurchaseCompensationExecutor executor =
-                new QwBenefitPurchaseCompensationExecutor(qwBenefitClient, benefitOrderRepository, paymentProtocolService, new ObjectMapper());
+                new QwBenefitPurchaseCompensationExecutor(qwBenefitClient, benefitOrderRepository, new ObjectMapper());
         AsyncCompensationTask task = new AsyncCompensationTask();
         task.setTaskId("task-qw-skip");
         task.setTaskType("QW_BENEFIT_PURCHASE_RETRY");
@@ -97,7 +135,8 @@ class QwBenefitPurchaseCompensationExecutorTest {
                   "externalUserId": "user-001",
                   "benefitOrderNo": "ord-synced",
                   "productCode": "HUXUAN_CARD",
-                  "loanAmount": 300000
+                  "loanAmount": 300000,
+                  "userSignId": 998877
                 }
                 """);
         BenefitOrder benefitOrder = new BenefitOrder();
@@ -114,7 +153,7 @@ class QwBenefitPurchaseCompensationExecutorTest {
     @Test
     void shouldRejectInvalidPayload() {
         QwBenefitPurchaseCompensationExecutor executor =
-                new QwBenefitPurchaseCompensationExecutor(qwBenefitClient, benefitOrderRepository, paymentProtocolService, new ObjectMapper());
+                new QwBenefitPurchaseCompensationExecutor(qwBenefitClient, benefitOrderRepository, new ObjectMapper());
         AsyncCompensationTask task = new AsyncCompensationTask();
         task.setTaskId("task-qw-invalid");
         task.setTaskType("QW_BENEFIT_PURCHASE_RETRY");

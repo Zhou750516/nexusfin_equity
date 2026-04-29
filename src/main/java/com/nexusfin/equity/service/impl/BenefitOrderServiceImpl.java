@@ -148,6 +148,7 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         benefitOrder.setRequestId(request.requestId());
         PaymentProtocolService.ResolvedPaymentProtocol resolvedPaymentProtocol =
                 paymentProtocolService.resolveForBenefitOrder(benefitOrder);
+        Long userSignId = parseUserSignId(resolvedPaymentProtocol.signRequestNo());
         benefitOrder.setPayProtocolNoSnapshot(resolvedPaymentProtocol.protocolNo());
         benefitOrder.setPayProtocolSource(resolvedPaymentProtocol.source());
         benefitOrder.setCreatedTs(LocalDateTime.now());
@@ -157,7 +158,7 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         agreementService.ensureAgreementArtifacts(benefitOrder);
         QwMemberSyncResponse syncResponse;
         try {
-            syncResponse = qwBenefitClient.syncMemberOrder(buildQwMemberSyncRequest(benefitOrder, product, resolvedPaymentProtocol));
+            syncResponse = qwBenefitClient.syncMemberOrder(buildQwMemberSyncRequest(benefitOrder, product, userSignId));
             benefitOrder.setSyncStatus(BenefitOrderStatusEnum.SYNC_SUCCESS.name());
             benefitOrder.setUpdatedTs(LocalDateTime.now());
             benefitOrderRepository.updateById(benefitOrder);
@@ -177,7 +178,8 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
                             benefitOrder.getExternalUserId(),
                             benefitOrder.getBenefitOrderNo(),
                             product.getProductCode(),
-                            benefitOrder.getLoanAmount()
+                            benefitOrder.getLoanAmount(),
+                            userSignId
                     )
             ));
             throw new BenefitPurchaseSyncTimeoutCompensationException("QW_SYNC_TIMEOUT:" + exception.getMessage());
@@ -240,7 +242,7 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
     private QwMemberSyncRequest buildQwMemberSyncRequest(
             BenefitOrder order,
             BenefitProduct product,
-            PaymentProtocolService.ResolvedPaymentProtocol resolvedPaymentProtocol
+            Long userSignId
     ) {
         return new QwMemberSyncRequest(
                 order.getExternalUserId(),
@@ -248,7 +250,7 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
                 order.getLoanAmount(),
                 product.getProductCode(),
                 product.getProductName(),
-                parseUserSignId(resolvedPaymentProtocol.signRequestNo()),
+                userSignId,
                 null,
                 0,
                 null,

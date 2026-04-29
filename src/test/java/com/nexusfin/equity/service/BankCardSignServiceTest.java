@@ -34,6 +34,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -194,6 +195,42 @@ class BankCardSignServiceTest {
         assertThatThrownBy(() -> bankCardSignService.getSignStatus("mem-missing", "6222020202020208"))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("Member not found");
+    }
+
+    @Test
+    void shouldFailFastWhenMerchantIdMissingOutsideMockMode() {
+        MemberInfo memberInfo = buildMember();
+        when(memberInfoRepository.selectById("mem-1")).thenReturn(memberInfo);
+        when(qwProperties.getMode()).thenReturn(QwProperties.Mode.ALLINPAY_DIRECT);
+        when(qwProperties.getDirect()).thenReturn(qwDirectProperties);
+        when(qwDirectProperties.getMerchantId()).thenReturn(null);
+
+        assertThatThrownBy(() -> bankCardSignService.getSignStatus("mem-1", "6222020202020208"))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("QW_SIGN_MERCHANT_ID_MISSING");
+
+        verify(qwBenefitClient, never()).querySignStatus(any());
+    }
+
+    @Test
+    void shouldAllowMissingMerchantIdInMockMode() {
+        MemberInfo memberInfo = buildMember();
+        when(memberInfoRepository.selectById("mem-1")).thenReturn(memberInfo);
+        when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
+        when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户");
+        when(sensitiveDataCipher.decrypt("id-cipher")).thenReturn("110101199003071234");
+        when(qwProperties.getMode()).thenReturn(QwProperties.Mode.MOCK);
+        when(qwBenefitClient.applySign(any())).thenReturn(new QwSignApplyResponse(88001234L, "2026-04-29 10:00:00"));
+
+        BankCardSignApplyResponse response = bankCardSignService.applySign(
+                "mem-1",
+                new BankCardSignApplyRequest("6222020202021234")
+        );
+
+        ArgumentCaptor<QwSignApplyRequest> requestCaptor = ArgumentCaptor.forClass(QwSignApplyRequest.class);
+        verify(qwBenefitClient).applySign(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().merchantId()).isNull();
+        assertThat(response.userSignId()).isEqualTo(88001234L);
     }
 
     private MemberInfo buildMember() {

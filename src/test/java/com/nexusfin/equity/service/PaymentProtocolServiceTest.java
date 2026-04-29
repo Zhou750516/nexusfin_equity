@@ -76,7 +76,8 @@ class PaymentProtocolServiceTest {
 
         assertThatThrownBy(() -> paymentProtocolService.resolveForBenefitOrder(order))
                 .isInstanceOf(BizException.class)
-                .hasMessageContaining("PAY_PROTOCOL_NOT_FOUND");
+                .hasMessageContaining("QW_SIGN_REQUIRED")
+                .hasMessageContaining("QW sign confirmation required before benefit order");
     }
 
     @Test

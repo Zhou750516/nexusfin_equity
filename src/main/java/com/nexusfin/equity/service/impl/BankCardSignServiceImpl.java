@@ -38,6 +38,7 @@ public class BankCardSignServiceImpl implements BankCardSignService {
     private static final String STATUS_SMS_SENT = "SMS_SENT";
     private static final String PROVIDER_QW_SIGN = "QW_SIGN";
     private static final String QW_SIGN_UPSTREAM_FAILED = "QW_SIGN_UPSTREAM_FAILED";
+    private static final String QW_SIGN_MERCHANT_ID_MISSING = "QW_SIGN_MERCHANT_ID_MISSING";
 
     private final MemberInfoRepository memberInfoRepository;
     private final MemberChannelRepository memberChannelRepository;
@@ -220,7 +221,11 @@ public class BankCardSignServiceImpl implements BankCardSignService {
     }
 
     private String resolveMerchantId() {
-        return qwProperties.getDirect() == null ? null : qwProperties.getDirect().getMerchantId();
+        String merchantId = qwProperties.getDirect() == null ? null : qwProperties.getDirect().getMerchantId();
+        if (qwProperties.getMode() != QwProperties.Mode.MOCK && (merchantId == null || merchantId.isBlank())) {
+            throw new BizException(QW_SIGN_MERCHANT_ID_MISSING, "QW sign merchantId is required outside MOCK mode");
+        }
+        return merchantId;
     }
 
     private static String lastFour(String accountNo) {

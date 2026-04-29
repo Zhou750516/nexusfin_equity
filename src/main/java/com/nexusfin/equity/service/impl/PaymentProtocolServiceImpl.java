@@ -92,6 +92,6 @@ public class PaymentProtocolServiceImpl implements PaymentProtocolService {
         log.warn("traceId={} bizOrderNo={} active qw sign reference missing",
                 TraceIdUtil.getTraceId(),
                 order.getBenefitOrderNo());
-        throw new BizException("PAY_PROTOCOL_NOT_FOUND", "Active pay protocol not found for benefit order");
+        throw new BizException("QW_SIGN_REQUIRED", "QW sign confirmation required before benefit order");
     }
 }

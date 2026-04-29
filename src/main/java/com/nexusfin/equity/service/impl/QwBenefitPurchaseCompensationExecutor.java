@@ -8,7 +8,6 @@ import com.nexusfin.equity.enums.BenefitOrderStatusEnum;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.service.AsyncCompensationExecutor;
-import com.nexusfin.equity.service.PaymentProtocolService;
 import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
 import com.nexusfin.equity.thirdparty.qw.QwMemberSyncRequest;
 import com.nexusfin.equity.thirdparty.qw.QwMemberSyncResponse;
@@ -19,18 +18,15 @@ public class QwBenefitPurchaseCompensationExecutor implements AsyncCompensationE
 
     private final QwBenefitClient qwBenefitClient;
     private final BenefitOrderRepository benefitOrderRepository;
-    private final PaymentProtocolService paymentProtocolService;
     private final ObjectMapper objectMapper;
 
     public QwBenefitPurchaseCompensationExecutor(
             QwBenefitClient qwBenefitClient,
             BenefitOrderRepository benefitOrderRepository,
-            PaymentProtocolService paymentProtocolService,
             ObjectMapper objectMapper
     ) {
         this.qwBenefitClient = qwBenefitClient;
         this.benefitOrderRepository = benefitOrderRepository;
-        this.paymentProtocolService = paymentProtocolService;
         this.objectMapper = objectMapper;
     }
 
@@ -51,15 +47,13 @@ public class QwBenefitPurchaseCompensationExecutor implements AsyncCompensationE
         if (benefitOrder == null) {
             throw new BizException("ORDER_NOT_FOUND", "Benefit order not found for compensation");
         }
-        PaymentProtocolService.ResolvedPaymentProtocol resolvedPaymentProtocol =
-                paymentProtocolService.resolveForBenefitOrder(benefitOrder);
         QwMemberSyncResponse response = qwBenefitClient.syncMemberOrder(new QwMemberSyncRequest(
                 payload.externalUserId(),
                 payload.benefitOrderNo(),
                 payload.loanAmount(),
                 payload.productCode(),
                 payload.productCode(),
-                parseUserSignId(resolvedPaymentProtocol.signRequestNo()),
+                requireUserSignId(payload.userSignId()),
                 null,
                 0,
                 null,
@@ -76,12 +70,11 @@ public class QwBenefitPurchaseCompensationExecutor implements AsyncCompensationE
         return new ExecutionResult(writeResponse(response));
     }
 
-    private Long parseUserSignId(String signRequestNo) {
-        try {
-            return Long.valueOf(signRequestNo);
-        } catch (NumberFormatException exception) {
-            throw new BizException("QW_SIGN_REFERENCE_INVALID", "QW sign userSignId is invalid");
+    private Long requireUserSignId(Long userSignId) {
+        if (userSignId == null) {
+            throw new BizException("QW_SIGN_REFERENCE_MISSING", "QW sign userSignId is missing in compensation payload");
         }
+        return userSignId;
     }
 
     private QwBenefitPurchasePayload readPayload(AsyncCompensationTask task) {
@@ -106,7 +99,8 @@ public class QwBenefitPurchaseCompensationExecutor implements AsyncCompensationE
             String externalUserId,
             String benefitOrderNo,
             String productCode,
-            Long loanAmount
+            Long loanAmount,
+            Long userSignId
     ) {
     }
 }
