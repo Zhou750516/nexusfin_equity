@@ -154,8 +154,8 @@ class BenefitOrderControllerIntegrationTest {
         assertThat(order).isNotNull();
         assertThat(order.getLoanAmount()).isEqualTo(800000L);
         assertThat(order.getOrderStatus()).isEqualTo("FIRST_DEDUCT_PENDING");
-        assertThat(order.getPayProtocolNoSnapshot()).isEqualTo("AIP-TEST-" + memberInfo.getMemberId());
-        assertThat(order.getPayProtocolSource()).isEqualTo("ALLINPAY");
+        assertThat(order.getPayProtocolNoSnapshot()).isEqualTo("QW-SIGN-" + memberInfo.getMemberId());
+        assertThat(order.getPayProtocolSource()).isEqualTo("QW_SIGN");
 
         List<SignTask> signTasks = signTaskRepository.selectList(Wrappers.<SignTask>lambdaQuery()
                 .eq(SignTask::getBenefitOrderNo, order.getBenefitOrderNo()));
@@ -235,7 +235,7 @@ class BenefitOrderControllerIntegrationTest {
                         .cookie(authCookie(memberInfo)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.exerciseUrl").value(org.hamcrest.Matchers.containsString("https://mock-qw.test/exercise")))
+                .andExpect(jsonPath("$.data.exerciseUrl").value(org.hamcrest.Matchers.containsString("https://mock-qw.local/exercise")))
                 .andExpect(jsonPath("$.data.exerciseUrl").value(org.hamcrest.Matchers.containsString(order.getBenefitOrderNo())))
                 .andExpect(jsonPath("$.data.expireTime").isNotEmpty());
     }
@@ -410,9 +410,10 @@ class BenefitOrderControllerIntegrationTest {
         MemberPaymentProtocol protocol = new MemberPaymentProtocol();
         protocol.setMemberId(memberId);
         protocol.setExternalUserId(externalUserId);
-        protocol.setProviderCode("ALLINPAY");
-        protocol.setProtocolNo("AIP-TEST-" + memberId);
+        protocol.setProviderCode("QW_SIGN");
+        protocol.setProtocolNo("QW-SIGN-" + memberId);
         protocol.setProtocolStatus("ACTIVE");
+        protocol.setSignRequestNo(String.valueOf(100000L + Math.abs(memberId.hashCode())));
         protocol.setChannelCode("KJ");
         protocol.setSignedTs(LocalDateTime.now());
         protocol.setLastVerifiedTs(LocalDateTime.now());

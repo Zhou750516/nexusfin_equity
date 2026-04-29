@@ -211,9 +211,10 @@ class Phase9TaskGroupECompensationIntegrationTest {
         MemberPaymentProtocol protocol = new MemberPaymentProtocol();
         protocol.setMemberId(memberId);
         protocol.setExternalUserId(externalUserId);
-        protocol.setProviderCode("ALLINPAY");
-        protocol.setProtocolNo("AIP-TEST-" + memberId);
+        protocol.setProviderCode("QW_SIGN");
+        protocol.setProtocolNo("QW-SIGN-" + memberId);
         protocol.setProtocolStatus("ACTIVE");
+        protocol.setSignRequestNo(String.valueOf(100000L + Math.abs(memberId.hashCode())));
         protocol.setChannelCode("KJ");
         protocol.setSignedTs(LocalDateTime.now());
         protocol.setLastVerifiedTs(LocalDateTime.now());
