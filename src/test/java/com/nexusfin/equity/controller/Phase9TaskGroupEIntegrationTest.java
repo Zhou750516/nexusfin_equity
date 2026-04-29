@@ -43,6 +43,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -175,7 +177,7 @@ class Phase9TaskGroupEIntegrationTest {
         assertThat(data.get("loanPeriod").asInt()).isEqualTo(3);
         assertThat(data.get("bankCardNo").asText()).isEqualTo("acc_001");
         assertThat(output).contains("loan apply yunka request begin");
-        assertThat(output).contains("loan apply yunka request success");
+        assertThat(output).contains("scene=loan apply").contains("yunka request success");
         assertThat(output).contains("path=/loan/apply");
         assertThat(output).contains("bizOrderNo=");
     }
@@ -305,6 +307,68 @@ class Phase9TaskGroupEIntegrationTest {
         assertThat(mapping.getMappingStatus()).isEqualTo("PENDING_REVIEW");
     }
 
+    @Test
+    void shouldReuseExistingPendingLoanChainWhenRetryingImmediatelyAfterTimeout() throws Exception {
+        MemberInfo memberInfo = createReadyMember("mem-loan-timeout-retry", "user-loan-timeout-retry");
+        createProduct("HUXUAN_CARD");
+        when(yunkaGatewayClient.proxy(any()))
+                .thenThrow(new UpstreamTimeoutException("Yunka loan apply timeout"));
+
+        String firstResponse = mockMvc.perform(post("/api/loan/apply")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": 3000,
+                                  "term": 3,
+                                  "receivingAccountId": "acc_001",
+                                  "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
+                                  "purpose": "shopping"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.status").value("pending"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        JsonNode firstData = objectMapper.readTree(firstResponse).path("data");
+
+        mockMvc.perform(post("/api/loan/apply")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": 3000,
+                                  "term": 3,
+                                  "receivingAccountId": "acc_001",
+                                  "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
+                                  "purpose": "shopping"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.status").value("pending"))
+                .andExpect(jsonPath("$.data.applicationId").value(firstData.path("applicationId").asText()))
+                .andExpect(jsonPath("$.data.benefitOrderNo").value(firstData.path("benefitOrderNo").asText()));
+
+        assertThat(benefitOrderRepository.selectCount(Wrappers.<BenefitOrder>lambdaQuery()
+                .eq(BenefitOrder::getMemberId, memberInfo.getMemberId()))).isEqualTo(1);
+        assertThat(loanApplicationMappingRepository.selectCount(Wrappers.<LoanApplicationMapping>lambdaQuery()
+                .eq(LoanApplicationMapping::getMemberId, memberInfo.getMemberId()))).isEqualTo(1);
+
+        LoanApplicationMapping mapping = loanApplicationMappingRepository.selectOne(
+                Wrappers.<LoanApplicationMapping>lambdaQuery()
+                        .eq(LoanApplicationMapping::getMemberId, memberInfo.getMemberId())
+                        .last("limit 1"));
+        assertThat(mapping).isNotNull();
+        assertThat(mapping.getApplicationId()).isEqualTo(firstData.path("applicationId").asText());
+        assertThat(mapping.getBenefitOrderNo()).isEqualTo(firstData.path("benefitOrderNo").asText());
+        assertThat(mapping.getMappingStatus()).isEqualTo("PENDING_REVIEW");
+
+        verify(yunkaGatewayClient, times(1)).proxy(any());
+    }
+
     private BenefitProduct createProduct(String productCode) {
         BenefitProduct product = new BenefitProduct();
         product.setProductCode(productCode);
@@ -356,9 +420,10 @@ class Phase9TaskGroupEIntegrationTest {
         MemberPaymentProtocol protocol = new MemberPaymentProtocol();
         protocol.setMemberId(memberId);
         protocol.setExternalUserId(externalUserId);
-        protocol.setProviderCode("ALLINPAY");
-        protocol.setProtocolNo("AIP-TEST-" + memberId);
+        protocol.setProviderCode("QW_SIGN");
+        protocol.setProtocolNo("QW-SIGN-" + memberId);
         protocol.setProtocolStatus("ACTIVE");
+        protocol.setSignRequestNo(String.valueOf(100000L + Math.abs(memberId.hashCode())));
         protocol.setChannelCode("KJ");
         protocol.setSignedTs(LocalDateTime.now());
         protocol.setLastVerifiedTs(LocalDateTime.now());

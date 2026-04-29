@@ -12,6 +12,7 @@ import com.nexusfin.equity.exception.BenefitPurchaseSyncTimeoutCompensationExcep
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.ErrorCodes;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
+import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.service.AsyncCompensationEnqueueService;
 import com.nexusfin.equity.service.AsyncCompensationEnqueuePayload;
 import com.nexusfin.equity.service.BenefitOrderService;
@@ -65,6 +66,14 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
     @Transactional(noRollbackFor = BenefitPurchaseSyncTimeoutCompensationException.class)
     public LoanApplyResponse apply(String memberId, String uid, LoanApplyRequest request) {
         validateApplyRequest(request);
+        LoanApplicationMapping pendingMapping = loanApplicationGateway.findLatestPendingMapping(memberId);
+        if (pendingMapping != null) {
+            return buildPendingResponse(
+                    pendingMapping.getApplicationId(),
+                    pendingMapping.getBenefitOrderNo(),
+                    h5I18nService.text("loan.apply.pendingReview", "借款申请已提交，正在审核中")
+            );
+        }
         String applicationId = next("APP");
         String loanId = next("LN");
         CreateBenefitOrderResponse benefitOrder = benefitOrderService.createOrder(
@@ -151,11 +160,8 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                             upstreamBankCardNum
                     )
             ));
-            return new LoanApplyResponse(
-                applicationId,
-                    "pending",
-                    h5I18nService.text("loan.approval.arrivalTime", "30分钟"),
-                    true,
+            return buildPendingResponse(
+                    applicationId,
                     benefitOrder.benefitOrderNo(),
                     h5I18nService.text("loan.apply.pendingReview", "借款申请已提交，正在审核中")
             );
@@ -181,11 +187,8 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                 request.purpose(),
                 "ACTIVE"
         ));
-        return new LoanApplyResponse(
+        return buildPendingResponse(
                 applicationId,
-                "pending",
-                h5I18nService.text("loan.approval.arrivalTime", "30分钟"),
-                true,
                 benefitOrder.benefitOrderNo(),
                 readRemark(response.data(), "借款申请已提交，正在处理中")
         );
@@ -208,6 +211,17 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                 true,
                 benefitOrderNo,
                 h5I18nService.text("loan.apply.failurePrefix", "权益购买成功，借款申请失败：") + safeReason
+        );
+    }
+
+    private LoanApplyResponse buildPendingResponse(String applicationId, String benefitOrderNo, String message) {
+        return new LoanApplyResponse(
+                applicationId,
+                "pending",
+                h5I18nService.text("loan.approval.arrivalTime", "30分钟"),
+                true,
+                benefitOrderNo,
+                message
         );
     }
 

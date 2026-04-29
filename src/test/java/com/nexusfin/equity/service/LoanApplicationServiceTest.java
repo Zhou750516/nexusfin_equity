@@ -8,6 +8,7 @@ import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.dto.request.LoanApplyRequest;
 import com.nexusfin.equity.dto.response.CreateBenefitOrderResponse;
 import com.nexusfin.equity.dto.response.LoanApplyResponse;
+import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.service.impl.LoanApplicationServiceImpl;
@@ -31,6 +32,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
@@ -72,6 +74,7 @@ class LoanApplicationServiceTest {
 
     @Test
     void shouldForwardRichApplyFieldsAndCreateActiveMappingOnSuccessfulLoanApply() throws Exception {
+        when(loanApplicationGateway.findLatestPendingMapping("mem-001")).thenReturn(null);
         when(benefitOrderService.createOrder(eq("mem-001"), any()))
                 .thenReturn(new CreateBenefitOrderResponse("BEN-001", "FIRST_DEDUCT_PENDING", "/redirect"));
         when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
@@ -117,6 +120,7 @@ class LoanApplicationServiceTest {
 
     @Test
     void shouldReturnFailedResponseWhenLoanApplyIsRejected(CapturedOutput output) throws Exception {
+        when(loanApplicationGateway.findLatestPendingMapping("mem-001")).thenReturn(null);
         when(benefitOrderService.createOrder(eq("mem-001"), any()))
                 .thenReturn(new CreateBenefitOrderResponse("BEN-REJECT", "FIRST_DEDUCT_PENDING", "/redirect"));
         when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
@@ -141,6 +145,7 @@ class LoanApplicationServiceTest {
     @Test
     void shouldEnqueueCompensationAndSavePendingReviewMappingWhenLoanApplyTimesOut(CapturedOutput output)
             throws Exception {
+        when(loanApplicationGateway.findLatestPendingMapping("mem-001")).thenReturn(null);
         when(benefitOrderService.createOrder(eq("mem-001"), any()))
                 .thenReturn(new CreateBenefitOrderResponse("BEN-TIMEOUT", "FIRST_DEDUCT_PENDING", "/redirect"));
         when(yunkaGatewayClient.proxy(any()))
@@ -179,6 +184,27 @@ class LoanApplicationServiceTest {
                 .contains("scene=loan apply")
                 .contains("errorNo=YUNKA_UPSTREAM_TIMEOUT");
         assertThat(countOccurrences(output.getOut(), "errorNo=YUNKA_UPSTREAM_TIMEOUT")).isEqualTo(1);
+    }
+
+    @Test
+    void shouldReuseExistingPendingLoanChainInsteadOfCreatingAnotherOne() throws Exception {
+        LoanApplicationMapping pendingMapping = new LoanApplicationMapping();
+        pendingMapping.setApplicationId("APP-PENDING-001");
+        pendingMapping.setBenefitOrderNo("BEN-PENDING-001");
+        pendingMapping.setMappingStatus("PENDING_REVIEW");
+        when(loanApplicationGateway.findLatestPendingMapping("mem-001")).thenReturn(pendingMapping);
+
+        LoanApplyResponse firstRetry = loanApplicationService.apply("mem-001", "user-001", buildApplyRequest());
+        LoanApplyResponse secondRetry = loanApplicationService.apply("mem-001", "user-001", buildApplyRequest());
+
+        assertThat(firstRetry.applicationId()).isEqualTo("APP-PENDING-001");
+        assertThat(firstRetry.benefitOrderNo()).isEqualTo("BEN-PENDING-001");
+        assertThat(firstRetry.status()).isEqualTo("pending");
+        assertThat(secondRetry.applicationId()).isEqualTo("APP-PENDING-001");
+        assertThat(secondRetry.benefitOrderNo()).isEqualTo("BEN-PENDING-001");
+        verifyNoInteractions(benefitOrderService, yunkaGatewayClient, asyncCompensationEnqueueService);
+        verify(loanApplicationGateway, org.mockito.Mockito.times(2)).findLatestPendingMapping("mem-001");
+        verifyNoMoreInteractions(loanApplicationGateway);
     }
 
     @Test

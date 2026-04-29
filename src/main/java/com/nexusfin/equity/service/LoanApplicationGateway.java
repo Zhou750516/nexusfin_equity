@@ -6,6 +6,8 @@ public interface LoanApplicationGateway {
 
     void save(SaveCommand command);
 
+    LoanApplicationMapping findLatestPendingMapping(String memberId);
+
     LoanApplicationMapping findActiveOrPendingMapping(String memberId, String applicationId);
 
     record SaveCommand(

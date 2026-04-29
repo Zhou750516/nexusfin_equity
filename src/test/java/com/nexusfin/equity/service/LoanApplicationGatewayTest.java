@@ -95,6 +95,23 @@ class LoanApplicationGatewayTest {
     }
 
     @Test
+    void shouldFindLatestPendingMappingByMemberId() {
+        LoanApplicationMapping mapping = new LoanApplicationMapping();
+        mapping.setApplicationId("APP-PENDING-001");
+        mapping.setMemberId("mem-001");
+        mapping.setBenefitOrderNo("BEN-PENDING-001");
+        mapping.setMappingStatus("PENDING_REVIEW");
+        mapping.setCreatedTs(LocalDateTime.now());
+        mapping.setUpdatedTs(LocalDateTime.now());
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(mapping);
+
+        LoanApplicationMapping result = loanApplicationGateway.findLatestPendingMapping("mem-001");
+
+        assertThat(result).isSameAs(mapping);
+        verify(loanApplicationMappingRepository).selectOne(any());
+    }
+
+    @Test
     void shouldReturnNullWhenActiveOrPendingMappingDoesNotExist() {
         when(loanApplicationMappingRepository.selectOne(any())).thenReturn(null);
 

@@ -37,6 +37,17 @@ public class LoanApplicationGatewayImpl implements LoanApplicationGateway {
     }
 
     @Override
+    public LoanApplicationMapping findLatestPendingMapping(String memberId) {
+        return loanApplicationMappingRepository.selectOne(
+                Wrappers.<LoanApplicationMapping>lambdaQuery()
+                        .eq(LoanApplicationMapping::getMemberId, memberId)
+                        .eq(LoanApplicationMapping::getMappingStatus, "PENDING_REVIEW")
+                        .orderByDesc(LoanApplicationMapping::getCreatedTs)
+                        .last("limit 1")
+        );
+    }
+
+    @Override
     public LoanApplicationMapping findActiveOrPendingMapping(String memberId, String applicationId) {
         return loanApplicationMappingRepository.selectOne(
                 Wrappers.<LoanApplicationMapping>lambdaQuery()
