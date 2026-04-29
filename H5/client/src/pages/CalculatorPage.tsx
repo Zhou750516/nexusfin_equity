@@ -7,7 +7,6 @@ import CalculatorPurposeDrawer from "@/components/calculator/CalculatorPurposeDr
 import {
   LOAN_PURPOSE_KEYS,
   PROTOCOL_KEYS,
-  type ProtocolKey,
 } from "@/components/calculator/calculatorOptions";
 import StickyActionBar from "@/components/shared/StickyActionBar";
 import { useCalculatorPageState } from "./useCalculatorPageState";
