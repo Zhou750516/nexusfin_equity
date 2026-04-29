@@ -10,7 +10,7 @@
 
 ## 1. 主线状态
 
-- **当前阶段**：重构降摩擦主线已完成 Phase 0、1A、1B、2A、2B、2C、2D、2E、5、3、4；当前进入结果收口与缺陷清单阶段。
+- **当前阶段**：重构降摩擦主线已完成 Phase 0、1A、1B、2A、2B、2C、2D、2E、5、3、4；当前进入稳态维护阶段。
 - **本周聚焦**：
   1. 维护 `docs/plan` 与 AGENTS 入口的真实状态，避免回填失真
   2. 保持收敛后的测试 context 与 H5 结构，不回退到高摩擦形态
@@ -39,17 +39,16 @@
 
 ### 3.0 当前真实阻塞
 
-| 阻塞项 | 状态 | 影响范围 |
-|------|------|---------|
-| `MySqlAsyncCompensationIntegrationTest` 启动失败 | 🔴 未收口 | MySQL IT / QW Spring 装配 |
+当前无主线阻塞项。
 
-当前已确认的直接原因：
+`2026-04-29` 已确认：
 
-- `AllinpayDirectQwBenefitClient` 存在两个带 `@Autowired` 标记的构造器
-- Spring 在 MySQL IT context 中创建 `routingQwBenefitClient` 依赖链时失败
-- 因此当前可以认为：
-  - 单测与 H5 类型检查通过
-  - 可选 MySQL IT 未通过，尚不能宣称“所有验证闭环已完成”
+- `AllinpayDirectQwBenefitClient` duplicated `@Autowired` constructors` 回归已在 `32722e7` 修复
+- `MySqlAsyncCompensationIntegrationTest` 已恢复通过
+- 当前可以宣称：
+  - 单测通过
+  - H5 类型检查通过
+  - 可选 MySQL IT 也已恢复通过
 
 ### 3.1 无外部阻塞的工作
 
@@ -76,7 +75,7 @@
 - ✅ 2026-04-28：测试 context 已完成第一轮收敛，controller-only 场景已切到更薄的 standalone MockMvc
 - ✅ 2026-04-28：QW / Allinpay direct 收敛完成，`QwProperties.java` 已从 359 行降到 81 行
 - ✅ 2026-04-29：H5 `CalculatorPage.tsx` 已拆到 161 行，`messages.ts` 已拆为按域目录，`components/ui` 已收敛到 8 个保留文件
-- ⚠️ 2026-04-29：补跑 `MySqlAsyncCompensationIntegrationTest` 时发现 QW Spring 装配回归，尚待修复后再宣称验证全绿
+- ✅ 2026-04-29：`32722e7` 已修复 QW Spring 构造器装配回归，`MySqlAsyncCompensationIntegrationTest` 恢复通过
 
 ## 5. 当前入口导航
 
@@ -93,12 +92,9 @@
 - Java 基线命令：`mvn test`
 - H5 基线命令：`cd H5 && ./node_modules/.bin/tsc --noEmit`
 - 当前已确认：
-  - `mvn test`：通过，`207 tests`
+  - `mvn test`：通过，`208 tests`
   - `cd H5 && ./node_modules/.bin/tsc --noEmit`：通过
-  - `MYSQL_IT_ENABLED=true MYSQL_IT_DATABASE=nexusfin_equity mvn -Dtest=MySqlAsyncCompensationIntegrationTest test`：失败
-- MySQL IT 当前失败原因：
-  - `AllinpayDirectQwBenefitClient` duplicated `@Autowired` constructors
-  - 这是收口后新暴露的集成缺陷，不影响“已完成 phase 的结构结论”，但影响“可选 IT 全绿”结论
+  - `MYSQL_IT_ENABLED=true MYSQL_IT_DATABASE=nexusfin_equity mvn -Dtest=MySqlAsyncCompensationIntegrationTest test`：通过
 
 ## 7. 维护规则
 
