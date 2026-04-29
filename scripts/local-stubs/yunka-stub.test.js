@@ -55,3 +55,18 @@ test("should support delay injection from nested payload fields", () => {
   assert.equal(plan.body.code, 0);
   assert.equal(plan.body.data.loanId, "LN-003");
 });
+
+test("should detect timeout marker from platformBenefitOrderNo for public loan apply flow", () => {
+  const fault = resolveFaultDirective({
+    requestId: "REQ_NORMAL_004",
+    path: "/loan/apply",
+    bizOrderNo: "APP-NORMAL-004",
+    data: {
+      platformBenefitOrderNo: "BO_B_P0_1_FAULT_TIMEOUT",
+      loanId: "LN-004",
+    },
+  });
+
+  assert.equal(fault.type, "timeout");
+  assert.equal(fault.marker, "BO_B_P0_1_FAULT_TIMEOUT");
+});
