@@ -6,6 +6,8 @@
 
 - `mvn test`
 - `MYSQL_IT_ENABLED=true MYSQL_IT_DATABASE=nexusfin_equity mvn -Dtest=MySqlRoundTripIntegrationTest,MySqlCallbackFlowIntegrationTest test`
+- `cd H5 && pnpm test`
+- `cd H5 && ./node_modules/.bin/tsc --noEmit`
 - `mvn clean package -DskipTests`
 - `mvn checkstyle:check`
 
