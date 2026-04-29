@@ -6,7 +6,6 @@ import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.dto.request.LoanCalculateRequest;
 import com.nexusfin.equity.dto.response.LoanCalculateResponse;
 import com.nexusfin.equity.dto.response.LoanCalculatorConfigResponse;
-import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.service.H5I18nService;
 import com.nexusfin.equity.service.LoanCalculatorService;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
@@ -16,6 +15,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import static com.nexusfin.equity.util.BizIds.next;
+import static com.nexusfin.equity.util.LoanInputValidator.validateAmountAndTerm;
 import static com.nexusfin.equity.util.MoneyUnits.centsToYuan;
 import static com.nexusfin.equity.util.MoneyUnits.yuanToCent;
 
@@ -92,22 +92,7 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
     }
 
     private void validateCalculateRequest(LoanCalculateRequest request) {
-        validateAmountAndTerm(request.amount(), request.term());
-    }
-
-    private void validateAmountAndTerm(Long amount, Integer term) {
-        H5LoanProperties.AmountRange amountRange = h5LoanProperties.amountRange();
-        if (amount < amountRange.min() || amount > amountRange.max()) {
-            throw new BizException(400, "amount is out of range");
-        }
-        if ((amount - amountRange.min()) % amountRange.step() != 0) {
-            throw new BizException(400, "amount step is invalid");
-        }
-        boolean supportedTerm = h5LoanProperties.termOptions().stream()
-                .anyMatch(termOption -> termOption.value().equals(term));
-        if (!supportedTerm) {
-            throw new BizException(400, "term is unsupported");
-        }
+        validateAmountAndTerm(h5LoanProperties, request.amount(), request.term());
     }
 
     private List<LoanCalculateResponse.RepaymentPlanItem> mapRepaymentPlan(JsonNode repaymentPlan) {

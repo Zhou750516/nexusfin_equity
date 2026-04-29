@@ -25,12 +25,13 @@ import com.nexusfin.equity.thirdparty.yunka.UserCardListRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserCardSummary;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import static com.nexusfin.equity.util.BizIds.next;
+import static com.nexusfin.equity.util.JsonNodes.readLong;
+import static com.nexusfin.equity.util.JsonNodes.readRemark;
+import static com.nexusfin.equity.util.JsonNodes.readText;
 import static com.nexusfin.equity.util.MoneyUnits.centsToYuan;
 import static com.nexusfin.equity.util.MoneyUnits.yuanToCent;
 import com.nexusfin.equity.util.SensitiveDataCipher;
 import com.nexusfin.equity.util.TraceIdUtil;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -323,35 +324,6 @@ public class RepaymentServiceImpl implements RepaymentService {
                     .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
         }
         return successTime.asText("");
-    }
-
-    private long readLong(JsonNode data, String... fields) {
-        for (String field : fields) {
-            JsonNode value = data.path(field);
-            if (!value.isMissingNode() && !value.isNull()) {
-                if (value.isNumber()) {
-                    return value.asLong();
-                }
-                String text = value.asText();
-                if (!text.isBlank()) {
-                    try {
-                        return new BigDecimal(text).setScale(0, RoundingMode.HALF_UP).longValue();
-                    } catch (NumberFormatException ignored) {
-                        return 0L;
-                    }
-                }
-            }
-        }
-        return 0L;
-    }
-
-    private String readText(JsonNode data, String fieldName, String fallback) {
-        String value = data.path(fieldName).asText();
-        return value == null || value.isBlank() ? fallback : value;
-    }
-
-    private String readRemark(JsonNode data, String fallback) {
-        return readText(data, "remark", fallback);
     }
 
     private List<String> repaymentTips() {

@@ -24,6 +24,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import static com.nexusfin.equity.util.BizIds.next;
+import static com.nexusfin.equity.util.JsonNodes.readRemark;
+import static com.nexusfin.equity.util.JsonNodes.readText;
+import static com.nexusfin.equity.util.LoanInputValidator.validateAmountAndTerm;
 import static com.nexusfin.equity.util.MoneyUnits.yuanToCent;
 
 @Service
@@ -189,25 +192,10 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
     }
 
     private void validateApplyRequest(LoanApplyRequest request) {
-        validateAmountAndTerm(request.amount(), request.term());
+        validateAmountAndTerm(h5LoanProperties, request.amount(), request.term());
         String accountId = h5LoanProperties.receivingAccount().accountId();
         if (!accountId.equals(request.receivingAccountId())) {
             throw new BizException(400, "receiving account is unsupported");
-        }
-    }
-
-    private void validateAmountAndTerm(Long amount, Integer term) {
-        H5LoanProperties.AmountRange amountRange = h5LoanProperties.amountRange();
-        if (amount < amountRange.min() || amount > amountRange.max()) {
-            throw new BizException(400, "amount is out of range");
-        }
-        if ((amount - amountRange.min()) % amountRange.step() != 0) {
-            throw new BizException(400, "amount step is invalid");
-        }
-        boolean supportedTerm = h5LoanProperties.termOptions().stream()
-                .anyMatch(termOption -> termOption.value().equals(term));
-        if (!supportedTerm) {
-            throw new BizException(400, "term is unsupported");
         }
     }
 
@@ -221,10 +209,6 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                 benefitOrderNo,
                 h5I18nService.text("loan.apply.failurePrefix", "权益购买成功，借款申请失败：") + safeReason
         );
-    }
-
-    private String readRemark(JsonNode data) {
-        return readRemark(data, "借款申请未通过，权益已购买成功。");
     }
 
     private String resolveBankCardNum(LoanApplyRequest request) {
@@ -243,19 +227,6 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
-    }
-
-    private String readRemark(JsonNode data, String fallback) {
-        String remark = readText(data, "remark", fallback);
-        return remark.isBlank() ? fallback : remark;
-    }
-
-    private String readText(JsonNode data, String fieldName, String fallback) {
-        if (data == null || data.isNull()) {
-            return fallback;
-        }
-        String value = data.path(fieldName).asText();
-        return value.isBlank() ? fallback : value;
     }
 
     private record LoanApplyForwardData(

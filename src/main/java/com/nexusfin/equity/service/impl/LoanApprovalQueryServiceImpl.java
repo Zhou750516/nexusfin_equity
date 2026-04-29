@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import static com.nexusfin.equity.util.BizIds.next;
+import static com.nexusfin.equity.util.JsonNodes.readText;
 import static com.nexusfin.equity.util.MoneyUnits.centsToYuan;
 
 @Service
@@ -257,14 +258,6 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
                 || "審批通過，預計30分鐘內到帳".equals(remark)
                 || "Approved. Funds are expected to arrive within 30 minutes.".equals(remark)
                 || "Đã phê duyệt, dự kiến tiền sẽ đến trong vòng 30 phút.".equals(remark);
-    }
-
-    private String readText(JsonNode data, String fieldName, String fallback) {
-        if (data == null || data.isNull()) {
-            return fallback;
-        }
-        String value = data.path(fieldName).asText();
-        return value.isBlank() ? fallback : value;
     }
 
     private record LoanQueryForwardData(
