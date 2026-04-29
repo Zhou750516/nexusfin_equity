@@ -90,9 +90,11 @@
 ## 6. 当前验证基线
 
 - Java 基线命令：`mvn test`
+- H5 测试命令：`cd H5 && pnpm test`
 - H5 基线命令：`cd H5 && ./node_modules/.bin/tsc --noEmit`
 - 当前已确认：
-  - `mvn test`：通过，`208 tests`
+  - `mvn test`：通过，`213 tests`
+  - `cd H5 && pnpm test`：通过，`15 files / 62 tests`
   - `cd H5 && ./node_modules/.bin/tsc --noEmit`：通过
   - `MYSQL_IT_ENABLED=true MYSQL_IT_DATABASE=nexusfin_equity mvn -Dtest=MySqlAsyncCompensationIntegrationTest test`：通过
 
