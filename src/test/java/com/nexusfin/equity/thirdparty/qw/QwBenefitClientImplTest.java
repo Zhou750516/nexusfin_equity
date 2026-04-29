@@ -115,18 +115,42 @@ class QwBenefitClientImplTest {
     }
 
     @Test
-    void shouldReturnActiveMockResultForSignConfirm() {
+    void shouldReturnMockAgreementForSignConfirm() {
+        QwProperties properties = qwProperties();
+        properties.setMode(QwProperties.Mode.MOCK);
+        QwBenefitClientImpl client = new QwBenefitClientImpl(properties, objectMapper);
+        try {
+            TraceIdUtil.bindTraceId("trace-sign-confirm");
+            QwSignConfirmResponse response = client.confirmSign(new QwSignConfirmRequest(
+                    5678L,
+                    "123456"
+            ));
+
+            assertThat(response.userSignId()).isEqualTo(5678L);
+            assertThat(response.agreementNo()).startsWith("mock-agreement-5678");
+        } finally {
+            TraceIdUtil.clear();
+        }
+    }
+
+    @Test
+    void shouldReturnUniqueMockAgreementPerTraceForSameUserSignId() {
         QwProperties properties = qwProperties();
         properties.setMode(QwProperties.Mode.MOCK);
         QwBenefitClientImpl client = new QwBenefitClientImpl(properties, objectMapper);
 
-        QwSignConfirmResponse response = client.confirmSign(new QwSignConfirmRequest(
-                5678L,
-                "123456"
-        ));
+        try {
+            TraceIdUtil.bindTraceId("trace-clean-user-sign-confirm");
+            QwSignConfirmResponse cleanUserResponse = client.confirmSign(new QwSignConfirmRequest(1234L, "123456"));
+            TraceIdUtil.bindTraceId("trace-happy-user-sign-confirm");
+            QwSignConfirmResponse happyUserResponse = client.confirmSign(new QwSignConfirmRequest(1234L, "123456"));
 
-        assertThat(response.userSignId()).isEqualTo(5678L);
-        assertThat(response.agreementNo()).isEqualTo("mock-agreement-5678");
+            assertThat(cleanUserResponse.agreementNo()).startsWith("mock-agreement-1234-");
+            assertThat(happyUserResponse.agreementNo()).startsWith("mock-agreement-1234-");
+            assertThat(cleanUserResponse.agreementNo()).isNotEqualTo(happyUserResponse.agreementNo());
+        } finally {
+            TraceIdUtil.clear();
+        }
     }
 
     @Test

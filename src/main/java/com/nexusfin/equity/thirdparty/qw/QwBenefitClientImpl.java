@@ -24,6 +24,7 @@ import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import org.slf4j.MDC;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
@@ -354,7 +355,7 @@ public class QwBenefitClientImpl implements QwBenefitClient {
         );
         return new QwSignConfirmResponse(
                 request.userSignId(),
-                "mock-agreement-" + request.userSignId()
+                mockAgreementNo(request.userSignId())
         );
     }
 
@@ -400,6 +401,23 @@ public class QwBenefitClientImpl implements QwBenefitClient {
         } catch (NumberFormatException exception) {
             return 0L;
         }
+    }
+
+    private String mockAgreementNo(Long userSignId) {
+        String base = "mock-agreement-" + userSignId;
+        String traceId = MDC.get(TraceIdUtil.TRACE_ID);
+        if (traceId == null || traceId.isBlank()) {
+            return base;
+        }
+        return base + "-" + shortTraceSuffix(traceId);
+    }
+
+    private String shortTraceSuffix(String traceId) {
+        String normalized = traceId.replaceAll("[^A-Za-z0-9]", "");
+        if (normalized.isBlank()) {
+            return "trace";
+        }
+        return Integer.toUnsignedString(normalized.hashCode(), 16);
     }
 
     private String lastFour(String accountNo) {

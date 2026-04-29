@@ -113,7 +113,7 @@ class BankCardSignControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.userSignId").value(5678))
-                .andExpect(jsonPath("$.data.agreementNo").value("mock-agreement-5678"))
+                .andExpect(jsonPath("$.data.agreementNo").value(org.hamcrest.Matchers.startsWith("mock-agreement-5678")))
                 .andExpect(jsonPath("$.data.signed").value(true))
                 .andExpect(jsonPath("$.data.status").value("SIGNED"));
 
@@ -123,7 +123,7 @@ class BankCardSignControllerIntegrationTest {
                 .last("limit 1"));
         assertThat(protocol).isNotNull();
         assertThat(protocol.getExternalUserId()).isEqualTo(memberInfo.getExternalUserId());
-        assertThat(protocol.getProtocolNo()).isEqualTo("mock-agreement-5678");
+        assertThat(protocol.getProtocolNo()).startsWith("mock-agreement-5678");
         assertThat(protocol.getProtocolStatus()).isEqualTo("ACTIVE");
         assertThat(protocol.getSignRequestNo()).isEqualTo("5678");
     }
