@@ -33,9 +33,7 @@ class AllinpayDirectRequestBuilderTest {
                 29900L,
                 "PROD-001",
                 "权益会员",
-                "13800000000",
-                "Alice",
-                "proto-001",
+                99887766L,
                 "6222020202020202",
                 0,
                 null,
@@ -48,6 +46,10 @@ class AllinpayDirectRequestBuilderTest {
         assertThat(prepared.signature()).isEqualTo("signed-payload");
         assertThat(prepared.requestBody()).contains("\"serviceCode\":\"SYNC001\"");
         assertThat(prepared.requestBody()).contains("\"uniqueId\":\"uid-001\"");
+        assertThat(prepared.requestBody()).contains("\"userSignId\":99887766");
+        assertThat(prepared.requestBody()).doesNotContain("payProtocolNo");
+        assertThat(prepared.requestBody()).doesNotContain("mobile");
+        assertThat(prepared.requestBody()).doesNotContain("username");
     }
 
     @Test
@@ -70,9 +72,7 @@ class AllinpayDirectRequestBuilderTest {
                 29900L,
                 "PROD-001",
                 "权益会员",
-                "13800000000",
-                "Alice",
-                "proto-001",
+                99887766L,
                 "6222020202020202",
                 0,
                 null,

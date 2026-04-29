@@ -11,9 +11,14 @@ import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.impl.BankCardSignServiceImpl;
+import com.nexusfin.equity.config.QwDirectProperties;
+import com.nexusfin.equity.config.QwProperties;
 import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
+import com.nexusfin.equity.thirdparty.qw.QwSignApplyRequest;
 import com.nexusfin.equity.thirdparty.qw.QwSignApplyResponse;
+import com.nexusfin.equity.thirdparty.qw.QwSignConfirmRequest;
 import com.nexusfin.equity.thirdparty.qw.QwSignConfirmResponse;
+import com.nexusfin.equity.thirdparty.qw.QwSignStatusRequest;
 import com.nexusfin.equity.thirdparty.qw.QwSignStatusResponse;
 import com.nexusfin.equity.util.SensitiveDataCipher;
 import java.time.LocalDateTime;
@@ -50,6 +55,12 @@ class BankCardSignServiceTest {
     @Mock
     private PaymentProtocolService paymentProtocolService;
 
+    @Mock
+    private QwProperties qwProperties;
+
+    @Mock
+    private QwDirectProperties qwDirectProperties;
+
     @InjectMocks
     private BankCardSignServiceImpl bankCardSignService;
 
@@ -59,10 +70,18 @@ class BankCardSignServiceTest {
         when(memberInfoRepository.selectById("mem-1")).thenReturn(memberInfo);
         when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
         when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户");
+        when(qwProperties.getDirect()).thenReturn(qwDirectProperties);
+        when(qwDirectProperties.getMerchantId()).thenReturn("200000000007804");
         when(qwBenefitClient.querySignStatus(any())).thenReturn(new QwSignStatusResponse(1));
 
         BankCardSignStatusResponse response = bankCardSignService.getSignStatus("mem-1", "6222020202020208");
 
+        ArgumentCaptor<QwSignStatusRequest> requestCaptor = ArgumentCaptor.forClass(QwSignStatusRequest.class);
+        verify(qwBenefitClient).querySignStatus(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().merchantId()).isEqualTo("200000000007804");
+        assertThat(requestCaptor.getValue().phone()).isEqualTo("13800138000");
+        assertThat(requestCaptor.getValue().name()).isEqualTo("测试用户");
+        assertThat(requestCaptor.getValue().accountNo()).isEqualTo("6222020202020208");
         assertThat(response.signed()).isTrue();
         assertThat(response.status()).isEqualTo("SIGNED");
         assertThat(response.accountNo()).isEqualTo("6222020202020208");
@@ -79,19 +98,29 @@ class BankCardSignServiceTest {
         when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
         when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户");
         when(sensitiveDataCipher.decrypt("id-cipher")).thenReturn("110101199003071234");
-        when(qwBenefitClient.applySign(any())).thenReturn(new QwSignApplyResponse("qw-apply-001"));
+        when(qwProperties.getDirect()).thenReturn(qwDirectProperties);
+        when(qwDirectProperties.getMerchantId()).thenReturn("200000000007804");
+        when(qwBenefitClient.applySign(any())).thenReturn(new QwSignApplyResponse(88001234L, "2026-04-29 10:00:00"));
 
         BankCardSignApplyResponse response = bankCardSignService.applySign(
                 "mem-1",
                 new BankCardSignApplyRequest("6222020202021234")
         );
 
-        assertThat(response.requestNo()).isEqualTo("qw-apply-001");
+        ArgumentCaptor<QwSignApplyRequest> requestCaptor = ArgumentCaptor.forClass(QwSignApplyRequest.class);
+        verify(qwBenefitClient).applySign(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().merchantId()).isEqualTo("200000000007804");
+        assertThat(requestCaptor.getValue().phone()).isEqualTo("13800138000");
+        assertThat(requestCaptor.getValue().name()).isEqualTo("测试用户");
+        assertThat(requestCaptor.getValue().accountNo()).isEqualTo("6222020202021234");
+        assertThat(requestCaptor.getValue().idNo()).isEqualTo("110101199003071234");
+        assertThat(response.userSignId()).isEqualTo(88001234L);
+        assertThat(response.applyTime()).isEqualTo("2026-04-29 10:00:00");
         assertThat(response.status()).isEqualTo("SMS_SENT");
         assertThat(output).contains("bank-card sign apply qw request begin");
         assertThat(output).contains("bank-card sign apply qw request success");
         assertThat(output).contains("bizOrderNo=bank-card-1234");
-        assertThat(output).contains("requestNo=qw-apply-001");
+        assertThat(output).contains("userSignId=88001234");
         assertThat(output).doesNotContain("6222020202021234");
     }
 
@@ -105,19 +134,21 @@ class BankCardSignServiceTest {
         memberChannel.setCreatedTs(LocalDateTime.now());
         when(memberInfoRepository.selectById("mem-1")).thenReturn(memberInfo);
         when(memberChannelRepository.selectLatestByMemberId("mem-1")).thenReturn(memberChannel);
-        when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
-        when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户");
-        when(sensitiveDataCipher.decrypt("id-cipher")).thenReturn("110101199003071234");
-        when(qwBenefitClient.confirmSign(any())).thenReturn(new QwSignConfirmResponse("qw-confirm-001", "ACTIVE"));
+        when(qwBenefitClient.confirmSign(any())).thenReturn(new QwSignConfirmResponse(5678L, "AGRM-5678"));
 
         BankCardSignConfirmResponse response = bankCardSignService.confirmSign(
                 "mem-1",
-                new BankCardSignConfirmRequest("6222020202025678", "123456")
+                new BankCardSignConfirmRequest(5678L, "123456")
         );
 
+        ArgumentCaptor<QwSignConfirmRequest> requestCaptor = ArgumentCaptor.forClass(QwSignConfirmRequest.class);
+        verify(qwBenefitClient).confirmSign(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().userSignId()).isEqualTo(5678L);
+        assertThat(requestCaptor.getValue().verCode()).isEqualTo("123456");
         assertThat(response.signed()).isTrue();
         assertThat(response.status()).isEqualTo("SIGNED");
-        assertThat(response.requestNo()).isEqualTo("qw-confirm-001");
+        assertThat(response.userSignId()).isEqualTo(5678L);
+        assertThat(response.agreementNo()).isEqualTo("AGRM-5678");
 
         ArgumentCaptor<PaymentProtocolService.SavePaymentProtocolCommand> captor =
                 ArgumentCaptor.forClass(PaymentProtocolService.SavePaymentProtocolCommand.class);
@@ -125,14 +156,14 @@ class BankCardSignServiceTest {
         assertThat(captor.getValue().memberId()).isEqualTo("mem-1");
         assertThat(captor.getValue().externalUserId()).isEqualTo("tech-user-1");
         assertThat(captor.getValue().providerCode()).isEqualTo("QW_SIGN");
-        assertThat(captor.getValue().protocolNo()).isEqualTo("QW-SIGN-qw-confirm-001");
-        assertThat(captor.getValue().signRequestNo()).isEqualTo("qw-confirm-001");
+        assertThat(captor.getValue().protocolNo()).isEqualTo("AGRM-5678");
+        assertThat(captor.getValue().signRequestNo()).isEqualTo("5678");
         assertThat(captor.getValue().channelCode()).isEqualTo("KJ");
         assertThat(output).contains("bank-card sign confirm qw request begin");
         assertThat(output).contains("bank-card sign confirm qw request success");
-        assertThat(output).contains("bizOrderNo=bank-card-5678");
-        assertThat(output).contains("requestNo=qw-confirm-001");
-        assertThat(output).doesNotContain("6222020202025678");
+        assertThat(output).contains("bizOrderNo=bank-card-sign-5678");
+        assertThat(output).contains("userSignId=5678");
+        assertThat(output).contains("agreementNo=AGRM-5678");
         assertThat(output).doesNotContain("123456");
     }
 
@@ -140,14 +171,11 @@ class BankCardSignServiceTest {
     void shouldLogWarnWhenSignConfirmRejected(CapturedOutput output) {
         MemberInfo memberInfo = buildMember();
         when(memberInfoRepository.selectById("mem-1")).thenReturn(memberInfo);
-        when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
-        when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户");
-        when(sensitiveDataCipher.decrypt("id-cipher")).thenReturn("110101199003071234");
-        when(qwBenefitClient.confirmSign(any())).thenReturn(new QwSignConfirmResponse("qw-confirm-002", "FAILED"));
+        when(qwBenefitClient.confirmSign(any())).thenReturn(new QwSignConfirmResponse(5678L, ""));
 
         assertThatThrownBy(() -> bankCardSignService.confirmSign(
                 "mem-1",
-                new BankCardSignConfirmRequest("6222020202025678", "123456")
+                new BankCardSignConfirmRequest(5678L, "123456")
         ))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("QW sign confirm failed");
@@ -155,8 +183,7 @@ class BankCardSignServiceTest {
         assertThat(output).contains("bank-card sign confirm qw request begin");
         assertThat(output).contains("errorNo=QW_SIGN_CONFIRM_FAILED");
         assertThat(output).contains("errorMsg=QW sign confirm failed");
-        assertThat(output).contains("bizOrderNo=bank-card-5678");
-        assertThat(output).doesNotContain("6222020202025678");
+        assertThat(output).contains("bizOrderNo=bank-card-sign-5678");
         assertThat(output).doesNotContain("123456");
     }
 

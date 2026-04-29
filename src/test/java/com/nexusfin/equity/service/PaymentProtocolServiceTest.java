@@ -1,7 +1,5 @@
 package com.nexusfin.equity.service;
 
-import com.nexusfin.equity.config.QwProperties;
-import com.nexusfin.equity.config.QwPaymentProperties;
 import com.nexusfin.equity.entity.BenefitOrder;
 import com.nexusfin.equity.entity.MemberPaymentProtocol;
 import com.nexusfin.equity.exception.BizException;
@@ -28,12 +26,6 @@ class PaymentProtocolServiceTest {
     @Mock
     private MemberPaymentProtocolRepository memberPaymentProtocolRepository;
 
-    @Mock
-    private QwProperties qwProperties;
-
-    @Mock
-    private QwPaymentProperties qwPaymentProperties;
-
     @InjectMocks
     private PaymentProtocolServiceImpl paymentProtocolService;
 
@@ -43,40 +35,44 @@ class PaymentProtocolServiceTest {
         MemberPaymentProtocol protocol = new MemberPaymentProtocol();
         protocol.setMemberId("mem-1");
         protocol.setExternalUserId("user-1");
-        protocol.setProviderCode("ALLINPAY");
-        protocol.setProtocolNo("AIP-REAL-001");
+        protocol.setProviderCode("QW_SIGN");
+        protocol.setProtocolNo("AGRM-REAL-001");
+        protocol.setSignRequestNo("998877");
         protocol.setProtocolStatus("ACTIVE");
-        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-1", "ALLINPAY")).thenReturn(protocol);
+        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-1", "QW_SIGN")).thenReturn(protocol);
 
         PaymentProtocolService.ResolvedPaymentProtocol resolved = paymentProtocolService.resolveForBenefitOrder(order);
 
-        assertThat(resolved.protocolNo()).isEqualTo("AIP-REAL-001");
-        assertThat(resolved.source()).isEqualTo("ALLINPAY");
+        assertThat(resolved.protocolNo()).isEqualTo("AGRM-REAL-001");
+        assertThat(resolved.signRequestNo()).isEqualTo("998877");
+        assertThat(resolved.source()).isEqualTo("QW_SIGN");
         verify(memberPaymentProtocolRepository, never()).selectActiveByExternalUserId(any(), any());
     }
 
     @Test
-    void shouldUseConfiguredOverrideWhenRealProtocolMissingAndOverrideAllowed() {
+    void shouldPreferActiveQwSignProtocolByExternalUserIdWhenMemberLookupMisses() {
         BenefitOrder order = buildOrder();
-        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-1", "ALLINPAY")).thenReturn(null);
-        when(memberPaymentProtocolRepository.selectActiveByExternalUserId("user-1", "ALLINPAY")).thenReturn(null);
-        when(qwProperties.getPayment()).thenReturn(qwPaymentProperties);
-        when(qwPaymentProperties.isAllowMemberSyncPayProtocolNoOverride()).thenReturn(true);
-        when(qwPaymentProperties.getMemberSyncPayProtocolNoOverride()).thenReturn("AIP-MOCK-001");
+        MemberPaymentProtocol protocol = new MemberPaymentProtocol();
+        protocol.setExternalUserId("user-1");
+        protocol.setProviderCode("QW_SIGN");
+        protocol.setProtocolNo("AGRM-EXT-001");
+        protocol.setSignRequestNo("665544");
+        protocol.setProtocolStatus("ACTIVE");
+        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-1", "QW_SIGN")).thenReturn(null);
+        when(memberPaymentProtocolRepository.selectActiveByExternalUserId("user-1", "QW_SIGN")).thenReturn(protocol);
 
         PaymentProtocolService.ResolvedPaymentProtocol resolved = paymentProtocolService.resolveForBenefitOrder(order);
 
-        assertThat(resolved.protocolNo()).isEqualTo("AIP-MOCK-001");
-        assertThat(resolved.source()).isEqualTo("TEST_OVERRIDE");
+        assertThat(resolved.protocolNo()).isEqualTo("AGRM-EXT-001");
+        assertThat(resolved.signRequestNo()).isEqualTo("665544");
+        assertThat(resolved.source()).isEqualTo("QW_SIGN");
     }
 
     @Test
-    void shouldRejectWhenNoRealProtocolAndOverrideUnavailable() {
+    void shouldRejectWhenNoActiveQwSignReferenceExists() {
         BenefitOrder order = buildOrder();
-        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-1", "ALLINPAY")).thenReturn(null);
-        when(memberPaymentProtocolRepository.selectActiveByExternalUserId("user-1", "ALLINPAY")).thenReturn(null);
-        when(qwProperties.getPayment()).thenReturn(qwPaymentProperties);
-        when(qwPaymentProperties.isAllowMemberSyncPayProtocolNoOverride()).thenReturn(false);
+        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-1", "QW_SIGN")).thenReturn(null);
+        when(memberPaymentProtocolRepository.selectActiveByExternalUserId("user-1", "QW_SIGN")).thenReturn(null);
 
         assertThatThrownBy(() -> paymentProtocolService.resolveForBenefitOrder(order))
                 .isInstanceOf(BizException.class)
@@ -85,14 +81,14 @@ class PaymentProtocolServiceTest {
 
     @Test
     void shouldInsertActiveProtocolWhenNoCurrentRecordExists() {
-        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-1", "ALLINPAY")).thenReturn(null);
+        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-1", "QW_SIGN")).thenReturn(null);
 
         paymentProtocolService.saveActiveProtocol(new PaymentProtocolService.SavePaymentProtocolCommand(
                 "mem-1",
                 "user-1",
-                "ALLINPAY",
-                "AIP-REAL-001",
-                "sign-req-1",
+                "QW_SIGN",
+                "AGRM-REAL-001",
+                "998877",
                 "KJ",
                 LocalDateTime.of(2026, 4, 2, 10, 30)
         ));
@@ -101,8 +97,9 @@ class PaymentProtocolServiceTest {
         verify(memberPaymentProtocolRepository).insert(captor.capture());
         assertThat(captor.getValue().getMemberId()).isEqualTo("mem-1");
         assertThat(captor.getValue().getExternalUserId()).isEqualTo("user-1");
-        assertThat(captor.getValue().getProviderCode()).isEqualTo("ALLINPAY");
-        assertThat(captor.getValue().getProtocolNo()).isEqualTo("AIP-REAL-001");
+        assertThat(captor.getValue().getProviderCode()).isEqualTo("QW_SIGN");
+        assertThat(captor.getValue().getProtocolNo()).isEqualTo("AGRM-REAL-001");
+        assertThat(captor.getValue().getSignRequestNo()).isEqualTo("998877");
         assertThat(captor.getValue().getProtocolStatus()).isEqualTo("ACTIVE");
     }
 
@@ -111,17 +108,17 @@ class PaymentProtocolServiceTest {
         MemberPaymentProtocol existing = new MemberPaymentProtocol();
         existing.setId(1L);
         existing.setMemberId("mem-1");
-        existing.setProviderCode("ALLINPAY");
-        existing.setProtocolNo("AIP-OLD-001");
+        existing.setProviderCode("QW_SIGN");
+        existing.setProtocolNo("AGRM-OLD-001");
         existing.setProtocolStatus("ACTIVE");
-        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-1", "ALLINPAY")).thenReturn(existing);
+        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-1", "QW_SIGN")).thenReturn(existing);
 
         paymentProtocolService.saveActiveProtocol(new PaymentProtocolService.SavePaymentProtocolCommand(
                 "mem-1",
                 "user-1",
-                "ALLINPAY",
-                "AIP-REAL-002",
-                "sign-req-2",
+                "QW_SIGN",
+                "AGRM-REAL-002",
+                "112233",
                 "KJ",
                 LocalDateTime.of(2026, 4, 2, 11, 0)
         ));
@@ -129,8 +126,8 @@ class PaymentProtocolServiceTest {
         ArgumentCaptor<MemberPaymentProtocol> captor = ArgumentCaptor.forClass(MemberPaymentProtocol.class);
         verify(memberPaymentProtocolRepository).updateById(captor.capture());
         assertThat(captor.getValue().getId()).isEqualTo(1L);
-        assertThat(captor.getValue().getProtocolNo()).isEqualTo("AIP-REAL-002");
-        assertThat(captor.getValue().getSignRequestNo()).isEqualTo("sign-req-2");
+        assertThat(captor.getValue().getProtocolNo()).isEqualTo("AGRM-REAL-002");
+        assertThat(captor.getValue().getSignRequestNo()).isEqualTo("112233");
     }
 
     private BenefitOrder buildOrder() {

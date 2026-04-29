@@ -1,7 +1,8 @@
 package com.nexusfin.equity.dto.response;
 
 public record BankCardSignConfirmResponse(
-        String requestNo,
+        Long userSignId,
+        String agreementNo,
         boolean signed,
         String status
 ) {

@@ -326,14 +326,23 @@ public class QwBenefitClientImpl implements QwBenefitClient {
     }
 
     private QwSignApplyResponse mockSignApply(QwSignApplyRequest request) {
-        return new QwSignApplyResponse("mock-sign-apply-" + lastFour(request.accountNo()));
+        return new QwSignApplyResponse(mockUserSignId(request.accountNo()), "2026-04-29 10:00:00");
     }
 
     private QwSignConfirmResponse mockSignConfirm(QwSignConfirmRequest request) {
         return new QwSignConfirmResponse(
-                "mock-sign-confirm-" + lastFour(request.accountNo()),
-                "ACTIVE"
+                request.userSignId(),
+                "mock-agreement-" + request.userSignId()
         );
+    }
+
+    private Long mockUserSignId(String accountNo) {
+        String lastFour = lastFour(accountNo);
+        try {
+            return Long.valueOf(lastFour);
+        } catch (NumberFormatException exception) {
+            return 0L;
+        }
     }
 
     private String lastFour(String accountNo) {

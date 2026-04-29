@@ -23,7 +23,7 @@ class AllinpayDirectProtocolSerializerTest {
                 ),
                 new AllinpayMemberSyncPayloadMapper().map(
                         new QwMemberSyncRequest(
-                                "user-1", "ord-1", 680000L, "P-1", "权益产品", "13800138000", "张三", "proto-1",
+                                "user-1", "ord-1", 680000L, "P-1", "权益产品", 99887766L,
                                 null, 0, null, null, null, null
                         ),
                         objectMapper
@@ -39,6 +39,8 @@ class AllinpayDirectProtocolSerializerTest {
         assertThat(serializedRequest.requestBody()).contains("\"operation\":\"MEMBER_SYNC\"");
         assertThat(serializedRequest.requestBody()).contains("\"serviceCode\":\"SYNC001\"");
         assertThat(serializedRequest.requestBody()).contains("\"partnerOrderNo\":\"ord-1\"");
+        assertThat(serializedRequest.requestBody()).contains("\"userSignId\":99887766");
+        assertThat(serializedRequest.requestBody()).doesNotContain("payProtocolNo");
         assertThat(serializedRequest.signingPayload()).isEqualTo(serializedRequest.requestBody());
     }
 }

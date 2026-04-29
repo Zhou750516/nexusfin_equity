@@ -10,6 +10,7 @@ import com.nexusfin.equity.util.UpstreamTimeoutDetector;
 import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
     private final YunkaMode mode;
     private final RestClient restClient;
 
+    @Autowired
     public RestYunkaGatewayClient(
             YunkaProperties yunkaProperties,
             RestClient.Builder restClientBuilder

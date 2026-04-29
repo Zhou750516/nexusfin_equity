@@ -32,7 +32,6 @@ import com.nexusfin.equity.thirdparty.qw.QwMemberSyncRequest;
 import com.nexusfin.equity.thirdparty.qw.QwMemberSyncResponse;
 import com.nexusfin.equity.util.OrderStateMachine;
 import com.nexusfin.equity.util.RequestIdUtil;
-import com.nexusfin.equity.util.SensitiveDataCipher;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.slf4j.Logger;
@@ -52,7 +51,6 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
     private final AgreementService agreementService;
     private final IdempotencyService idempotencyService;
     private final PaymentProtocolService paymentProtocolService;
-    private final SensitiveDataCipher sensitiveDataCipher;
     private final QwBenefitClient qwBenefitClient;
     private final AsyncCompensationEnqueueService asyncCompensationEnqueueService;
 
@@ -64,7 +62,6 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
             AgreementService agreementService,
             IdempotencyService idempotencyService,
             PaymentProtocolService paymentProtocolService,
-            SensitiveDataCipher sensitiveDataCipher,
             QwBenefitClient qwBenefitClient,
             AsyncCompensationEnqueueService asyncCompensationEnqueueService
     ) {
@@ -75,7 +72,6 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         this.agreementService = agreementService;
         this.idempotencyService = idempotencyService;
         this.paymentProtocolService = paymentProtocolService;
-        this.sensitiveDataCipher = sensitiveDataCipher;
         this.qwBenefitClient = qwBenefitClient;
         this.asyncCompensationEnqueueService = asyncCompensationEnqueueService;
     }
@@ -161,7 +157,7 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         agreementService.ensureAgreementArtifacts(benefitOrder);
         QwMemberSyncResponse syncResponse;
         try {
-            syncResponse = qwBenefitClient.syncMemberOrder(buildQwMemberSyncRequest(benefitOrder, product, memberInfo));
+            syncResponse = qwBenefitClient.syncMemberOrder(buildQwMemberSyncRequest(benefitOrder, product, resolvedPaymentProtocol));
             benefitOrder.setSyncStatus(BenefitOrderStatusEnum.SYNC_SUCCESS.name());
             benefitOrder.setUpdatedTs(LocalDateTime.now());
             benefitOrderRepository.updateById(benefitOrder);
@@ -241,18 +237,18 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         );
     }
 
-    private QwMemberSyncRequest buildQwMemberSyncRequest(BenefitOrder order, BenefitProduct product, MemberInfo memberInfo) {
-        String realName = sensitiveDataCipher.decrypt(memberInfo.getRealNameEncrypted());
-        String mobile = memberInfo.getMobileEncrypted() == null ? null : sensitiveDataCipher.decrypt(memberInfo.getMobileEncrypted());
+    private QwMemberSyncRequest buildQwMemberSyncRequest(
+            BenefitOrder order,
+            BenefitProduct product,
+            PaymentProtocolService.ResolvedPaymentProtocol resolvedPaymentProtocol
+    ) {
         return new QwMemberSyncRequest(
                 order.getExternalUserId(),
                 order.getBenefitOrderNo(),
                 order.getLoanAmount(),
                 product.getProductCode(),
                 product.getProductName(),
-                mobile,
-                realName,
-                order.getPayProtocolNoSnapshot(),
+                parseUserSignId(resolvedPaymentProtocol.signRequestNo()),
                 null,
                 0,
                 null,
@@ -260,5 +256,13 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
                 null,
                 null
         );
+    }
+
+    private Long parseUserSignId(String signRequestNo) {
+        try {
+            return Long.valueOf(signRequestNo);
+        } catch (NumberFormatException exception) {
+            throw new BizException("QW_SIGN_REFERENCE_INVALID", "QW sign userSignId is invalid");
+        }
     }
 }

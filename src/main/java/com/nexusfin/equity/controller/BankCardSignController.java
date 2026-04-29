@@ -55,7 +55,7 @@ public class BankCardSignController {
     public Result<BankCardSignConfirmResponse> confirmSign(@Valid @RequestBody BankCardSignConfirmRequest request) {
         AuthPrincipal principal = AuthContextUtil.getRequiredPrincipal();
         log.info("traceId={} bizOrderNo={} bank-card sign confirm requested by memberId={}",
-                TraceIdUtil.getTraceId(), bankCardBizOrderNo(request.accountNo()), principal.memberId());
+                TraceIdUtil.getTraceId(), bankCardSignBizOrderNo(request.userSignId()), principal.memberId());
         return Result.success(bankCardSignService.confirmSign(principal.memberId(), request));
     }
 
@@ -64,5 +64,9 @@ public class BankCardSignController {
             return "bank-card-UNKNOWN";
         }
         return "bank-card-" + (accountNo.length() <= 4 ? accountNo : accountNo.substring(accountNo.length() - 4));
+    }
+
+    private String bankCardSignBizOrderNo(Long userSignId) {
+        return userSignId == null ? "bank-card-sign-UNKNOWN" : "bank-card-sign-" + userSignId;
     }
 }

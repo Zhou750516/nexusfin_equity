@@ -1,5 +1,6 @@
 package com.nexusfin.equity.service.impl;
 
+import com.nexusfin.equity.config.QwProperties;
 import com.nexusfin.equity.dto.request.BankCardSignApplyRequest;
 import com.nexusfin.equity.dto.request.BankCardSignConfirmRequest;
 import com.nexusfin.equity.dto.response.BankCardSignApplyResponse;
@@ -36,7 +37,6 @@ public class BankCardSignServiceImpl implements BankCardSignService {
     private static final String STATUS_UNSIGNED = "UNSIGNED";
     private static final String STATUS_SMS_SENT = "SMS_SENT";
     private static final String PROVIDER_QW_SIGN = "QW_SIGN";
-    private static final String PROTOCOL_STATUS_ACTIVE = "ACTIVE";
     private static final String QW_SIGN_UPSTREAM_FAILED = "QW_SIGN_UPSTREAM_FAILED";
 
     private final MemberInfoRepository memberInfoRepository;
@@ -44,19 +44,22 @@ public class BankCardSignServiceImpl implements BankCardSignService {
     private final SensitiveDataCipher sensitiveDataCipher;
     private final QwBenefitClient qwBenefitClient;
     private final PaymentProtocolService paymentProtocolService;
+    private final QwProperties qwProperties;
 
     public BankCardSignServiceImpl(
             MemberInfoRepository memberInfoRepository,
             MemberChannelRepository memberChannelRepository,
             SensitiveDataCipher sensitiveDataCipher,
             QwBenefitClient qwBenefitClient,
-            PaymentProtocolService paymentProtocolService
+            PaymentProtocolService paymentProtocolService,
+            QwProperties qwProperties
     ) {
         this.memberInfoRepository = memberInfoRepository;
         this.memberChannelRepository = memberChannelRepository;
         this.sensitiveDataCipher = sensitiveDataCipher;
         this.qwBenefitClient = qwBenefitClient;
         this.paymentProtocolService = paymentProtocolService;
+        this.qwProperties = qwProperties;
     }
 
     @Override
@@ -69,6 +72,7 @@ public class BankCardSignServiceImpl implements BankCardSignService {
         try {
             MemberInfo memberInfo = resolveMember(memberId);
             QwSignStatusResponse response = qwBenefitClient.querySignStatus(new QwSignStatusRequest(
+                    resolveMerchantId(),
                     decryptRequired(memberInfo.getMobileEncrypted(), "MEMBER_MOBILE_MISSING", "Member mobile is missing"),
                     decryptRequired(memberInfo.getRealNameEncrypted(), "MEMBER_NAME_MISSING", "Member real name is missing"),
                     accountNo
@@ -94,15 +98,20 @@ public class BankCardSignServiceImpl implements BankCardSignService {
         try {
             MemberInfo memberInfo = resolveMember(memberId);
             QwSignApplyResponse response = qwBenefitClient.applySign(new QwSignApplyRequest(
+                    resolveMerchantId(),
                     decryptRequired(memberInfo.getMobileEncrypted(), "MEMBER_MOBILE_MISSING", "Member mobile is missing"),
                     decryptRequired(memberInfo.getRealNameEncrypted(), "MEMBER_NAME_MISSING", "Member real name is missing"),
                     request.accountNo(),
                     decryptRequired(memberInfo.getIdCardEncrypted(), "MEMBER_ID_CARD_MISSING", "Member id card is missing")
             ));
-            String requestNo = firstNonBlank(response == null ? null : response.requestNo(), requestId);
-            log.info("traceId={} bizOrderNo={} requestId={} requestNo={} memberId={} elapsedMs={} status={} bank-card sign apply qw request success",
-                    TraceIdUtil.getTraceId(), bizOrderNo, requestId, requestNo, memberId, elapsedMs(startNanos), STATUS_SMS_SENT);
-            return new BankCardSignApplyResponse(requestNo, STATUS_SMS_SENT);
+            Long userSignId = response == null ? null : response.userSignId();
+            String applyTime = response == null ? null : response.applyTime();
+            if (userSignId == null || applyTime == null || applyTime.isBlank()) {
+                throw new BizException("QW_SIGN_APPLY_INVALID", "QW sign apply response is invalid");
+            }
+            log.info("traceId={} bizOrderNo={} requestId={} userSignId={} memberId={} elapsedMs={} status={} bank-card sign apply qw request success",
+                    TraceIdUtil.getTraceId(), bizOrderNo, requestId, userSignId, memberId, elapsedMs(startNanos), STATUS_SMS_SENT);
+            return new BankCardSignApplyResponse(userSignId, applyTime, STATUS_SMS_SENT);
         } catch (RuntimeException exception) {
             logFailure("bank-card sign apply qw request failed", bizOrderNo, requestId, memberId, startNanos, exception);
             throw exception;
@@ -112,22 +121,19 @@ public class BankCardSignServiceImpl implements BankCardSignService {
     @Override
     public BankCardSignConfirmResponse confirmSign(String memberId, BankCardSignConfirmRequest request) {
         String requestId = RequestIdUtil.nextId("qwsignconfirm");
-        String bizOrderNo = bankCardBizOrderNo(request.accountNo());
+        String bizOrderNo = bankCardSignBizOrderNo(request.userSignId());
         long startNanos = System.nanoTime();
         log.info("traceId={} bizOrderNo={} requestId={} memberId={} bank-card sign confirm qw request begin",
                 TraceIdUtil.getTraceId(), bizOrderNo, requestId, memberId);
         try {
             MemberInfo memberInfo = resolveMember(memberId);
             QwSignConfirmResponse response = qwBenefitClient.confirmSign(new QwSignConfirmRequest(
-                    decryptRequired(memberInfo.getMobileEncrypted(), "MEMBER_MOBILE_MISSING", "Member mobile is missing"),
-                    decryptRequired(memberInfo.getRealNameEncrypted(), "MEMBER_NAME_MISSING", "Member real name is missing"),
-                    request.accountNo(),
-                    decryptRequired(memberInfo.getIdCardEncrypted(), "MEMBER_ID_CARD_MISSING", "Member id card is missing"),
+                    request.userSignId(),
                     request.verificationCode()
             ));
-            String requestNo = firstNonBlank(response == null ? null : response.requestNo(), requestId);
-            String protocolStatus = firstNonBlank(response == null ? null : response.protocolStatus(), PROTOCOL_STATUS_ACTIVE);
-            if (!PROTOCOL_STATUS_ACTIVE.equalsIgnoreCase(protocolStatus)) {
+            Long userSignId = response == null ? null : response.userSignId();
+            String agreementNo = response == null ? null : response.agreementNo();
+            if (userSignId == null || agreementNo == null || agreementNo.isBlank()) {
                 throw new BizException("QW_SIGN_CONFIRM_FAILED", "QW sign confirm failed");
             }
             MemberChannel memberChannel = memberChannelRepository.selectLatestByMemberId(memberId);
@@ -135,14 +141,14 @@ public class BankCardSignServiceImpl implements BankCardSignService {
                     memberInfo.getMemberId(),
                     firstNonBlank(memberInfo.getExternalUserId(), memberInfo.getTechPlatformUserId()),
                     PROVIDER_QW_SIGN,
-                    "QW-SIGN-" + requestNo,
-                    requestNo,
+                    agreementNo,
+                    String.valueOf(userSignId),
                     memberChannel == null ? null : memberChannel.getChannelCode(),
                     LocalDateTime.now()
             ));
-            log.info("traceId={} bizOrderNo={} requestId={} requestNo={} memberId={} elapsedMs={} status={} bank-card sign confirm qw request success",
-                    TraceIdUtil.getTraceId(), bizOrderNo, requestId, requestNo, memberId, elapsedMs(startNanos), STATUS_SIGNED);
-            return new BankCardSignConfirmResponse(requestNo, true, STATUS_SIGNED);
+            log.info("traceId={} bizOrderNo={} requestId={} userSignId={} agreementNo={} memberId={} elapsedMs={} status={} bank-card sign confirm qw request success",
+                    TraceIdUtil.getTraceId(), bizOrderNo, requestId, userSignId, agreementNo, memberId, elapsedMs(startNanos), STATUS_SIGNED);
+            return new BankCardSignConfirmResponse(userSignId, agreementNo, true, STATUS_SIGNED);
         } catch (RuntimeException exception) {
             logFailure("bank-card sign confirm qw request failed", bizOrderNo, requestId, memberId, startNanos, exception);
             throw exception;
@@ -207,6 +213,14 @@ public class BankCardSignServiceImpl implements BankCardSignService {
 
     private static String bankCardBizOrderNo(String accountNo) {
         return "bank-card-" + lastFour(accountNo);
+    }
+
+    private static String bankCardSignBizOrderNo(Long userSignId) {
+        return userSignId == null ? "bank-card-sign-UNKNOWN" : "bank-card-sign-" + userSignId;
+    }
+
+    private String resolveMerchantId() {
+        return qwProperties.getDirect() == null ? null : qwProperties.getDirect().getMerchantId();
     }
 
     private static String lastFour(String accountNo) {

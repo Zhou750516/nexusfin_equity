@@ -57,12 +57,24 @@ class QwBenefitClientImplTest {
         QwBenefitClientImpl client = new QwBenefitClientImpl(properties, objectMapper);
 
         QwSignStatusResponse response = client.querySignStatus(new QwSignStatusRequest(
+                "200000000007804",
                 "13800138000",
                 "测试用户",
                 "6222020202020208"
         ));
 
         assertThat(response.status()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldEncodeMerchantIdInSignStatusRequestBody() throws Exception {
+        QwBenefitClientImpl client = new QwBenefitClientImpl(qwProperties(), objectMapper);
+
+        String ciphertext = (String) invoke(client, "encodeBusinessData", new Class<?>[]{Object.class},
+                new QwSignStatusRequest("200000000007804", "13800138000", "测试用户", "6222020202020208"));
+
+        assertThat(decryptHex("FbRW7iaiwcEKk2kY", ciphertext))
+                .isEqualTo("{\"merchantId\":\"200000000007804\",\"phone\":\"13800138000\",\"name\":\"测试用户\",\"accountNo\":\"6222020202020208\"}");
     }
 
     @Test
@@ -87,13 +99,15 @@ class QwBenefitClientImplTest {
         QwBenefitClientImpl client = new QwBenefitClientImpl(properties, objectMapper);
 
         QwSignApplyResponse response = client.applySign(new QwSignApplyRequest(
+                "200000000007804",
                 "13800138000",
                 "测试用户",
                 "6222020202021234",
                 "110101199003071234"
         ));
 
-        assertThat(response.requestNo()).isEqualTo("mock-sign-apply-1234");
+        assertThat(response.userSignId()).isEqualTo(1234L);
+        assertThat(response.applyTime()).isEqualTo("2026-04-29 10:00:00");
     }
 
     @Test
@@ -103,15 +117,23 @@ class QwBenefitClientImplTest {
         QwBenefitClientImpl client = new QwBenefitClientImpl(properties, objectMapper);
 
         QwSignConfirmResponse response = client.confirmSign(new QwSignConfirmRequest(
-                "13800138000",
-                "测试用户",
-                "6222020202025678",
-                "110101199003071234",
+                5678L,
                 "123456"
         ));
 
-        assertThat(response.requestNo()).isEqualTo("mock-sign-confirm-5678");
-        assertThat(response.protocolStatus()).isEqualTo("ACTIVE");
+        assertThat(response.userSignId()).isEqualTo(5678L);
+        assertThat(response.agreementNo()).isEqualTo("mock-agreement-5678");
+    }
+
+    @Test
+    void shouldEncodeSimplifiedSignConfirmRequestFor0429Contract() throws Exception {
+        QwBenefitClientImpl client = new QwBenefitClientImpl(qwProperties(), objectMapper);
+
+        String ciphertext = (String) invoke(client, "encodeBusinessData", new Class<?>[]{Object.class},
+                new QwSignConfirmRequest(5678L, "123456"));
+
+        assertThat(decryptHex("FbRW7iaiwcEKk2kY", ciphertext))
+                .isEqualTo("{\"userSignId\":5678,\"verCode\":\"123456\"}");
     }
 
     @Test

@@ -26,9 +26,9 @@ public class AllinpayMemberSyncPayloadMapper implements AllinpayDirectPayloadMap
         }
         node.put("productCode", request.productCode());
         node.put("productName", request.productName());
-        node.put("mobile", request.mobile());
-        node.put("username", request.username());
-        node.put("payProtocolNo", request.payProtocolNo());
+        if (request.userSignId() != null) {
+            node.put("userSignId", request.userSignId());
+        }
         if (request.cardNo() != null) {
             node.put("cardNo", request.cardNo());
         }

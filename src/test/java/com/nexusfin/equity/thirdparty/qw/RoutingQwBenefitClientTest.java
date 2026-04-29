@@ -45,7 +45,7 @@ class RoutingQwBenefitClientTest {
         when(qweimobileClient.syncMemberOrder(any())).thenReturn(expected);
 
         QwMemberSyncResponse response = routingClient.syncMemberOrder(new QwMemberSyncRequest(
-                "user-1", "ord-1", 680000L, "P-1", "权益产品", "13800138000", "张三", "proto-1",
+                "user-1", "ord-1", 680000L, "P-1", "权益产品", 99887766L,
                 null, 0, null, null, null, null
         ));
 
@@ -106,6 +106,7 @@ class RoutingQwBenefitClientTest {
         when(qweimobileClient.querySignStatus(any())).thenReturn(expected);
 
         QwSignStatusResponse response = routingClient.querySignStatus(new QwSignStatusRequest(
+                "200000000007804",
                 "13800138000",
                 "测试用户",
                 "6222020202020208"

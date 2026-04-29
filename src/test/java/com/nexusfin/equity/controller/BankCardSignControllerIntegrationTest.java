@@ -91,7 +91,8 @@ class BankCardSignControllerIntegrationTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.requestNo").value("mock-sign-apply-1234"))
+                .andExpect(jsonPath("$.data.userSignId").value(1234))
+                .andExpect(jsonPath("$.data.applyTime").value("2026-04-29 10:00:00"))
                 .andExpect(jsonPath("$.data.status").value("SMS_SENT"));
     }
 
@@ -105,13 +106,14 @@ class BankCardSignControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "accountNo": "6222020202025678",
+                                  "userSignId": 5678,
                                   "verificationCode": "123456"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.requestNo").value("mock-sign-confirm-5678"))
+                .andExpect(jsonPath("$.data.userSignId").value(5678))
+                .andExpect(jsonPath("$.data.agreementNo").value("mock-agreement-5678"))
                 .andExpect(jsonPath("$.data.signed").value(true))
                 .andExpect(jsonPath("$.data.status").value("SIGNED"));
 
@@ -121,9 +123,9 @@ class BankCardSignControllerIntegrationTest {
                 .last("limit 1"));
         assertThat(protocol).isNotNull();
         assertThat(protocol.getExternalUserId()).isEqualTo(memberInfo.getExternalUserId());
-        assertThat(protocol.getProtocolNo()).isEqualTo("QW-SIGN-mock-sign-confirm-5678");
+        assertThat(protocol.getProtocolNo()).isEqualTo("mock-agreement-5678");
         assertThat(protocol.getProtocolStatus()).isEqualTo("ACTIVE");
-        assertThat(protocol.getSignRequestNo()).isEqualTo("mock-sign-confirm-5678");
+        assertThat(protocol.getSignRequestNo()).isEqualTo("5678");
     }
 
     private MemberInfo createMember(String memberId, String externalUserId) {

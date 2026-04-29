@@ -31,10 +31,13 @@ class QwBenefitPurchaseCompensationExecutorTest {
     @Mock
     private BenefitOrderRepository benefitOrderRepository;
 
+    @Mock
+    private PaymentProtocolService paymentProtocolService;
+
     @Test
     void shouldBuildQwRequestFromTaskPayload() {
         QwBenefitPurchaseCompensationExecutor executor =
-                new QwBenefitPurchaseCompensationExecutor(qwBenefitClient, benefitOrderRepository, new ObjectMapper());
+                new QwBenefitPurchaseCompensationExecutor(qwBenefitClient, benefitOrderRepository, paymentProtocolService, new ObjectMapper());
         AsyncCompensationTask task = new AsyncCompensationTask();
         task.setTaskId("task-qw-1");
         task.setTaskType("QW_BENEFIT_PURCHASE_RETRY");
@@ -48,8 +51,12 @@ class QwBenefitPurchaseCompensationExecutorTest {
                 """);
         BenefitOrder benefitOrder = new BenefitOrder();
         benefitOrder.setBenefitOrderNo("ord-001");
+        benefitOrder.setMemberId("mem-001");
+        benefitOrder.setExternalUserId("user-001");
         benefitOrder.setSyncStatus(BenefitOrderStatusEnum.SYNC_FAIL.name());
         when(benefitOrderRepository.selectById("ord-001")).thenReturn(benefitOrder);
+        when(paymentProtocolService.resolveForBenefitOrder(benefitOrder))
+                .thenReturn(new PaymentProtocolService.ResolvedPaymentProtocol("AGRM-001", "998877", "QW_SIGN"));
         when(qwBenefitClient.syncMemberOrder(any())).thenReturn(new QwMemberSyncResponse(
                 "qw-order-001",
                 "card-001",
@@ -70,6 +77,7 @@ class QwBenefitPurchaseCompensationExecutorTest {
         assertThat(requestCaptor.getValue().partnerOrderNo()).isEqualTo("ord-001");
         assertThat(requestCaptor.getValue().productCode()).isEqualTo("HUXUAN_CARD");
         assertThat(requestCaptor.getValue().payAmount()).isEqualTo(300000L);
+        assertThat(requestCaptor.getValue().userSignId()).isEqualTo(998877L);
         assertThat(result.responsePayload()).contains("qw-order-001");
         ArgumentCaptor<BenefitOrder> orderCaptor = ArgumentCaptor.forClass(BenefitOrder.class);
         verify(benefitOrderRepository).updateById(orderCaptor.capture());
@@ -80,7 +88,7 @@ class QwBenefitPurchaseCompensationExecutorTest {
     @Test
     void shouldSkipRemoteCallWhenBenefitOrderAlreadySynced() {
         QwBenefitPurchaseCompensationExecutor executor =
-                new QwBenefitPurchaseCompensationExecutor(qwBenefitClient, benefitOrderRepository, new ObjectMapper());
+                new QwBenefitPurchaseCompensationExecutor(qwBenefitClient, benefitOrderRepository, paymentProtocolService, new ObjectMapper());
         AsyncCompensationTask task = new AsyncCompensationTask();
         task.setTaskId("task-qw-skip");
         task.setTaskType("QW_BENEFIT_PURCHASE_RETRY");
@@ -106,7 +114,7 @@ class QwBenefitPurchaseCompensationExecutorTest {
     @Test
     void shouldRejectInvalidPayload() {
         QwBenefitPurchaseCompensationExecutor executor =
-                new QwBenefitPurchaseCompensationExecutor(qwBenefitClient, benefitOrderRepository, new ObjectMapper());
+                new QwBenefitPurchaseCompensationExecutor(qwBenefitClient, benefitOrderRepository, paymentProtocolService, new ObjectMapper());
         AsyncCompensationTask task = new AsyncCompensationTask();
         task.setTaskId("task-qw-invalid");
         task.setTaskType("QW_BENEFIT_PURCHASE_RETRY");

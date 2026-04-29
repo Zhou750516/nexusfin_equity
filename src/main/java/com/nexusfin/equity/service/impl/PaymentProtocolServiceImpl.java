@@ -1,6 +1,5 @@
 package com.nexusfin.equity.service.impl;
 
-import com.nexusfin.equity.config.QwProperties;
 import com.nexusfin.equity.entity.BenefitOrder;
 import com.nexusfin.equity.entity.MemberPaymentProtocol;
 import com.nexusfin.equity.exception.BizException;
@@ -17,20 +16,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class PaymentProtocolServiceImpl implements PaymentProtocolService {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentProtocolServiceImpl.class);
-    private static final String PROVIDER_ALLINPAY = "ALLINPAY";
+    private static final String PROVIDER_QW_SIGN = "QW_SIGN";
     private static final String STATUS_ACTIVE = "ACTIVE";
-    private static final String SOURCE_ALLINPAY = "ALLINPAY";
-    private static final String SOURCE_TEST_OVERRIDE = "TEST_OVERRIDE";
+    private static final String SOURCE_QW_SIGN = "QW_SIGN";
 
     private final MemberPaymentProtocolRepository memberPaymentProtocolRepository;
-    private final QwProperties qwProperties;
 
-    public PaymentProtocolServiceImpl(
-            MemberPaymentProtocolRepository memberPaymentProtocolRepository,
-            QwProperties qwProperties
-    ) {
+    public PaymentProtocolServiceImpl(MemberPaymentProtocolRepository memberPaymentProtocolRepository) {
         this.memberPaymentProtocolRepository = memberPaymentProtocolRepository;
-        this.qwProperties = qwProperties;
     }
 
     @Override
@@ -73,31 +66,30 @@ public class PaymentProtocolServiceImpl implements PaymentProtocolService {
     public ResolvedPaymentProtocol resolveForBenefitOrder(BenefitOrder order) {
         MemberPaymentProtocol activeProtocol = memberPaymentProtocolRepository.selectActiveByMemberId(
                 order.getMemberId(),
-                PROVIDER_ALLINPAY
+                PROVIDER_QW_SIGN
         );
         if (activeProtocol == null && order.getExternalUserId() != null && !order.getExternalUserId().isBlank()) {
             activeProtocol = memberPaymentProtocolRepository.selectActiveByExternalUserId(
                     order.getExternalUserId(),
-                    PROVIDER_ALLINPAY
+                    PROVIDER_QW_SIGN
             );
         }
-        if (activeProtocol != null && activeProtocol.getProtocolNo() != null && !activeProtocol.getProtocolNo().isBlank()) {
-            log.info("traceId={} bizOrderNo={} resolved active payProtocolNo from {}",
+        if (activeProtocol != null
+                && activeProtocol.getProtocolNo() != null
+                && !activeProtocol.getProtocolNo().isBlank()
+                && activeProtocol.getSignRequestNo() != null
+                && !activeProtocol.getSignRequestNo().isBlank()) {
+            log.info("traceId={} bizOrderNo={} resolved active qw sign reference from {}",
                     TraceIdUtil.getTraceId(),
                     order.getBenefitOrderNo(),
-                    SOURCE_ALLINPAY);
-            return new ResolvedPaymentProtocol(activeProtocol.getProtocolNo(), SOURCE_ALLINPAY);
+                    SOURCE_QW_SIGN);
+            return new ResolvedPaymentProtocol(
+                    activeProtocol.getProtocolNo(),
+                    activeProtocol.getSignRequestNo(),
+                    SOURCE_QW_SIGN
+            );
         }
-        String configuredOverride = qwProperties.getPayment().getMemberSyncPayProtocolNoOverride();
-        if (qwProperties.getPayment().isAllowMemberSyncPayProtocolNoOverride()
-                && configuredOverride != null
-                && !configuredOverride.isBlank()) {
-            log.info("traceId={} bizOrderNo={} using configured qw payProtocolNo override",
-                    TraceIdUtil.getTraceId(),
-                    order.getBenefitOrderNo());
-            return new ResolvedPaymentProtocol(configuredOverride, SOURCE_TEST_OVERRIDE);
-        }
-        log.warn("traceId={} bizOrderNo={} active payProtocolNo missing",
+        log.warn("traceId={} bizOrderNo={} active qw sign reference missing",
                 TraceIdUtil.getTraceId(),
                 order.getBenefitOrderNo());
         throw new BizException("PAY_PROTOCOL_NOT_FOUND", "Active pay protocol not found for benefit order");

@@ -38,7 +38,7 @@ class AllinpayDirectQwBenefitClientTest {
         );
 
         assertThatThrownBy(() -> client.syncMemberOrder(new QwMemberSyncRequest(
-                "user-1", "ord-1", 680000L, "P-1", "权益产品", "13800138000", "张三", "proto-1",
+                "user-1", "ord-1", 680000L, "P-1", "权益产品", 99887766L,
                 null, 0, null, null, null, null
         )))
                 .isInstanceOf(BizException.class)
@@ -69,7 +69,7 @@ class AllinpayDirectQwBenefitClientTest {
         );
 
         assertThatThrownBy(() -> client.syncMemberOrder(new QwMemberSyncRequest(
-                "user-1", "ord-1", 680000L, "P-1", "权益产品", "13800138000", "张三", "proto-1",
+                "user-1", "ord-1", 680000L, "P-1", "权益产品", 99887766L,
                 null, 0, null, null, null, null
         )))
                 .isInstanceOf(BizException.class)
@@ -149,7 +149,7 @@ class AllinpayDirectQwBenefitClientTest {
         );
 
         QwMemberSyncResponse response = client.syncMemberOrder(new QwMemberSyncRequest(
-                "user-1", "ord-1", 680000L, "P-1", "权益产品", "13800138000", "张三", "proto-1",
+                "user-1", "ord-1", 680000L, "P-1", "权益产品", 99887766L,
                 null, 0, null, null, null, null
         ));
 

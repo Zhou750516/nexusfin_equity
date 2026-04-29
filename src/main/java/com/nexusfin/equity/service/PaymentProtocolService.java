@@ -20,6 +20,10 @@ public interface PaymentProtocolService {
     ) {
     }
 
-    record ResolvedPaymentProtocol(String protocolNo, String source) {
+    record ResolvedPaymentProtocol(
+            String protocolNo,
+            String signRequestNo,
+            String source
+    ) {
     }
 }
