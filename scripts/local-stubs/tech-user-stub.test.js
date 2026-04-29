@@ -17,6 +17,12 @@ test("should keep happy-path token and support dedicated no-sign and clean token
   assert.notEqual(cleanUser.userId, readyUser.userId);
   assert.notEqual(cleanUser.userId, noSignUser.userId);
 
+  const secondCleanUser = resolveProfile("Bearer mock-tech-token-clean-2", profiles);
+  assert.equal(secondCleanUser.userId, "tech-user-local-clean-002");
+  assert.notEqual(secondCleanUser.userId, readyUser.userId);
+  assert.notEqual(secondCleanUser.userId, noSignUser.userId);
+  assert.notEqual(secondCleanUser.userId, cleanUser.userId);
+
   const invalidUser = resolveProfile("Bearer unsupported-token", profiles);
   assert.equal(invalidUser, null);
 });
