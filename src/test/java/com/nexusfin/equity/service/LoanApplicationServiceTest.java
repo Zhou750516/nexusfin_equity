@@ -135,10 +135,12 @@ class LoanApplicationServiceTest {
                 .contains("scene=loan apply")
                 .contains("errorNo=YUNKA_UPSTREAM_REJECTED")
                 .doesNotContain("yunka request success");
+        assertThat(countOccurrences(output.getOut(), "errorNo=YUNKA_UPSTREAM_REJECTED")).isEqualTo(1);
     }
 
     @Test
-    void shouldEnqueueCompensationAndSavePendingReviewMappingWhenLoanApplyTimesOut() throws Exception {
+    void shouldEnqueueCompensationAndSavePendingReviewMappingWhenLoanApplyTimesOut(CapturedOutput output)
+            throws Exception {
         when(benefitOrderService.createOrder(eq("mem-001"), any()))
                 .thenReturn(new CreateBenefitOrderResponse("BEN-TIMEOUT", "FIRST_DEDUCT_PENDING", "/redirect"));
         when(yunkaGatewayClient.proxy(any()))
@@ -173,6 +175,10 @@ class LoanApplicationServiceTest {
         assertThat(payload.benefitOrderNo()).isEqualTo("BEN-TIMEOUT");
         assertThat(payload.uid()).isEqualTo("user-001");
         assertThat(payload.applyId()).isEqualTo(response.applicationId());
+        assertThat(output)
+                .contains("scene=loan apply")
+                .contains("errorNo=YUNKA_UPSTREAM_TIMEOUT");
+        assertThat(countOccurrences(output.getOut(), "errorNo=YUNKA_UPSTREAM_TIMEOUT")).isEqualTo(1);
     }
 
     @Test
@@ -285,5 +291,9 @@ class LoanApplicationServiceTest {
                         "/benefit/sync"
                 )
         );
+    }
+
+    private int countOccurrences(String text, String fragment) {
+        return text.split(java.util.regex.Pattern.quote(fragment), -1).length - 1;
     }
 }

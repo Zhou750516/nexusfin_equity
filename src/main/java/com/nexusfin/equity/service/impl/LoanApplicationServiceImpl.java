@@ -20,9 +20,6 @@ import com.nexusfin.equity.service.LoanApplicationGateway;
 import com.nexusfin.equity.service.LoanApplicationService;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
-import com.nexusfin.equity.util.TraceIdUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,8 +28,6 @@ import static com.nexusfin.equity.util.MoneyUnits.yuanToCent;
 
 @Service
 public class LoanApplicationServiceImpl implements LoanApplicationService {
-
-    private static final Logger log = LoggerFactory.getLogger(LoanApplicationServiceImpl.class);
 
     private final H5LoanProperties h5LoanProperties;
     private final H5BenefitsProperties h5BenefitsProperties;
@@ -104,7 +99,6 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                 request.optionInfo(),
                 request.imageInfo()
         );
-        long startNanos = System.nanoTime();
         try {
             response = yunkaCallTemplate.execute(
                     YunkaCallTemplate.YunkaCall.of(
@@ -124,16 +118,6 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                     }
             );
         } catch (UpstreamTimeoutException exception) {
-            log.warn("traceId={} bizOrderNo={} requestId={} memberId={} benefitOrderNo={} path={} elapsedMs={} errorNo={} errorMsg={}",
-                    TraceIdUtil.getTraceId(),
-                    applicationId,
-                    requestId,
-                    memberId,
-                    benefitOrder.benefitOrderNo(),
-                    yunkaProperties.paths().loanApply(),
-                    java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos),
-                    ErrorCodes.YUNKA_UPSTREAM_TIMEOUT,
-                    "Yunka loan apply timeout, async compensation enqueued");
             loanApplicationGateway.save(new LoanApplicationGateway.SaveCommand(
                     memberId,
                     uid,
@@ -173,16 +157,6 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                     h5I18nService.text("loan.apply.pendingReview", "借款申请已提交，正在审核中")
             );
         } catch (BizException exception) {
-            log.warn("traceId={} bizOrderNo={} requestId={} memberId={} benefitOrderNo={} path={} elapsedMs={} errorNo={} errorMsg={}",
-                    TraceIdUtil.getTraceId(),
-                    applicationId,
-                    requestId,
-                    memberId,
-                    benefitOrder.benefitOrderNo(),
-                    yunkaProperties.paths().loanApply(),
-                    java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos),
-                    exception.getErrorNo(),
-                    exception.getErrorMsg());
             return buildLoanFailedResponse(
                     applicationId,
                     benefitOrder.benefitOrderNo(),
@@ -192,20 +166,6 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                             : exception.getMessage()
             );
         } catch (RuntimeException exception) {
-            log.warn("traceId={} bizOrderNo={} requestId={} memberId={} benefitOrderNo={} path={} elapsedMs={} errorNo={} errorMsg={}",
-                    TraceIdUtil.getTraceId(),
-                    applicationId,
-                    requestId,
-                    memberId,
-                    benefitOrder.benefitOrderNo(),
-                    yunkaProperties.paths().loanApply(),
-                    java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos),
-                    exception instanceof BizException bizException
-                            ? bizException.getErrorNo()
-                            : ErrorCodes.YUNKA_UPSTREAM_FAILED,
-                    exception instanceof BizException bizException
-                            ? bizException.getErrorMsg()
-                            : exception.getMessage());
             return buildLoanFailedResponse(applicationId, benefitOrder.benefitOrderNo(), exception.getMessage());
         }
         String upstreamLoanId = readText(response.data(), "loanId", loanId);
