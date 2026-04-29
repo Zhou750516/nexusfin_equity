@@ -5,13 +5,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class RoutingQwBenefitClientTest {
 
     @Mock
@@ -19,6 +21,19 @@ class RoutingQwBenefitClientTest {
 
     @Mock
     private AllinpayDirectQwBenefitClient allinpayDirectClient;
+
+    @Test
+    void shouldLogConfiguredModeAndDelegatesAtInitialization(CapturedOutput output) {
+        QwProperties properties = new QwProperties();
+        properties.setMode(QwProperties.Mode.ALLINPAY_DIRECT);
+
+        new RoutingQwBenefitClient(properties, qweimobileClient, allinpayDirectClient);
+
+        assertThat(output).contains("qw benefit client routing initialized");
+        assertThat(output).contains("mode=ALLINPAY_DIRECT");
+        assertThat(output).contains("businessDelegate=allinpayDirectClient");
+        assertThat(output).contains("signDelegate=qweimobileClient");
+    }
 
     @Test
     void shouldRouteMockModeToQweimobileClient() {
@@ -54,6 +69,21 @@ class RoutingQwBenefitClientTest {
     }
 
     @Test
+    void shouldRouteHttpModeToQweimobileClient() {
+        QwProperties properties = new QwProperties();
+        properties.setMode(QwProperties.Mode.HTTP);
+        RoutingQwBenefitClient routingClient = new RoutingQwBenefitClient(properties, qweimobileClient, allinpayDirectClient);
+        QwExerciseUrlResponse expected = new QwExerciseUrlResponse(0, "https://redirect-http.test", "token-http",
+                "2026-03-31 00:00:00", "2027-03-31 00:00:00");
+        when(qweimobileClient.getExerciseUrl(any())).thenReturn(expected);
+
+        QwExerciseUrlResponse response = routingClient.getExerciseUrl(new QwExerciseUrlRequest("user-http", "ord-http"));
+
+        assertThat(response).isSameAs(expected);
+        verify(qweimobileClient).getExerciseUrl(any());
+    }
+
+    @Test
     void shouldRouteAllinpayDirectModeToDirectClient() {
         QwProperties properties = new QwProperties();
         properties.setMode(QwProperties.Mode.ALLINPAY_DIRECT);
@@ -65,5 +95,23 @@ class RoutingQwBenefitClientTest {
 
         assertThat(response).isSameAs(expected);
         verify(allinpayDirectClient).notifyLending(any());
+    }
+
+    @Test
+    void shouldAlwaysRouteSignMethodsToQweimobileClientEvenWhenModeIsAllinpayDirect() {
+        QwProperties properties = new QwProperties();
+        properties.setMode(QwProperties.Mode.ALLINPAY_DIRECT);
+        RoutingQwBenefitClient routingClient = new RoutingQwBenefitClient(properties, qweimobileClient, allinpayDirectClient);
+        QwSignStatusResponse expected = new QwSignStatusResponse(1);
+        when(qweimobileClient.querySignStatus(any())).thenReturn(expected);
+
+        QwSignStatusResponse response = routingClient.querySignStatus(new QwSignStatusRequest(
+                "13800138000",
+                "测试用户",
+                "6222020202020208"
+        ));
+
+        assertThat(response).isSameAs(expected);
+        verify(qweimobileClient).querySignStatus(any());
     }
 }

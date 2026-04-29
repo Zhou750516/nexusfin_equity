@@ -66,6 +66,21 @@ class QwBenefitClientImplTest {
     }
 
     @Test
+    void shouldReturnMockExerciseUrlForMockMode() {
+        QwProperties properties = qwProperties();
+        properties.setMode(QwProperties.Mode.MOCK);
+        properties.getHttp().setMockExerciseBaseUrl("https://mock-qw.test/exercise");
+        QwBenefitClientImpl client = new QwBenefitClientImpl(properties, objectMapper);
+
+        QwExerciseUrlResponse response = client.getExerciseUrl(new QwExerciseUrlRequest("user-1", "ord-1"));
+
+        assertThat(response.memberFlag()).isEqualTo(0);
+        assertThat(response.redirectUrl()).contains("https://mock-qw.test/exercise");
+        assertThat(response.redirectUrl()).contains("partnerOrderNo=ord-1");
+        assertThat(response.token()).isEqualTo("mock-token-ord-1");
+    }
+
+    @Test
     void shouldReturnMockApplyRequestNoForSignApply() {
         QwProperties properties = qwProperties();
         properties.setMode(QwProperties.Mode.MOCK);
