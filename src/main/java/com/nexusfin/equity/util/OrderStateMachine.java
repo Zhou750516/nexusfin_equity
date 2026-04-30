@@ -17,8 +17,11 @@ public final class OrderStateMachine {
         }
     }
 
-    public static void applyFirstDeductResult(BenefitOrder order, boolean success) {
+    public static boolean applyFirstDeductResult(BenefitOrder order, boolean success) {
         // 首扣结果直接决定订单走直连路径还是兜底路径，因此需要一次性更新订单与支付视图状态。
+        if (BenefitOrderStatusEnum.FIRST_DEDUCT_SUCCESS.name().equals(order.getOrderStatus())) {
+            return false;
+        }
         if (success) {
             order.setOrderStatus(BenefitOrderStatusEnum.FIRST_DEDUCT_SUCCESS.name());
             order.setFirstDeductStatus(PaymentStatusEnum.SUCCESS.name());
@@ -28,6 +31,7 @@ public final class OrderStateMachine {
             order.setFirstDeductStatus(PaymentStatusEnum.FAIL.name());
             order.setSyncStatus(BenefitOrderStatusEnum.SYNC_PENDING.name());
         }
+        return true;
     }
 
     public static void ensureCanTriggerFallback(BenefitOrder order) {

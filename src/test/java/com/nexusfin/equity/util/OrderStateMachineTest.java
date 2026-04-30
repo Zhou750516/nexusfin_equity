@@ -20,8 +20,24 @@ class OrderStateMachineTest {
     void shouldApplyFirstDeductSuccessState() {
         BenefitOrder order = new BenefitOrder();
 
-        OrderStateMachine.applyFirstDeductResult(order, true);
+        boolean transitioned = OrderStateMachine.applyFirstDeductResult(order, true);
 
+        assertThat(transitioned).isTrue();
+        assertThat(order.getOrderStatus()).isEqualTo("FIRST_DEDUCT_SUCCESS");
+        assertThat(order.getFirstDeductStatus()).isEqualTo("SUCCESS");
+        assertThat(order.getSyncStatus()).isEqualTo("SYNC_SUCCESS");
+    }
+
+    @Test
+    void shouldKeepFirstDeductSuccessTerminalWhenLaterFailureArrives() {
+        BenefitOrder order = new BenefitOrder();
+        order.setOrderStatus("FIRST_DEDUCT_SUCCESS");
+        order.setFirstDeductStatus("SUCCESS");
+        order.setSyncStatus("SYNC_SUCCESS");
+
+        boolean transitioned = OrderStateMachine.applyFirstDeductResult(order, false);
+
+        assertThat(transitioned).isFalse();
         assertThat(order.getOrderStatus()).isEqualTo("FIRST_DEDUCT_SUCCESS");
         assertThat(order.getFirstDeductStatus()).isEqualTo("SUCCESS");
         assertThat(order.getSyncStatus()).isEqualTo("SYNC_SUCCESS");

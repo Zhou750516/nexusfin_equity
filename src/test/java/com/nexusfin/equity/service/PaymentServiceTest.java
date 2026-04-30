@@ -84,6 +84,38 @@ class PaymentServiceTest {
     }
 
     @Test
+    void shouldKeepFirstDeductSuccessTerminalWhenLaterFailureUsesDifferentRequestId() {
+        BenefitOrder order = new BenefitOrder();
+        order.setBenefitOrderNo("ord-terminal");
+        order.setOrderStatus("FIRST_DEDUCT_SUCCESS");
+        order.setFirstDeductStatus("SUCCESS");
+        order.setSyncStatus("SYNC_SUCCESS");
+        when(paymentRecordRepository.selectOne(any())).thenReturn(null);
+        when(idempotencyService.isProcessed("req-terminal-fail")).thenReturn(false);
+        when(benefitOrderRepository.selectById("ord-terminal")).thenReturn(order);
+
+        PaymentStatusResponse response = paymentService.handleFirstDeductCallback(
+                request("req-terminal-fail", "ord-terminal", "FAIL")
+        );
+
+        ArgumentCaptor<PaymentRecord> captor = ArgumentCaptor.forClass(PaymentRecord.class);
+        verify(paymentRecordRepository).insert(captor.capture());
+        verify(downstreamSyncService, never()).syncOrder(any());
+        verify(benefitOrderRepository, never()).updateById(order);
+        verify(idempotencyService).markProcessed(
+                "req-terminal-fail",
+                "FIRST_DEDUCT",
+                captor.getValue().getPaymentNo(),
+                "FAIL"
+        );
+        assertThat(response.paymentStatus()).isEqualTo("FAIL");
+        assertThat(captor.getValue().getPaymentStatus()).isEqualTo("FAIL");
+        assertThat(order.getOrderStatus()).isEqualTo("FIRST_DEDUCT_SUCCESS");
+        assertThat(order.getFirstDeductStatus()).isEqualTo("SUCCESS");
+        assertThat(order.getSyncStatus()).isEqualTo("SYNC_SUCCESS");
+    }
+
+    @Test
     void shouldRejectCallbackWhenOrderMissing() {
         when(paymentRecordRepository.selectOne(any())).thenReturn(null);
         when(idempotencyService.isProcessed("req-3")).thenReturn(false);

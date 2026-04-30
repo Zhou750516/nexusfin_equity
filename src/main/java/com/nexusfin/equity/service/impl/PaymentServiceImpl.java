@@ -97,15 +97,20 @@ public class PaymentServiceImpl implements PaymentService {
         paymentRecord.setCreatedTs(LocalDateTime.now());
         paymentRecord.setUpdatedTs(LocalDateTime.now());
         paymentRecordRepository.insert(paymentRecord);
+        boolean orderTransitioned = true;
         if (paymentType == PaymentTypeEnum.FIRST_DEDUCT) {
-            OrderStateMachine.applyFirstDeductResult(order, success);
-            // 首扣成功或失败后都要向下游同步，失败场景会让订单进入“待兜底”路径。
-            downstreamSyncService.syncOrder(order);
+            orderTransitioned = OrderStateMachine.applyFirstDeductResult(order, success);
+            if (orderTransitioned) {
+                // 首扣成功或失败后都要向下游同步，失败场景会让订单进入“待兜底”路径。
+                downstreamSyncService.syncOrder(order);
+            }
         } else {
             OrderStateMachine.applyFallbackResult(order, success);
         }
-        order.setUpdatedTs(LocalDateTime.now());
-        benefitOrderRepository.updateById(order);
+        if (orderTransitioned) {
+            order.setUpdatedTs(LocalDateTime.now());
+            benefitOrderRepository.updateById(order);
+        }
         idempotencyService.markProcessed(request.requestId(), paymentType.name(), paymentRecord.getPaymentNo(), paymentRecord.getPaymentStatus());
         return new PaymentStatusResponse(
                 paymentRecord.getPaymentNo(),

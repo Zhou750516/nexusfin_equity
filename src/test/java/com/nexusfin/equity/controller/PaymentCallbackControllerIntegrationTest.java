@@ -108,6 +108,39 @@ class PaymentCallbackControllerIntegrationTest {
     }
 
     @Test
+    void shouldNotRollbackSuccessfulFirstDeductWhenLaterFailureUsesDifferentRequestId() throws Exception {
+        BenefitOrder order = createOrder("ord-first-terminal", "user-first-terminal");
+        String successRequestId = "req-first-terminal-success-" + UUID.randomUUID().toString().replace("-", "");
+        String failureRequestId = "req-first-terminal-fail-" + UUID.randomUUID().toString().replace("-", "");
+
+        mockMvc.perform(post("/api/callbacks/first-deduction")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .headers(signatureHeaders("nonce-first-terminal-success"))
+                        .content(deductionRequest(successRequestId, order.getBenefitOrderNo(), "SUCCESS", 680000L, null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.paymentStatus").value("SUCCESS"));
+
+        mockMvc.perform(post("/api/callbacks/first-deduction")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .headers(signatureHeaders("nonce-first-terminal-fail"))
+                        .content(deductionRequest(failureRequestId, order.getBenefitOrderNo(), "FAIL", 680000L, "LATE_FAIL")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.paymentStatus").value("FAIL"));
+
+        BenefitOrder savedOrder = benefitOrderRepository.selectById(order.getBenefitOrderNo());
+        assertThat(savedOrder.getOrderStatus()).isEqualTo("FIRST_DEDUCT_SUCCESS");
+        assertThat(savedOrder.getFirstDeductStatus()).isEqualTo("SUCCESS");
+        assertThat(savedOrder.getSyncStatus()).isEqualTo("SYNC_SUCCESS");
+
+        assertThat(paymentRecordRepository.selectCount(Wrappers.<PaymentRecord>lambdaQuery()
+                .eq(PaymentRecord::getBenefitOrderNo, order.getBenefitOrderNo())
+                .eq(PaymentRecord::getPaymentType, "FIRST_DEDUCT"))).isEqualTo(2);
+        assertThat(idempotencyRecordRepository.selectCount(Wrappers.<IdempotencyRecord>lambdaQuery()
+                .eq(IdempotencyRecord::getBizType, "DOWNSTREAM_SYNC")
+                .like(IdempotencyRecord::getBizKey, order.getBenefitOrderNo()))).isEqualTo(1);
+    }
+
+    @Test
     void shouldPersistFallbackDeductSuccess() throws Exception {
         BenefitOrder order = createOrder("ord-fallback-success", "user-fallback-success");
         order.setOrderStatus("FALLBACK_DEDUCT_PENDING");
