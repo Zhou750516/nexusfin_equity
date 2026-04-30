@@ -2,6 +2,7 @@ package com.nexusfin.equity.service.impl;
 
 import com.nexusfin.equity.config.H5BenefitsProperties;
 import com.nexusfin.equity.config.H5LoanProperties;
+import com.nexusfin.equity.dto.request.BenefitRedirectUrlRequest;
 import com.nexusfin.equity.dto.request.BenefitsActivateRequest;
 import com.nexusfin.equity.dto.request.CreateBenefitOrderRequest;
 import com.nexusfin.equity.dto.response.BenefitsActivateResponse;
@@ -12,20 +13,26 @@ import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.repository.BenefitProductRepository;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.service.BenefitOrderService;
+import com.nexusfin.equity.service.BenefitRedirectUrlService;
 import com.nexusfin.equity.service.BenefitsService;
 import com.nexusfin.equity.service.H5I18nService;
 import com.nexusfin.equity.service.XiaohuaGatewayService;
 import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncRequest;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserCardListRequest;
+import com.nexusfin.equity.util.TraceIdUtil;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.IntStream;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class BenefitsServiceImpl implements BenefitsService {
+
+    private static final Logger log = LoggerFactory.getLogger(BenefitsServiceImpl.class);
 
     private final H5BenefitsProperties h5BenefitsProperties;
     private final H5LoanProperties h5LoanProperties;
@@ -34,6 +41,7 @@ public class BenefitsServiceImpl implements BenefitsService {
     private final BenefitOrderService benefitOrderService;
     private final H5I18nService h5I18nService;
     private final XiaohuaGatewayService xiaohuaGatewayService;
+    private final BenefitRedirectUrlService benefitRedirectUrlService;
 
     public BenefitsServiceImpl(
             H5BenefitsProperties h5BenefitsProperties,
@@ -42,7 +50,8 @@ public class BenefitsServiceImpl implements BenefitsService {
             MemberPaymentProtocolRepository memberPaymentProtocolRepository,
             BenefitOrderService benefitOrderService,
             H5I18nService h5I18nService,
-            XiaohuaGatewayService xiaohuaGatewayService
+            XiaohuaGatewayService xiaohuaGatewayService,
+            BenefitRedirectUrlService benefitRedirectUrlService
     ) {
         this.h5BenefitsProperties = h5BenefitsProperties;
         this.h5LoanProperties = h5LoanProperties;
@@ -51,6 +60,7 @@ public class BenefitsServiceImpl implements BenefitsService {
         this.benefitOrderService = benefitOrderService;
         this.h5I18nService = h5I18nService;
         this.xiaohuaGatewayService = xiaohuaGatewayService;
+        this.benefitRedirectUrlService = benefitRedirectUrlService;
     }
 
     @Override
@@ -115,6 +125,15 @@ public class BenefitsServiceImpl implements BenefitsService {
                 activate.defaultLoanAmount(),
                 Boolean.TRUE
         ));
+        String benefitUrl = benefitRedirectUrlService.generate(new BenefitRedirectUrlRequest(
+                request.token(),
+                response.benefitOrderNo()
+        )).redirectUrl();
+        log.info("traceId={} bizOrderNo={} benefits sync benefiturl generated applicationId={} benefitUrlPresent={}",
+                TraceIdUtil.getTraceId(),
+                response.benefitOrderNo(),
+                request.applicationId(),
+                !benefitUrl.isBlank());
         var syncResponse = xiaohuaGatewayService.syncBenefitOrder(
                 "BENEFITS-SYNC-" + request.applicationId(),
                 response.benefitOrderNo(),
@@ -122,7 +141,8 @@ public class BenefitsServiceImpl implements BenefitsService {
                         uid,
                         request.applicationId(),
                         "ACTIVE",
-                        activate.defaultLoanAmount()
+                        activate.defaultLoanAmount(),
+                        benefitUrl
                 )
         );
         if (syncResponse != null && !isBenefitSyncAccepted(syncResponse.status())) {

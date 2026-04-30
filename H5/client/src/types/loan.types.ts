@@ -139,6 +139,7 @@ export interface BenefitsCardDetail {
 export interface ActivateParams {
   applicationId: string;
   cardType: string;
+  token: string;
 }
 
 export interface ActivateResult {

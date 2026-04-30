@@ -15,7 +15,9 @@ import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
 import com.nexusfin.equity.service.AsyncCompensationEnqueueService;
+import com.nexusfin.equity.service.BenefitRedirectUrlService;
 import com.nexusfin.equity.service.XiaohuaGatewayService;
+import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncRequest;
 import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncResponse;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolLink;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryResponse;
@@ -29,6 +31,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -39,6 +42,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -87,6 +91,9 @@ class BenefitsControllerIntegrationTest {
 
     @MockBean
     private AsyncCompensationEnqueueService asyncCompensationEnqueueService;
+
+    @MockBean
+    private BenefitRedirectUrlService benefitRedirectUrlService;
 
     @BeforeEach
     void setUp() {
@@ -137,7 +144,8 @@ class BenefitsControllerIntegrationTest {
                         .content("""
                                 {
                                   "applicationId": "APP-benefits-block",
-                                  "cardType": "huixuan_card"
+                                  "cardType": "huixuan_card",
+                                  "token": "joint-token-benefits-block"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -157,6 +165,8 @@ class BenefitsControllerIntegrationTest {
                 .thenReturn(new UserCardListResponse(List.of(
                         new UserCardSummary("card-001", "招商银行", "8648", 1)
                 )));
+        when(benefitRedirectUrlService.generate(any()))
+                .thenReturn(new BenefitRedirectUrlService.BenefitRedirectUrlResult("https://redirect.test/exercise"));
         when(xiaohuaGatewayService.syncBenefitOrder(any(), any(), any()))
                 .thenReturn(new BenefitOrderSyncResponse("SUCCESS", "ok"));
 
@@ -166,7 +176,8 @@ class BenefitsControllerIntegrationTest {
                         .content("""
                                 {
                                   "applicationId": "APP-benefits-sync",
-                                  "cardType": "huixuan_card"
+                                  "cardType": "huixuan_card",
+                                  "token": "joint-token-benefits-sync"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -174,6 +185,9 @@ class BenefitsControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.status").value("activated"));
 
         assertThat(benefitOrderRepository.selectCount(Wrappers.emptyWrapper())).isEqualTo(1);
+        ArgumentCaptor<BenefitOrderSyncRequest> syncCaptor = ArgumentCaptor.forClass(BenefitOrderSyncRequest.class);
+        verify(xiaohuaGatewayService).syncBenefitOrder(any(), any(), syncCaptor.capture());
+        assertThat(syncCaptor.getValue().benefitUrl()).isEqualTo("https://redirect.test/exercise");
     }
 
     private BenefitProduct createProduct() {
@@ -212,19 +226,31 @@ class BenefitsControllerIntegrationTest {
         memberChannel.setUpdatedTs(LocalDateTime.now());
         memberChannelRepository.insert(memberChannel);
 
+        memberPaymentProtocolRepository.insert(activeProtocol(memberId, externalUserId, "ALLINPAY", "AIP-" + memberId, null));
+        memberPaymentProtocolRepository.insert(activeProtocol(memberId, externalUserId, "QW_SIGN", "QW-" + memberId, "1234"));
+        return memberInfo;
+    }
+
+    private MemberPaymentProtocol activeProtocol(
+            String memberId,
+            String externalUserId,
+            String providerCode,
+            String protocolNo,
+            String signRequestNo
+    ) {
         MemberPaymentProtocol protocol = new MemberPaymentProtocol();
         protocol.setMemberId(memberId);
         protocol.setExternalUserId(externalUserId);
-        protocol.setProviderCode("ALLINPAY");
-        protocol.setProtocolNo("AIP-" + memberId);
+        protocol.setProviderCode(providerCode);
+        protocol.setProtocolNo(protocolNo);
+        protocol.setSignRequestNo(signRequestNo);
         protocol.setProtocolStatus("ACTIVE");
         protocol.setChannelCode("KJ");
         protocol.setSignedTs(LocalDateTime.now());
         protocol.setLastVerifiedTs(LocalDateTime.now());
         protocol.setCreatedTs(LocalDateTime.now());
         protocol.setUpdatedTs(LocalDateTime.now());
-        memberPaymentProtocolRepository.insert(protocol);
-        return memberInfo;
+        return protocol;
     }
 
     private Cookie authCookie(MemberInfo memberInfo) {

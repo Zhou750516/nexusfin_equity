@@ -6,6 +6,7 @@ import { useLoan } from "@/contexts/LoanContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { Locale } from "@/i18n/locale";
 import { formatCurrency } from "@/lib/format";
+import { readJointLoginParams } from "@/lib/joint-session";
 import { activateBenefitsCard, getBenefitsCardDetail } from "@/lib/loan-api";
 import { shouldRequestLocalizedData } from "@/lib/localized-request";
 import { buildPath, getQueryParam } from "@/lib/route";
@@ -20,6 +21,13 @@ const MISSING_CONTEXT_COPY: Record<Locale, string> = {
   "zh-TW": "缺少借款申請編號，暫時無法開通權益。",
   "en-US": "Missing application ID. Benefits cannot be activated right now.",
   "vi-VN": "Thiếu mã hồ sơ vay nên chưa thể kích hoạt quyền lợi.",
+};
+
+const MISSING_JOINT_TOKEN_COPY: Record<Locale, string> = {
+  "zh-CN": "缺少联登凭证，暂无法生成权益跳转链接。",
+  "zh-TW": "缺少聯登憑證，暫時無法生成權益跳轉連結。",
+  "en-US": "Missing joint-login token. Benefit redirect URL cannot be generated right now.",
+  "vi-VN": "Thiếu token đăng nhập liên kết nên chưa thể tạo liên kết quyền lợi.",
 };
 
 const PROTOCOL_NOT_READY_COPY: Record<Locale, string> = {
@@ -117,6 +125,11 @@ export default function BenefitsCardPage() {
       setError(MISSING_CONTEXT_COPY[locale]);
       return;
     }
+    const jointLoginToken = readJointLoginParams()?.token;
+    if (!jointLoginToken) {
+      setError(MISSING_JOINT_TOKEN_COPY[locale]);
+      return;
+    }
 
     setIsActivating(true);
     setError(null);
@@ -124,6 +137,7 @@ export default function BenefitsCardPage() {
       const response = await activateBenefitsCard({
         applicationId,
         cardType: "huixuan_card",
+        token: jointLoginToken,
       });
       loan.setBenefitsCardActivated(response.status === "activated");
       toast.success(response.message);

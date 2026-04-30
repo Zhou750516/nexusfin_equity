@@ -237,7 +237,7 @@ public class ApiResult<T> {
 
 **请求体：**
 ```json
-{ "applicationId": "APP202604120001", "cardType": "huixuan_card" }
+{ "applicationId": "APP202604120001", "cardType": "huixuan_card", "token": "joint-token-001" }
 ```
 
 **响应 (200)：**

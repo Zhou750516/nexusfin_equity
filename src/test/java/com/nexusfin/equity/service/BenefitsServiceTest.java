@@ -13,6 +13,7 @@ import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.repository.BenefitProductRepository;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.service.impl.BenefitsServiceImpl;
+import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncRequest;
 import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncResponse;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolLink;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryResponse;
@@ -31,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -52,6 +54,9 @@ class BenefitsServiceTest {
     @Mock
     private XiaohuaGatewayService xiaohuaGatewayService;
 
+    @Mock
+    private BenefitRedirectUrlService benefitRedirectUrlService;
+
     private BenefitsService benefitsService;
 
     @BeforeEach
@@ -64,7 +69,8 @@ class BenefitsServiceTest {
                 memberPaymentProtocolRepository,
                 benefitOrderService,
                 h5I18nService,
-                xiaohuaGatewayService
+                xiaohuaGatewayService,
+                benefitRedirectUrlService
         );
     }
 
@@ -101,7 +107,7 @@ class BenefitsServiceTest {
         assertThatThrownBy(() -> benefitsService.activate(
                 "mem-001",
                 "user-001",
-                new BenefitsActivateRequest("APP-001", "huixuan_card")
+                new BenefitsActivateRequest("APP-001", "huixuan_card", "joint-token-benefits-block")
         )).isInstanceOf(BizException.class)
                 .extracting(ex -> ((BizException) ex).getErrorNo())
                 .isEqualTo("BENEFITS_PROTOCOL_NOT_READY");
@@ -121,20 +127,53 @@ class BenefitsServiceTest {
         when(memberPaymentProtocolRepository.selectOne(any())).thenReturn(activeProtocol());
         when(benefitOrderService.createOrder(eq("mem-001"), any(CreateBenefitOrderRequest.class)))
                 .thenReturn(new CreateBenefitOrderResponse("ord-001", "FIRST_DEDUCT_PENDING", "/h5/equity/orders/ord-001"));
+        when(benefitRedirectUrlService.generate(any()))
+                .thenReturn(new BenefitRedirectUrlService.BenefitRedirectUrlResult("https://redirect.test/exercise"));
         when(xiaohuaGatewayService.syncBenefitOrder(any(), eq("ord-001"), any()))
                 .thenReturn(new BenefitOrderSyncResponse("SUCCESS", "ok"));
 
         BenefitsActivateResponse response = benefitsService.activate(
                 "mem-001",
                 "user-001",
-                new BenefitsActivateRequest("APP-001", "huixuan_card")
+                new BenefitsActivateRequest("APP-001", "huixuan_card", "joint-token-benefits-001")
         );
 
         assertThat(response.activationId()).isEqualTo("ord-001");
         ArgumentCaptor<CreateBenefitOrderRequest> orderCaptor = ArgumentCaptor.forClass(CreateBenefitOrderRequest.class);
         verify(benefitOrderService).createOrder(eq("mem-001"), orderCaptor.capture());
         assertThat(orderCaptor.getValue().requestId()).isEqualTo("activate-APP-001");
-        verify(xiaohuaGatewayService).syncBenefitOrder(any(), eq("ord-001"), any());
+        ArgumentCaptor<BenefitOrderSyncRequest> syncCaptor = ArgumentCaptor.forClass(BenefitOrderSyncRequest.class);
+        verify(xiaohuaGatewayService).syncBenefitOrder(any(), eq("ord-001"), syncCaptor.capture());
+        assertThat(syncCaptor.getValue().benefitUrl()).isEqualTo("https://redirect.test/exercise");
+    }
+
+    @Test
+    void shouldFailActivationWhenBenefitRedirectUrlGenerationFails() {
+        when(benefitProductRepository.selectById("HUXUAN_CARD")).thenReturn(activeProduct());
+        when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(new ProtocolQueryResponse(List.of(
+                        new ProtocolLink("借款协议", 1, "https://agreements/loan")
+                )));
+        when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(new UserCardListResponse(List.of(
+                        new UserCardSummary("card-001", "招商银行", "8648", 1)
+                )));
+        when(memberPaymentProtocolRepository.selectOne(any())).thenReturn(activeProtocol());
+        when(benefitOrderService.createOrder(eq("mem-001"), any(CreateBenefitOrderRequest.class)))
+                .thenReturn(new CreateBenefitOrderResponse("ord-001", "FIRST_DEDUCT_PENDING", "/h5/equity/orders/ord-001"));
+        when(benefitRedirectUrlService.generate(any()))
+                .thenThrow(new BizException("REDRECT_BENEFIT_URL_UPSTREAM_FAILED", "Benefit redirect url is unavailable"));
+
+        assertThatThrownBy(() -> benefitsService.activate(
+                "mem-001",
+                "user-001",
+                new BenefitsActivateRequest("APP-001", "huixuan_card", "joint-token-benefits-002")
+        )).isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo("REDRECT_BENEFIT_URL_UPSTREAM_FAILED");
+
+        verify(benefitRedirectUrlService).generate(any());
+        verify(xiaohuaGatewayService, never()).syncBenefitOrder(any(), any(), any());
     }
 
     private BenefitProduct activeProduct() {

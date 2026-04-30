@@ -170,10 +170,34 @@ class XiaohuaGatewayServiceTest {
         assertThatThrownBy(() -> gatewayService.syncBenefitOrder(
                 "REQ-SYNC-001",
                 "BIZ-SYNC-001",
-                new BenefitOrderSyncRequest("user-001", "BEN-001", "ACTIVE", 30000L)
+                new BenefitOrderSyncRequest("user-001", "BEN-001", "ACTIVE", 30000L, "https://redirect.test/exercise")
         )).isInstanceOf(BizException.class)
                 .extracting(ex -> ((BizException) ex).getErrorNo())
                 .isEqualTo(ErrorCodes.YUNKA_UPSTREAM_REJECTED);
+    }
+
+    @Test
+    void shouldForwardBenefitUrlWhenSyncingBenefitOrder() throws Exception {
+        JsonNode data = objectMapper.readTree("""
+                {
+                  "status": "SUCCESS",
+                  "message": "ok"
+                }
+                """);
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", data));
+
+        gatewayService.syncBenefitOrder(
+                "REQ-SYNC-002",
+                "BIZ-SYNC-002",
+                new BenefitOrderSyncRequest("user-001", "BEN-001", "ACTIVE", 30000L, "https://redirect.test/exercise")
+        );
+
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> captor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(captor.capture());
+        JsonNode forwarded = objectMapper.valueToTree(captor.getValue().data());
+        assertThat(forwarded.path("benefiturl").asText()).isEqualTo("https://redirect.test/exercise");
     }
 
     private YunkaProperties yunkaProperties() {

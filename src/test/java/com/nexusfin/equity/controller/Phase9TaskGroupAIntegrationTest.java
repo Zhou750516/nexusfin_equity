@@ -15,6 +15,7 @@ import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
+import com.nexusfin.equity.service.BenefitRedirectUrlService;
 import com.nexusfin.equity.service.XiaohuaGatewayService;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolLink;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryResponse;
@@ -85,6 +86,9 @@ class Phase9TaskGroupAIntegrationTest {
     @MockBean
     private XiaohuaGatewayService xiaohuaGatewayService;
 
+    @MockBean
+    private BenefitRedirectUrlService benefitRedirectUrlService;
+
     @BeforeEach
     void setUp() {
         contractArchiveRepository.delete(null);
@@ -119,7 +123,8 @@ class Phase9TaskGroupAIntegrationTest {
                         .content("""
                                 {
                                   "applicationId": "APP-auth-check",
-                                  "cardType": "huixuan_card"
+                                  "cardType": "huixuan_card",
+                                  "token": "joint-token-auth-check"
                                 }
                                 """))
                 .andExpect(status().isUnauthorized())
@@ -194,6 +199,8 @@ class Phase9TaskGroupAIntegrationTest {
                 .thenReturn(new ProtocolQueryResponse(List.of(
                         new ProtocolLink("借款协议", 1, "https://agreements/loan")
                 )));
+        when(benefitRedirectUrlService.generate(any()))
+                .thenReturn(new BenefitRedirectUrlService.BenefitRedirectUrlResult("https://redirect.test/exercise"));
 
         mockMvc.perform(post("/api/benefits/activate")
                         .cookie(authCookie(memberInfo))
@@ -201,7 +208,8 @@ class Phase9TaskGroupAIntegrationTest {
                         .content("""
                                 {
                                   "applicationId": "APP202604130001",
-                                  "cardType": "huixuan_card"
+                                  "cardType": "huixuan_card",
+                                  "token": "joint-token-benefits-activate"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -259,18 +267,30 @@ class Phase9TaskGroupAIntegrationTest {
     }
 
     private void createActiveProtocol(String memberId, String externalUserId) {
+        memberPaymentProtocolRepository.insert(activeProtocol(memberId, externalUserId, "ALLINPAY", "AIP-TEST-" + memberId, null));
+        memberPaymentProtocolRepository.insert(activeProtocol(memberId, externalUserId, "QW_SIGN", "QW-TEST-" + memberId, "1234"));
+    }
+
+    private MemberPaymentProtocol activeProtocol(
+            String memberId,
+            String externalUserId,
+            String providerCode,
+            String protocolNo,
+            String signRequestNo
+    ) {
         MemberPaymentProtocol protocol = new MemberPaymentProtocol();
         protocol.setMemberId(memberId);
         protocol.setExternalUserId(externalUserId);
-        protocol.setProviderCode("ALLINPAY");
-        protocol.setProtocolNo("AIP-TEST-" + memberId);
+        protocol.setProviderCode(providerCode);
+        protocol.setProtocolNo(protocolNo);
+        protocol.setSignRequestNo(signRequestNo);
         protocol.setProtocolStatus("ACTIVE");
         protocol.setChannelCode("KJ");
         protocol.setSignedTs(LocalDateTime.now());
         protocol.setLastVerifiedTs(LocalDateTime.now());
         protocol.setCreatedTs(LocalDateTime.now());
         protocol.setUpdatedTs(LocalDateTime.now());
-        memberPaymentProtocolRepository.insert(protocol);
+        return protocol;
     }
 
     private Cookie authCookie(MemberInfo memberInfo) {
