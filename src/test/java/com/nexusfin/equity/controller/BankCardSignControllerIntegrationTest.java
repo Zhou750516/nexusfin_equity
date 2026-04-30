@@ -87,6 +87,8 @@ class BankCardSignControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(-1))
                 .andExpect(jsonPath("$.message").value("QW_SIGN_UPSTREAM_TIMEOUT:QW sign status temporarily unavailable"));
+
+        assertThat(memberPaymentProtocolRepository.selectCount(null)).isZero();
     }
 
     @Test
