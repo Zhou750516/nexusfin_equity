@@ -127,6 +127,31 @@ class BankCardSignServiceTest {
     }
 
     @Test
+    void shouldTranslateApplySignTimeoutToBizException(CapturedOutput output) {
+        MemberInfo memberInfo = buildMember();
+        when(memberInfoRepository.selectById("mem-1")).thenReturn(memberInfo);
+        when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
+        when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户");
+        when(sensitiveDataCipher.decrypt("id-cipher")).thenReturn("110101199003071234");
+        when(qwProperties.getDirect()).thenReturn(qwDirectProperties);
+        when(qwDirectProperties.getMerchantId()).thenReturn("200000000007804");
+        when(qwBenefitClient.applySign(any()))
+                .thenThrow(new UpstreamTimeoutException("Mock QW timeout: 6222020202021234_FAULT_TIMEOUT"));
+
+        assertThatThrownBy(() -> bankCardSignService.applySign(
+                "mem-1",
+                new BankCardSignApplyRequest("6222020202021234_FAULT_TIMEOUT")
+        ))
+                .isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo("QW_SIGN_UPSTREAM_TIMEOUT");
+
+        assertThat(output).contains("bank-card sign apply qw request begin");
+        assertThat(output).contains("bank-card sign apply qw request failed");
+        assertThat(output).contains("errorNo=QW_SIGN_UPSTREAM_FAILED");
+    }
+
+    @Test
     void shouldPersistLocalProtocolWhenSignConfirmSucceeds(CapturedOutput output) {
         MemberInfo memberInfo = buildMember();
         MemberChannel memberChannel = new MemberChannel();

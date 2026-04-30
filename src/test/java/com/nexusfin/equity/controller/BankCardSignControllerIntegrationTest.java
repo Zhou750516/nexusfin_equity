@@ -112,6 +112,26 @@ class BankCardSignControllerIntegrationTest {
     }
 
     @Test
+    void shouldReturnControlledBizErrorWhenMockApplySignTimesOut() throws Exception {
+        MemberInfo memberInfo = createMember("mem-sign-apply-timeout", "tech-user-sign-apply-timeout");
+        createChannel(memberInfo.getMemberId(), memberInfo.getExternalUserId());
+
+        mockMvc.perform(post("/api/bank-card/sign-apply")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "accountNo": "6222020202021234_FAULT_TIMEOUT"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(-1))
+                .andExpect(jsonPath("$.message").value("QW_SIGN_UPSTREAM_TIMEOUT:QW sign apply temporarily unavailable"));
+
+        assertThat(memberPaymentProtocolRepository.selectCount(null)).isZero();
+    }
+
+    @Test
     void shouldConfirmSignAndPersistLocalProtocol() throws Exception {
         MemberInfo memberInfo = createMember("mem-sign-confirm", "tech-user-sign-confirm");
         createChannel(memberInfo.getMemberId(), memberInfo.getExternalUserId());
