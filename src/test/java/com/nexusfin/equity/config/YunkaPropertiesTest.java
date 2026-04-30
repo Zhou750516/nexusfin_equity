@@ -18,7 +18,9 @@ class YunkaPropertiesTest {
                 Map.entry("nexusfin.third-party.yunka.gateway-path", "/api/gateway/proxy"),
                 Map.entry("nexusfin.third-party.yunka.connect-timeout-ms", "2000"),
                 Map.entry("nexusfin.third-party.yunka.read-timeout-ms", "3000"),
-                Map.entry("nexusfin.third-party.yunka.paths.loan-calculate", "/loan/trail"),
+                Map.entry("nexusfin.third-party.yunka.channel-code", "ABS"),
+                Map.entry("nexusfin.third-party.yunka.signature", "abs-signature"),
+                Map.entry("nexusfin.third-party.yunka.paths.loan-calculate", "/loan/trial"),
                 Map.entry("nexusfin.third-party.yunka.paths.loan-query", "/loan/query"),
                 Map.entry("nexusfin.third-party.yunka.paths.loan-apply", "/loan/apply"),
                 Map.entry("nexusfin.third-party.yunka.paths.repay-trial", "/repay/trial"),
@@ -39,7 +41,9 @@ class YunkaPropertiesTest {
                 .bind("nexusfin.third-party.yunka", YunkaProperties.class)
                 .orElseThrow(IllegalStateException::new);
 
-        assertThat(properties.paths().loanCalculate()).isEqualTo("/loan/trail");
+        assertThat(properties.channelCode()).isEqualTo("ABS");
+        assertThat(properties.signature()).isEqualTo("abs-signature");
+        assertThat(properties.paths().loanCalculate()).isEqualTo("/loan/trial");
         assertThat(properties.paths().loanQuery()).isEqualTo("/loan/query");
         assertThat(properties.paths().loanApply()).isEqualTo("/loan/apply");
         assertThat(properties.paths().repayTrial()).isEqualTo("/repay/trial");

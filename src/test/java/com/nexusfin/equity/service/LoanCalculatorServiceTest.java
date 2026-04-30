@@ -107,7 +107,7 @@ class LoanCalculatorServiceTest {
         verify(yunkaCallTemplate).executeForData(captor.capture());
         assertThat(captor.getValue().scene()).isEqualTo("loan calculate");
         assertThat(captor.getValue().memberId()).isEqualTo("mem-001");
-        assertThat(captor.getValue().path()).isEqualTo("/loan/trail");
+        assertThat(captor.getValue().path()).isEqualTo("/loan/trial");
     }
 
     @Test
@@ -173,7 +173,7 @@ class LoanCalculatorServiceTest {
                 3000,
                 5000,
                 new YunkaProperties.Paths(
-                        "/loan/trail",
+                        "/loan/trial",
                         "/loan/query",
                         "/loan/apply",
                         "/repay/trial",
@@ -188,7 +188,9 @@ class LoanCalculatorServiceTest {
                         "/card/userCards",
                         "/credit/image/query",
                         "/benefit/sync"
-                )
+                ),
+                "ABS",
+                "abs-signature"
         );
     }
 }

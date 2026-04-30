@@ -203,6 +203,7 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         JsonNode data = objectMapper.valueToTree(requestCaptor.getValue().data());
         assertThat(requestCaptor.getValue().path()).isEqualTo("/repay/query");
         assertThat(data.get("uid").asText()).isEqualTo("user-repay-result");
+        assertThat(data.get("loanId").asText()).isEqualTo("LOAN202604130002");
         assertThat(data.get("swiftNumber").asText()).isEqualTo("RP-LOAN202604130002");
     }
 

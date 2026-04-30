@@ -372,7 +372,7 @@ class YunkaLoanApplyCompensationExecutorTest {
                 2000,
                 3000,
                 new YunkaProperties.Paths(
-                        "/loan/trail",
+                        "/loan/trial",
                         "/loan/query",
                         "/loan/apply",
                         "/repay/trial",
@@ -387,7 +387,9 @@ class YunkaLoanApplyCompensationExecutorTest {
                         "/card/userCards",
                         "/credit/image/query",
                         "/benefit/sync"
-                )
+                ),
+                "ABS",
+                "abs-signature"
         );
     }
 }

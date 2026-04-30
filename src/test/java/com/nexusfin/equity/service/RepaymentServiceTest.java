@@ -1,5 +1,6 @@
 package com.nexusfin.equity.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.config.H5LoanProperties;
 import com.nexusfin.equity.config.YunkaProperties;
@@ -191,6 +192,15 @@ class RepaymentServiceTest {
         assertThat(response.swiftNumber()).isEqualTo("RP-LN-001");
         assertThat(response.interestSaved()).isEqualByComparingTo("26.50");
         assertThat(response.bankCard().lastFour()).isEqualTo("8648");
+
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> captor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(captor.capture());
+        JsonNode data = objectMapper.valueToTree(captor.getValue().data());
+        assertThat(captor.getValue().path()).isEqualTo("/repay/query");
+        assertThat(data.get("uid").asText()).isEqualTo("user-001");
+        assertThat(data.get("loanId").asText()).isEqualTo("LN-001");
+        assertThat(data.get("swiftNumber").asText()).isEqualTo("RP-LN-001");
     }
 
     @Test
@@ -244,7 +254,7 @@ class RepaymentServiceTest {
                 3000,
                 5000,
                 new YunkaProperties.Paths(
-                        "/loan/trail",
+                        "/loan/trial",
                         "/loan/query",
                         "/loan/apply",
                         "/repay/trial",
@@ -259,7 +269,9 @@ class RepaymentServiceTest {
                         "/card/userCards",
                         "/credit/image/query",
                         "/benefit/sync"
-                )
+                ),
+                "ABS",
+                "abs-signature"
         );
     }
 }

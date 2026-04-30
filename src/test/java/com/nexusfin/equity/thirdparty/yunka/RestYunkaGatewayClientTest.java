@@ -2,8 +2,11 @@ package com.nexusfin.equity.thirdparty.yunka;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.nexusfin.equity.config.YunkaProperties;
+import com.nexusfin.equity.util.TraceIdUtil;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.mock.http.client.MockClientHttpRequest;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -13,12 +16,18 @@ import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 @ExtendWith(OutputCaptureExtension.class)
 class RestYunkaGatewayClientTest {
+
+    @AfterEach
+    void tearDown() {
+        TraceIdUtil.clear();
+    }
 
     @Test
     void shouldReturnMockResponseWithoutCallingHttpWhenModeIsMock(CapturedOutput output) {
@@ -42,14 +51,37 @@ class RestYunkaGatewayClientTest {
 
     @Test
     void shouldLogBeginAndSuccessWithTraceableGatewayFields(CapturedOutput output) {
+        TraceIdUtil.bindTraceId("TRACE-REQ-001");
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
         server.expect(requestTo("http://127.0.0.1:18081/api/gateway/proxy"))
                 .andExpect(method(HttpMethod.POST))
+                .andExpect(request -> {
+                    assertThat(request.getHeaders().getFirst("X-Trace-Id")).isEqualTo("TRACE-REQ-001");
+                    assertThat(request.getHeaders().getFirst("X-Request-Id")).isEqualTo("REQ-001");
+                    assertThat(request.getHeaders().getFirst("X-Biz-Order-No")).isEqualTo("APP-001");
+                    assertThat(request.getHeaders().getFirst("X-Channel-Code")).isEqualTo("ABS");
+                    assertThat(request.getHeaders().getFirst("X-Signature")).isEqualTo("abs-signature");
+                    assertThat(request.getHeaders().getFirst("X-Timestamp")).isNotBlank();
+                    assertThat(((MockClientHttpRequest) request).getBodyAsString())
+                            .contains("\"requestId\":\"REQ-001\"")
+                            .contains("\"path\":\"/loan/apply\"")
+                            .contains("\"bizOrderNo\":\"APP-001\"");
+                })
+                .andExpect(content().json("""
+                        {
+                          "requestId": "REQ-001",
+                          "path": "/loan/apply",
+                          "bizOrderNo": "APP-001",
+                          "data": {}
+                        }
+                        """))
                 .andRespond(withSuccess("""
                         {
                           "code": 0,
                           "message": "OK",
+                          "traceId": "YUNKA-TRACE-001",
+                          "requestId": "REQ-001",
                           "data": {
                             "loanId": "LN-001"
                           }
@@ -71,6 +103,8 @@ class RestYunkaGatewayClientTest {
         ));
 
         assertThat(response.code()).isEqualTo(0);
+        assertThat(response.traceId()).isEqualTo("YUNKA-TRACE-001");
+        assertThat(response.requestId()).isEqualTo("REQ-001");
         assertThat(output).contains("yunka gateway client initialized");
         assertThat(output).contains("mode=REST");
         assertThat(output).contains("yunka gateway request begin");
@@ -110,7 +144,7 @@ class RestYunkaGatewayClientTest {
                 2000,
                 3000,
                 new YunkaProperties.Paths(
-                        "/loan/trail",
+                        "/loan/trial",
                         "/loan/query",
                         "/loan/apply",
                         "/repay/trial",
@@ -125,7 +159,9 @@ class RestYunkaGatewayClientTest {
                         "/card/userCards",
                         "/credit/image/query",
                         "/benefit/sync"
-                )
+                ),
+                "ABS",
+                "abs-signature"
         );
     }
 }

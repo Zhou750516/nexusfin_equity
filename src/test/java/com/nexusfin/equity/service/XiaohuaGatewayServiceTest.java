@@ -185,7 +185,7 @@ class XiaohuaGatewayServiceTest {
                 2000,
                 3000,
                 new YunkaProperties.Paths(
-                        "/loan/trail",
+                        "/loan/trial",
                         "/loan/query",
                         "/loan/apply",
                         "/repay/trial",
@@ -200,7 +200,9 @@ class XiaohuaGatewayServiceTest {
                         "/card/userCards",
                         "/credit/image/query",
                         "/benefit/sync"
-                )
+                ),
+                "ABS",
+                "abs-signature"
         );
     }
 }

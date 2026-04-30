@@ -187,7 +187,7 @@ public class RepaymentServiceImpl implements RepaymentService {
 
     @Override
     public RepaymentResultResponse getResult(String uid, String repaymentId) {
-        validateKnownRepaymentId(uid, repaymentId);
+        String loanId = validateAndResolveLoanId(uid, repaymentId);
         String requestId = next("RQ");
         JsonNode data = yunkaCallTemplate.executeForData(
                 YunkaCallTemplate.YunkaCall.of(
@@ -195,7 +195,7 @@ public class RepaymentServiceImpl implements RepaymentService {
                         requestId,
                         yunkaProperties.paths().repayQuery(),
                         repaymentId,
-                        new RepayQueryForwardData(uid, repaymentId)
+                        new RepayQueryForwardData(uid, loanId, repaymentId)
                 )
         );
         String swiftNumber = readText(data, "swiftNumber", repaymentId);
@@ -283,13 +283,14 @@ public class RepaymentServiceImpl implements RepaymentService {
         }
     }
 
-    private void validateKnownRepaymentId(String uid, String repaymentId) {
-        if (findLoanMapping(uid, repaymentId) != null) {
-            return;
+    private String validateAndResolveLoanId(String uid, String repaymentId) {
+        LoanApplicationMapping directMapping = findLoanMapping(uid, repaymentId);
+        if (directMapping != null) {
+            return directMapping.getUpstreamQueryValue();
         }
         String loanId = extractLoanId(repaymentId);
         if (loanId != null && findLoanMapping(uid, loanId) != null) {
-            return;
+            return loanId;
         }
         throw new BizException(404, "repayment reference not found");
     }
@@ -415,6 +416,7 @@ public class RepaymentServiceImpl implements RepaymentService {
 
     private record RepayQueryForwardData(
             String uid,
+            String loanId,
             String swiftNumber
     ) {
     }

@@ -100,7 +100,7 @@ nexusfin:
       connect-timeout-ms: 2000
       read-timeout-ms: 3000
       paths:
-        loan-calculate: /loan/trail
+        loan-calculate: /loan/trial
         loan-query: /loan/query
         loan-apply: /loan/apply
         repay-trial: /repay/trial

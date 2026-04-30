@@ -94,7 +94,7 @@ class Phase9TaskGroupCIntegrationTest extends AbstractYunkaXiaohuaIT {
     }
 
     @Test
-    void shouldForwardLoanCalculateToYunkaTrailPath(CapturedOutput output) throws Exception {
+    void shouldForwardLoanCalculateToYunkaTrialPath(CapturedOutput output) throws Exception {
         MemberInfo memberInfo = createMember("mem-loan-calculate", "user-loan-calculate");
         JsonNode yunkaData = objectMapper.readTree("""
                 {
@@ -133,15 +133,16 @@ class Phase9TaskGroupCIntegrationTest extends AbstractYunkaXiaohuaIT {
         org.mockito.Mockito.verify(yunkaGatewayClient).proxy(requestCaptor.capture());
         YunkaGatewayClient.YunkaGatewayRequest request = requestCaptor.getValue();
         JsonNode data = objectMapper.valueToTree(request.data());
-        assertThat(request.path()).isEqualTo("/loan/trail");
+        assertThat(request.path()).isEqualTo("/loan/trial");
         assertThat(request.requestId()).startsWith("LC-");
         assertThat(data.get("uid").asText()).isEqualTo("user-loan-calculate");
         assertThat(data.get("applyId").asText()).startsWith("LC-");
         assertThat(data.get("loanAmount").asLong()).isEqualTo(300000L);
         assertThat(data.get("loanPeriod").asInt()).isEqualTo(3);
-        assertThat(output).contains("loan calculate yunka request begin");
-        assertThat(output).contains("loan calculate yunka request success");
-        assertThat(output).contains("path=/loan/trail");
+        assertThat(output).contains("scene=loan calculate");
+        assertThat(output).contains("yunka request begin");
+        assertThat(output).contains("yunka request success");
+        assertThat(output).contains("path=/loan/trial");
         assertThat(output).contains("bizOrderNo=");
     }
 

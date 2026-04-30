@@ -17,7 +17,12 @@ public interface YunkaGatewayClient {
     record YunkaGatewayResponse(
             int code,
             String message,
+            String traceId,
+            String requestId,
             JsonNode data
     ) {
+        public YunkaGatewayResponse(int code, String message, JsonNode data) {
+            this(code, message, null, null, data);
+        }
     }
 }

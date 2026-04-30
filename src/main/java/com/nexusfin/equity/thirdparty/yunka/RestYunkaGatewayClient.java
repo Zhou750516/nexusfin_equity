@@ -9,6 +9,9 @@ import com.nexusfin.equity.exception.ErrorCodes;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.util.TraceIdUtil;
 import com.nexusfin.equity.util.UpstreamTimeoutDetector;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +26,12 @@ import org.springframework.web.client.RestClientException;
 public class RestYunkaGatewayClient implements YunkaGatewayClient {
 
     private static final Logger log = LoggerFactory.getLogger(RestYunkaGatewayClient.class);
+    private static final String REQUEST_ID_HEADER = "X-Request-Id";
+    private static final String BIZ_ORDER_NO_HEADER = "X-Biz-Order-No";
+    private static final String TIMESTAMP_HEADER = "X-Timestamp";
+    private static final String CHANNEL_CODE_HEADER = "X-Channel-Code";
+    private static final String SIGNATURE_HEADER = "X-Signature";
+    private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
     private final YunkaProperties yunkaProperties;
     private final YunkaMode mode;
@@ -66,8 +75,10 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
             return new YunkaGatewayResponse(0, "MOCK", JsonNodeFactory.instance.objectNode());
         }
         long startNanos = System.nanoTime();
+        String traceId = TraceIdUtil.getTraceId();
+        String timestamp = currentTimestamp();
         log.info("traceId={} bizOrderNo={} requestId={} path={} requestBodyJson={} yunka gateway request begin",
-                TraceIdUtil.getTraceId(),
+                traceId,
                 request.bizOrderNo(),
                 request.requestId(),
                 request.path(),
@@ -76,13 +87,19 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
             YunkaGatewayResponse response = restClient.post()
                     .uri(yunkaProperties.gatewayPath())
                     .contentType(MediaType.APPLICATION_JSON)
+                    .header(TraceIdUtil.TRACE_ID_HEADER, traceId)
+                    .header(REQUEST_ID_HEADER, headerValue(request.requestId()))
+                    .header(BIZ_ORDER_NO_HEADER, headerValue(request.bizOrderNo()))
+                    .header(TIMESTAMP_HEADER, timestamp)
+                    .header(CHANNEL_CODE_HEADER, headerValue(yunkaProperties.channelCode()))
+                    .header(SIGNATURE_HEADER, headerValue(yunkaProperties.signature()))
                     .body(request)
                     .retrieve()
                     .body(YunkaGatewayResponse.class);
             long elapsedMs = elapsedMs(startNanos);
             if (response == null) {
                 log.warn("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} errorNo={} errorMsg={} responseBodyJson={}",
-                        TraceIdUtil.getTraceId(),
+                        traceId,
                         request.bizOrderNo(),
                         request.requestId(),
                         request.path(),
@@ -94,7 +111,7 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
             }
             if (response.code() == 0) {
                 log.info("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} yunkaCode={} responseBodyJson={} yunka gateway request success",
-                        TraceIdUtil.getTraceId(),
+                        traceId,
                         request.bizOrderNo(),
                         request.requestId(),
                         request.path(),
@@ -103,7 +120,7 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                         toJson(response));
             } else {
                 log.warn("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} yunkaCode={} errorNo={} errorMsg={} responseBodyJson={}",
-                        TraceIdUtil.getTraceId(),
+                        traceId,
                         request.bizOrderNo(),
                         request.requestId(),
                         request.path(),
@@ -118,7 +135,7 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
             long elapsedMs = elapsedMs(startNanos);
             if (UpstreamTimeoutDetector.isTimeout(exception)) {
                 log.error("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} errorNo={} errorMsg={}",
-                        TraceIdUtil.getTraceId(),
+                        traceId,
                         request.bizOrderNo(),
                         request.requestId(),
                         request.path(),
@@ -128,7 +145,7 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                 throw new UpstreamTimeoutException("Yunka gateway timeout", exception);
             }
             log.error("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} errorNo={} errorMsg={}",
-                    TraceIdUtil.getTraceId(),
+                    traceId,
                     request.bizOrderNo(),
                     request.requestId(),
                     request.path(),
@@ -152,6 +169,14 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
         } catch (JsonProcessingException exception) {
             return "\"SERIALIZE_FAILED\"";
         }
+    }
+
+    private String headerValue(String value) {
+        return value == null ? "" : value;
+    }
+
+    private String currentTimestamp() {
+        return OffsetDateTime.now(ZoneOffset.ofHours(8)).format(TIMESTAMP_FORMATTER);
     }
 
     private static SimpleClientHttpRequestFactory requestFactory(YunkaProperties yunkaProperties) {

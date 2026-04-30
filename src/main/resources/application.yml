@@ -125,8 +125,10 @@ nexusfin:
       gateway-path: ${YUNKA_GATEWAY_PATH:/api/gateway/proxy}
       connect-timeout-ms: ${YUNKA_CONNECT_TIMEOUT_MS:2000}
       read-timeout-ms: ${YUNKA_READ_TIMEOUT_MS:3000}
+      channel-code: ${YUNKA_CHANNEL_CODE:ABS}
+      signature: ${YUNKA_SIGNATURE:${NEXUSFIN_APP_SECRET:abs-secret-key}}
       paths:
-        loan-calculate: ${YUNKA_LOAN_CALCULATE_PATH:/loan/trail}
+        loan-calculate: ${YUNKA_LOAN_CALCULATE_PATH:/loan/trial}
         loan-query: ${YUNKA_LOAN_QUERY_PATH:/loan/query}
         loan-apply: ${YUNKA_LOAN_APPLY_PATH:/loan/apply}
         repay-trial: ${YUNKA_REPAY_TRIAL_PATH:/repay/trial}

@@ -10,7 +10,9 @@ public record YunkaProperties(
         String gatewayPath,
         int connectTimeoutMs,
         int readTimeoutMs,
-        Paths paths
+        Paths paths,
+        String channelCode,
+        String signature
 ) {
 
     public record Paths(
