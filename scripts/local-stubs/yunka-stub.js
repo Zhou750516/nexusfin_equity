@@ -94,6 +94,38 @@ function loanQueryPayload(data) {
   };
 }
 
+function normalizeToken(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.trim();
+}
+
+function jointUserTokenPayload(data) {
+  const token = normalizeToken(data.token);
+  const cidSource = token || "joint-login-default";
+  return {
+    cid: `cid-${cidSource}`,
+    name: "联合登录用户",
+    phone: "13800138000",
+  };
+}
+
+function jointUserQueryPayload(data) {
+  return {
+    userId: data.userId ?? "mem-joint-login-stub-001",
+    cid: data.cid ?? "cid-joint-login-default",
+    phone: "13800138000",
+    basicInfo: {
+      phone: "13800138000",
+    },
+    idInfo: {
+      idno: "310101199001011111",
+      name: "联合登录用户",
+    },
+  };
+}
+
 function handleGatewayRequest(payload) {
   const path = payload.path;
   const data = payload.data ?? {};
@@ -160,6 +192,10 @@ function handleGatewayRequest(payload) {
         bankCardNum: "6222020202028648",
         successTime: "2026-04-29T10:00:00+08:00",
       });
+    case "/user/token":
+      return gatewaySuccess(jointUserTokenPayload(data));
+    case "/user/query":
+      return gatewaySuccess(jointUserQueryPayload(data));
     case "/card/userCards":
       return gatewaySuccess({
         list: [
@@ -202,6 +238,8 @@ function supportedPaths() {
     "/repay/trial",
     "/repay/apply",
     "/repay/query",
+    "/user/token",
+    "/user/query",
     "/card/userCards",
     "/card/smsSend",
     "/card/smsConfirm",

@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { createGatewayPlan, resolveFaultDirective } = require("./yunka-stub");
+const { createGatewayPlan, resolveFaultDirective, supportedPaths } = require("./yunka-stub");
 
 test("should keep happy-path unchanged when no fault marker is present", () => {
   const plan = createGatewayPlan({
@@ -69,4 +69,38 @@ test("should detect timeout marker from platformBenefitOrderNo for public loan a
 
   assert.equal(fault.type, "timeout");
   assert.equal(fault.marker, "BO_B_P0_1_FAULT_TIMEOUT");
+});
+
+test("should support joint-login user token and user query paths", () => {
+  const tokenPlan = createGatewayPlan({
+    requestId: "REQ_USER_TOKEN_001",
+    path: "/user/token",
+    bizOrderNo: "JOINT-LOGIN-PUSH",
+    data: {
+      token: "joint-token-push-runtime-001",
+    },
+  });
+  assert.equal(tokenPlan.statusCode, 200);
+  assert.equal(tokenPlan.body.code, 0);
+  assert.equal(tokenPlan.body.data.cid, "cid-joint-token-push-runtime-001");
+  assert.equal(tokenPlan.body.data.name, "联合登录用户");
+  assert.equal(tokenPlan.body.data.phone, "13800138000");
+
+  const userPlan = createGatewayPlan({
+    requestId: "REQ_USER_QUERY_001",
+    path: "/user/query",
+    bizOrderNo: "JOINT-LOGIN-PUSH",
+    data: {
+      userId: "mem-local-001",
+      cid: "cid-joint-token-push-runtime-001",
+    },
+  });
+  assert.equal(userPlan.statusCode, 200);
+  assert.equal(userPlan.body.code, 0);
+  assert.equal(userPlan.body.data.idInfo.idno, "310101199001011111");
+  assert.equal(userPlan.body.data.idInfo.name, "联合登录用户");
+  assert.equal(userPlan.body.data.phone, "13800138000");
+  assert.equal(userPlan.body.data.basicInfo.phone, "13800138000");
+  assert.ok(supportedPaths().includes("/user/token"));
+  assert.ok(supportedPaths().includes("/user/query"));
 });

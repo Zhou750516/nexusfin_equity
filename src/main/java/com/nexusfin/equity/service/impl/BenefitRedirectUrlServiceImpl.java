@@ -50,6 +50,9 @@ public class BenefitRedirectUrlServiceImpl implements BenefitRedirectUrlService 
         }
 
         try {
+            // Current business assumption: benefit redirect URL is satisfied by the QW exercise redirect URL.
+            // This preserves the external redrect_benefit_url contract while keeping the actual upstream
+            // dependency explicit for later protocol clarification.
             QwExerciseUrlResponse response = qwBenefitClient.getExerciseUrl(new QwExerciseUrlRequest(
                     loginResult.externalUserId(),
                     request.benefitOrderNo()

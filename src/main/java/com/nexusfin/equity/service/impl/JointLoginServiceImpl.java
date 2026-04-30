@@ -112,11 +112,26 @@ public class JointLoginServiceImpl implements JointLoginService {
         } catch (UpstreamTimeoutException exception) {
             throw new BizException("JOINT_LOGIN_UPSTREAM_TIMEOUT", "Joint login temporarily unavailable");
         } catch (BizException exception) {
-            if (ErrorCodes.YUNKA_UPSTREAM_REJECTED.equals(exception.getErrorNo())) {
+            if (isTokenInvalidReject(exception)) {
                 throw new BizException("JOINT_LOGIN_TOKEN_INVALID", "Joint login session expired");
             }
             throw new BizException("JOINT_LOGIN_UPSTREAM_FAILED", "Joint login temporarily unavailable");
         }
+    }
+
+    private boolean isTokenInvalidReject(BizException exception) {
+        if (!ErrorCodes.YUNKA_UPSTREAM_REJECTED.equals(exception.getErrorNo())) {
+            return false;
+        }
+        String message = exception.getErrorMsg();
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        String normalized = message.toLowerCase(Locale.ROOT);
+        return normalized.contains("token invalid")
+                || normalized.contains("invalid token")
+                || normalized.contains("token expired")
+                || normalized.contains("session expired");
     }
 
     private UserQueryResponse queryJointUser(

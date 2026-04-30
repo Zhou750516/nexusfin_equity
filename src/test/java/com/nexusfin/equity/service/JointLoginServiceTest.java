@@ -235,6 +235,64 @@ class JointLoginServiceTest {
     }
 
     @Test
+    void shouldTranslateUnsupportedPathRejectToJointLoginUpstreamFailed() {
+        AuthProperties authProperties = authProperties();
+        JointLoginServiceImpl jointLoginService = new JointLoginServiceImpl(
+                xiaohuaGatewayService,
+                memberInfoRepository,
+                memberChannelRepository,
+                new JwtUtil(authProperties),
+                authProperties,
+                sensitiveDataCipher,
+                new JointLoginTargetPageResolver()
+        );
+        JointLoginRequest request = new JointLoginRequest(
+                "joint-token-unsupported-path",
+                "push",
+                null,
+                null,
+                null
+        );
+
+        when(xiaohuaGatewayService.validateUserToken(any(), any(), any()))
+                .thenThrow(new BizException(ErrorCodes.YUNKA_UPSTREAM_REJECTED, "unsupported path: /user/token"));
+
+        assertThatThrownBy(() -> jointLoginService.login(request))
+                .isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo("JOINT_LOGIN_UPSTREAM_FAILED");
+    }
+
+    @Test
+    void shouldTranslateGenericRejectToJointLoginUpstreamFailed() {
+        AuthProperties authProperties = authProperties();
+        JointLoginServiceImpl jointLoginService = new JointLoginServiceImpl(
+                xiaohuaGatewayService,
+                memberInfoRepository,
+                memberChannelRepository,
+                new JwtUtil(authProperties),
+                authProperties,
+                sensitiveDataCipher,
+                new JointLoginTargetPageResolver()
+        );
+        JointLoginRequest request = new JointLoginRequest(
+                "joint-token-generic-reject",
+                "push",
+                null,
+                null,
+                null
+        );
+
+        when(xiaohuaGatewayService.validateUserToken(any(), any(), any()))
+                .thenThrow(new BizException(ErrorCodes.YUNKA_UPSTREAM_REJECTED, "gateway unavailable"));
+
+        assertThatThrownBy(() -> jointLoginService.login(request))
+                .isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo("JOINT_LOGIN_UPSTREAM_FAILED");
+    }
+
+    @Test
     void shouldTranslateTimeoutToJointLoginUpstreamTimeout() {
         AuthProperties authProperties = authProperties();
         JointLoginServiceImpl jointLoginService = new JointLoginServiceImpl(
