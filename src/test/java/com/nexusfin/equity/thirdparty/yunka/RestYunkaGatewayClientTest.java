@@ -79,6 +79,14 @@ class RestYunkaGatewayClientTest {
         assertThat(output).contains("path=/loan/apply");
         assertThat(output).contains("bizOrderNo=APP-001");
         assertThat(output).contains("elapsedMs=");
+        assertThat(output).contains("requestBodyJson=");
+        assertThat(output).contains("\"requestId\":\"REQ-001\"");
+        assertThat(output).contains("\"path\":\"/loan/apply\"");
+        assertThat(output).contains("\"bizOrderNo\":\"APP-001\"");
+        assertThat(output).contains("responseBodyJson=");
+        assertThat(output).contains("\"code\":0");
+        assertThat(output).contains("\"message\":\"OK\"");
+        assertThat(output).contains("\"data\":{\"loanId\":\"LN-001\"}");
         server.verify();
     }
 

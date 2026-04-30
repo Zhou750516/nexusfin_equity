@@ -1,5 +1,7 @@
 package com.nexusfin.equity.thirdparty.yunka;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.exception.BizException;
@@ -25,6 +27,7 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
     private final YunkaProperties yunkaProperties;
     private final YunkaMode mode;
     private final RestClient restClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     public RestYunkaGatewayClient(
@@ -63,11 +66,12 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
             return new YunkaGatewayResponse(0, "MOCK", JsonNodeFactory.instance.objectNode());
         }
         long startNanos = System.nanoTime();
-        log.info("traceId={} bizOrderNo={} requestId={} path={} yunka gateway request begin",
+        log.info("traceId={} bizOrderNo={} requestId={} path={} requestBodyJson={} yunka gateway request begin",
                 TraceIdUtil.getTraceId(),
                 request.bizOrderNo(),
                 request.requestId(),
-                request.path());
+                request.path(),
+                toJson(request));
         try {
             YunkaGatewayResponse response = restClient.post()
                     .uri(yunkaProperties.gatewayPath())
@@ -77,26 +81,28 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                     .body(YunkaGatewayResponse.class);
             long elapsedMs = elapsedMs(startNanos);
             if (response == null) {
-                log.warn("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} errorNo={} errorMsg={}",
+                log.warn("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} errorNo={} errorMsg={} responseBodyJson={}",
                         TraceIdUtil.getTraceId(),
                         request.bizOrderNo(),
                         request.requestId(),
                         request.path(),
                         elapsedMs,
                         ErrorCodes.YUNKA_RESPONSE_EMPTY,
-                        "Yunka gateway returned empty response");
+                        "Yunka gateway returned empty response",
+                        "null");
                 return null;
             }
             if (response.code() == 0) {
-                log.info("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} yunkaCode={} yunka gateway request success",
+                log.info("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} yunkaCode={} responseBodyJson={} yunka gateway request success",
                         TraceIdUtil.getTraceId(),
                         request.bizOrderNo(),
                         request.requestId(),
                         request.path(),
                         elapsedMs,
-                        response.code());
+                        response.code(),
+                        toJson(response));
             } else {
-                log.warn("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} yunkaCode={} errorNo={} errorMsg={}",
+                log.warn("traceId={} bizOrderNo={} requestId={} path={} elapsedMs={} yunkaCode={} errorNo={} errorMsg={} responseBodyJson={}",
                         TraceIdUtil.getTraceId(),
                         request.bizOrderNo(),
                         request.requestId(),
@@ -104,7 +110,8 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                         elapsedMs,
                         response.code(),
                         ErrorCodes.YUNKA_UPSTREAM_REJECTED,
-                        response.message());
+                        response.message(),
+                        toJson(response));
             }
             return response;
         } catch (RestClientException exception) {
@@ -134,6 +141,17 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
 
     private long elapsedMs(long startNanos) {
         return java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+    }
+
+    private String toJson(Object value) {
+        if (value == null) {
+            return "null";
+        }
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException exception) {
+            return "\"SERIALIZE_FAILED\"";
+        }
     }
 
     private static SimpleClientHttpRequestFactory requestFactory(YunkaProperties yunkaProperties) {
