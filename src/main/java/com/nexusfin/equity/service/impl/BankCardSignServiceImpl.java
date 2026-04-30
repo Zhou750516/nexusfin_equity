@@ -158,6 +158,9 @@ public class BankCardSignServiceImpl implements BankCardSignService {
             log.info("traceId={} bizOrderNo={} requestId={} userSignId={} agreementNo={} memberId={} elapsedMs={} status={} bank-card sign confirm qw request success",
                     TraceIdUtil.getTraceId(), bizOrderNo, requestId, userSignId, agreementNo, memberId, elapsedMs(startNanos), STATUS_SIGNED);
             return new BankCardSignConfirmResponse(userSignId, agreementNo, true, STATUS_SIGNED);
+        } catch (UpstreamTimeoutException exception) {
+            logFailure("bank-card sign confirm qw request failed", bizOrderNo, requestId, memberId, startNanos, exception);
+            throw new BizException(QW_SIGN_UPSTREAM_TIMEOUT, "QW sign confirm temporarily unavailable");
         } catch (RuntimeException exception) {
             logFailure("bank-card sign confirm qw request failed", bizOrderNo, requestId, memberId, startNanos, exception);
             throw exception;

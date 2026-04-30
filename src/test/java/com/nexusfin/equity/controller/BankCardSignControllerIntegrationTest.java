@@ -163,6 +163,30 @@ class BankCardSignControllerIntegrationTest {
         assertThat(protocol.getSignRequestNo()).isEqualTo("5678");
     }
 
+    @Test
+    void shouldReturnControlledBizErrorWhenMockConfirmSignTimesOut() throws Exception {
+        MemberInfo memberInfo = createMember("mem-sign-confirm-timeout", "tech-user-sign-confirm-timeout");
+        createChannel(memberInfo.getMemberId(), memberInfo.getExternalUserId());
+
+        mockMvc.perform(post("/api/bank-card/sign-confirm")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Trace-Id", "REQ_EX_P0_1_3_FAULT_TIMEOUT")
+                        .content("""
+                                {
+                                  "userSignId": 5678,
+                                  "verificationCode": "123456"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(-1))
+                .andExpect(jsonPath("$.message").value("QW_SIGN_UPSTREAM_TIMEOUT:QW sign confirm temporarily unavailable"));
+
+        assertThat(memberPaymentProtocolRepository.selectCount(null)).isZero();
+        assertThat(memberPaymentProtocolRepository.selectCount(Wrappers.<MemberPaymentProtocol>lambdaQuery()
+                .eq(MemberPaymentProtocol::getSignRequestNo, "5678"))).isZero();
+    }
+
     private MemberInfo createMember(String memberId, String externalUserId) {
         MemberInfo memberInfo = new MemberInfo();
         memberInfo.setMemberId(memberId);

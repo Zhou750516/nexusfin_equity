@@ -215,6 +215,28 @@ class BankCardSignServiceTest {
     }
 
     @Test
+    void shouldTranslateConfirmSignTimeoutToBizException(CapturedOutput output) {
+        MemberInfo memberInfo = buildMember();
+        when(memberInfoRepository.selectById("mem-1")).thenReturn(memberInfo);
+        when(qwBenefitClient.confirmSign(any()))
+                .thenThrow(new UpstreamTimeoutException("Mock QW timeout: REQ_EX_P0_1_3_FAULT_TIMEOUT"));
+
+        assertThatThrownBy(() -> bankCardSignService.confirmSign(
+                "mem-1",
+                new BankCardSignConfirmRequest(5678L, "123456")
+        ))
+                .isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo("QW_SIGN_UPSTREAM_TIMEOUT");
+
+        verify(paymentProtocolService, never()).saveActiveProtocol(any());
+        assertThat(output).contains("bank-card sign confirm qw request begin");
+        assertThat(output).contains("bank-card sign confirm qw request failed");
+        assertThat(output).contains("errorNo=QW_SIGN_UPSTREAM_FAILED");
+        assertThat(output).doesNotContain("123456");
+    }
+
+    @Test
     void shouldRejectWhenMemberMissing() {
         when(memberInfoRepository.selectById("mem-missing")).thenReturn(null);
 
