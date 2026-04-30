@@ -81,21 +81,17 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                 new CreateBenefitOrderRequest(
                         "loan-apply-" + applicationId,
                         h5BenefitsProperties.productCode(),
-                        yuanToCent(request.amount()),
+                        yuanToCent(request.orderAmount()),
                         Boolean.TRUE
                 )
         );
         YunkaGatewayClient.YunkaGatewayResponse response;
         String requestId = next("LA");
         String upstreamBankCardNum = resolveBankCardNum(request);
-        String platformBenefitOrderNo = resolvePlatformBenefitOrderNo(
-                benefitOrder.benefitOrderNo(),
-                request.platformBenefitOrderNo()
-        );
         LoanApplyForwardData forwardData = new LoanApplyForwardData(
                 uid,
                 benefitOrder.benefitOrderNo(),
-                platformBenefitOrderNo,
+                request.platformBenefitOrderNo(),
                 applicationId,
                 loanId,
                 yuanToCent(request.amount()),
@@ -230,13 +226,6 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
             return request.bankCardNum();
         }
         return request.receivingAccountId();
-    }
-
-    private String resolvePlatformBenefitOrderNo(String benefitOrderNo, String requestPlatformBenefitOrderNo) {
-        if (hasText(requestPlatformBenefitOrderNo)) {
-            return requestPlatformBenefitOrderNo;
-        }
-        return benefitOrderNo;
     }
 
     private boolean hasText(String value) {

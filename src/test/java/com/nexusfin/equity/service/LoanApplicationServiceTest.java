@@ -96,6 +96,11 @@ class LoanApplicationServiceTest {
         assertThat(response.benefitOrderNo()).isEqualTo("BEN-001");
         assertThat(response.message()).isEqualTo("处理中");
 
+        ArgumentCaptor<com.nexusfin.equity.dto.request.CreateBenefitOrderRequest> benefitOrderCaptor =
+                ArgumentCaptor.forClass(com.nexusfin.equity.dto.request.CreateBenefitOrderRequest.class);
+        verify(benefitOrderService).createOrder(eq("mem-001"), benefitOrderCaptor.capture());
+        assertThat(benefitOrderCaptor.getValue().loanAmount()).isEqualTo(29900L);
+
         ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> yunkaCaptor =
                 ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
         verify(yunkaGatewayClient).proxy(yunkaCaptor.capture());
@@ -104,6 +109,7 @@ class LoanApplicationServiceTest {
         assertThat(forwardData.path("loanReason").asText()).isEqualTo("DAILY_CONSUMPTION");
         assertThat(forwardData.path("bankCardNum").asText()).isEqualTo("6222020202028648");
         assertThat(forwardData.path("platformBenefitOrderNo").asText()).isEqualTo("PBEN-001");
+        assertThat(forwardData.path("loanAmount").asLong()).isEqualTo(300000L);
         assertThat(forwardData.path("basicInfo").path("education").asText()).isEqualTo("BACHELOR");
         assertThat(forwardData.path("contactInfo").isArray()).isTrue();
         assertThat(forwardData.path("imageInfo").isArray()).isTrue();
@@ -211,6 +217,7 @@ class LoanApplicationServiceTest {
     void shouldRejectUnsupportedReceivingAccountBeforeCreatingBenefitOrder() throws Exception {
         LoanApplyRequest invalidRequest = new LoanApplyRequest(
                 3000L,
+                299L,
                 3,
                 "acc_invalid",
                 List.of("loan", "user"),
@@ -237,6 +244,7 @@ class LoanApplicationServiceTest {
     private LoanApplyRequest buildApplyRequest() throws Exception {
         return new LoanApplyRequest(
                 3000L,
+                299L,
                 3,
                 "acc_001",
                 List.of("loan", "user"),

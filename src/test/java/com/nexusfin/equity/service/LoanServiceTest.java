@@ -137,6 +137,7 @@ class LoanServiceTest {
     private LoanApplyRequest buildApplyRequest() {
         return new LoanApplyRequest(
                 3000L,
+                299L,
                 3,
                 "acc_001",
                 List.of("loan", "user"),

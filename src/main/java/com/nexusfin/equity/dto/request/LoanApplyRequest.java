@@ -10,6 +10,7 @@ import java.util.List;
 
 public record LoanApplyRequest(
         @NotNull @Min(1) Long amount,
+        @NotNull @Min(1) Long orderAmount,
         @NotNull @Min(1) Integer term,
         @NotBlank String receivingAccountId,
         @NotEmpty List<String> agreedProtocols,
@@ -24,6 +25,6 @@ public record LoanApplyRequest(
         JsonNode supplementInfo,
         JsonNode optionInfo,
         JsonNode imageInfo,
-        String platformBenefitOrderNo
+        @NotBlank String platformBenefitOrderNo
 ) {
 }

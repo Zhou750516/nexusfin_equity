@@ -126,10 +126,12 @@ class Phase9TaskGroupECompensationIntegrationTest {
                         .content("""
                                 {
                                   "amount": 3000,
+                                  "orderAmount": 299,
                                   "term": 3,
                                   "receivingAccountId": "acc_001",
                                   "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
-                                  "purpose": "shopping"
+                                  "purpose": "shopping",
+                                  "platformBenefitOrderNo": "PBO-QW-TIMEOUT-001"
                                 }
                                 """))
                 .andExpect(status().isOk())

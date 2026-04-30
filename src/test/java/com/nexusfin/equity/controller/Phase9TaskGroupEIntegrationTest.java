@@ -136,10 +136,12 @@ class Phase9TaskGroupEIntegrationTest {
                         .content("""
                                 {
                                   "amount": 3000,
+                                  "orderAmount": 299,
                                   "term": 3,
                                   "receivingAccountId": "acc_001",
                                   "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
-                                  "purpose": "shopping"
+                                  "purpose": "shopping",
+                                  "platformBenefitOrderNo": "PBO-INT-001"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -171,11 +173,13 @@ class Phase9TaskGroupEIntegrationTest {
         assertThat(requestCaptor.getValue().path()).isEqualTo("/loan/apply");
         assertThat(data.get("uid").asText()).isEqualTo("user-loan-apply");
         assertThat(data.get("benefitOrderNo").asText()).isEqualTo(benefitOrder.getBenefitOrderNo());
+        assertThat(data.get("platformBenefitOrderNo").asText()).isEqualTo("PBO-INT-001");
         assertThat(data.get("applyId").asText()).isEqualTo(mapping.getApplicationId());
         assertThat(data.get("loanId").asText()).startsWith("LN-");
         assertThat(data.get("loanAmount").asLong()).isEqualTo(300000L);
         assertThat(data.get("loanPeriod").asInt()).isEqualTo(3);
         assertThat(data.get("bankCardNo").asText()).isEqualTo("acc_001");
+        assertThat(benefitOrder.getLoanAmount()).isEqualTo(29900L);
         assertThat(output).contains("loan apply yunka request begin");
         assertThat(output).contains("scene=loan apply").contains("yunka request success");
         assertThat(output).contains("path=/loan/apply");
@@ -202,10 +206,12 @@ class Phase9TaskGroupEIntegrationTest {
                         .content("""
                                 {
                                   "amount": 3000,
+                                  "orderAmount": 299,
                                   "term": 3,
                                   "receivingAccountId": "acc_001",
                                   "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
-                                  "purpose": "rent"
+                                  "purpose": "rent",
+                                  "platformBenefitOrderNo": "PBO-PURPOSE-001"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -230,14 +236,62 @@ class Phase9TaskGroupEIntegrationTest {
                         .content("""
                                 {
                                   "amount": 3000,
+                                  "orderAmount": 299,
                                   "term": 3,
                                   "receivingAccountId": "acc_001",
-                                  "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"]
+                                  "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
+                                  "platformBenefitOrderNo": "PBO-MISSING-PURPOSE-001"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("purpose")));
+    }
+
+    @Test
+    void shouldRejectLoanApplyWhenPlatformBenefitOrderNoIsMissing() throws Exception {
+        MemberInfo memberInfo = createReadyMember("mem-loan-pbo-missing", "user-loan-pbo-missing");
+        createProduct("HUXUAN_CARD");
+
+        mockMvc.perform(post("/api/loan/apply")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": 3000,
+                                  "orderAmount": 299,
+                                  "term": 3,
+                                  "receivingAccountId": "acc_001",
+                                  "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
+                                  "purpose": "shopping"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("platformBenefitOrderNo")));
+    }
+
+    @Test
+    void shouldRejectLoanApplyWhenOrderAmountIsMissing() throws Exception {
+        MemberInfo memberInfo = createReadyMember("mem-loan-order-amount-missing", "user-loan-order-amount-missing");
+        createProduct("HUXUAN_CARD");
+
+        mockMvc.perform(post("/api/loan/apply")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": 3000,
+                                  "term": 3,
+                                  "receivingAccountId": "acc_001",
+                                  "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
+                                  "purpose": "shopping",
+                                  "platformBenefitOrderNo": "PBO-MISSING-ORDER-AMOUNT-001"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("orderAmount")));
     }
 
     @Test
@@ -253,10 +307,12 @@ class Phase9TaskGroupEIntegrationTest {
                         .content("""
                                 {
                                   "amount": 3000,
+                                  "orderAmount": 299,
                                   "term": 3,
                                   "receivingAccountId": "acc_001",
                                   "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
-                                  "purpose": "shopping"
+                                  "purpose": "shopping",
+                                  "platformBenefitOrderNo": "PBO-FAIL-001"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -286,10 +342,12 @@ class Phase9TaskGroupEIntegrationTest {
                         .content("""
                                 {
                                   "amount": 3000,
+                                  "orderAmount": 299,
                                   "term": 3,
                                   "receivingAccountId": "acc_001",
                                   "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
-                                  "purpose": "shopping"
+                                  "purpose": "shopping",
+                                  "platformBenefitOrderNo": "PBO-TIMEOUT-001"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -320,10 +378,12 @@ class Phase9TaskGroupEIntegrationTest {
                         .content("""
                                 {
                                   "amount": 3000,
+                                  "orderAmount": 299,
                                   "term": 3,
                                   "receivingAccountId": "acc_001",
                                   "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
-                                  "purpose": "shopping"
+                                  "purpose": "shopping",
+                                  "platformBenefitOrderNo": "PBO-RETRY-001"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -340,10 +400,12 @@ class Phase9TaskGroupEIntegrationTest {
                         .content("""
                                 {
                                   "amount": 3000,
+                                  "orderAmount": 299,
                                   "term": 3,
                                   "receivingAccountId": "acc_001",
                                   "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
-                                  "purpose": "shopping"
+                                  "purpose": "shopping",
+                                  "platformBenefitOrderNo": "PBO-RETRY-001"
                                 }
                                 """))
                 .andExpect(status().isOk())
