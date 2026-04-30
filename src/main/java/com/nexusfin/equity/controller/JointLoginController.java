@@ -46,7 +46,7 @@ public class JointLoginController {
                 result.localUserReady()
         );
         log.info("traceId={} bizOrderNo={} joint login entry resolved targetPage={}",
-                TraceIdUtil.getTraceId(), request.benefitOrderNo(), result.targetPage());
+                TraceIdUtil.getTraceId(), result.benefitOrderNo(), result.targetPage());
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookieUtil.buildAuthCookie(result.jwtToken()).toString())
                 .body(Result.success(response));

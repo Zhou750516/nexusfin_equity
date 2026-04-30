@@ -26,16 +26,24 @@ export function parseJointLoginParams(search: string): JointLoginParams | null {
   if (!token || !scene) {
     return null;
   }
-  return {
+  const params = {
     token,
     scene,
     orderNo: normalizeOptionalParam(searchParams.get("orderNo")),
     benefitOrderNo: normalizeOptionalParam(searchParams.get("benefitOrderNo")),
     productCode: normalizeOptionalParam(searchParams.get("productCode")),
   };
+  if (scene !== "push" && !params.benefitOrderNo && !params.orderNo) {
+    return null;
+  }
+  return params;
 }
 
 export function resolveJointEntryTarget(result: JointLoginResult) {
+  if (result.targetPage === "landing") {
+    return "/landing";
+  }
+
   const params = {
     scene: result.scene,
     benefitOrderNo: result.benefitOrderNo,
@@ -52,9 +60,15 @@ export function resolveJointEntryTarget(result: JointLoginResult) {
   return "/joint-unsupported";
 }
 
-export function resolveJointEntryErrorKey(message: string): "jointEntry.sessionExpired" | "jointEntry.systemBusy" {
+export function resolveJointEntryErrorKey(
+  message: string,
+): "jointEntry.missingParams" | "jointEntry.sessionExpired" | "jointEntry.systemBusy" {
   if (message.includes("JOINT_LOGIN_TOKEN_INVALID")) {
     return "jointEntry.sessionExpired";
+  }
+
+  if (message.includes("JOINT_LOGIN_BENEFIT_ORDER_REQUIRED")) {
+    return "jointEntry.missingParams";
   }
 
   return "jointEntry.systemBusy";

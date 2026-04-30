@@ -151,13 +151,12 @@ class NexusfinEquityApplicationTests {
                         .content("""
                                 {
                                   "token": "joint-token-quickstart",
-                                  "scene": "push",
-                                  "benefitOrderNo": "BEN-SMOKE-001"
+                                  "scene": "push"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.targetPage").value("joint-dispatch"))
+                .andExpect(jsonPath("$.data.targetPage").value("landing"))
                 .andReturn();
 
         jakarta.servlet.http.Cookie authCookie = loginResult.getResponse().getCookie("NEXUSFIN_AUTH");

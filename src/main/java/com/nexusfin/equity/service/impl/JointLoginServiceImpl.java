@@ -66,7 +66,8 @@ public class JointLoginServiceImpl implements JointLoginService {
         if (request.token() == null || request.token().isBlank()) {
             throw new BizException("JOINT_LOGIN_TOKEN_REQUIRED", "Joint login token is required");
         }
-        String benefitOrderNo = firstNonBlank(request.benefitOrderNo(), request.orderNo());
+        String normalizedScene = normalizeScene(request.scene());
+        String benefitOrderNo = resolveBenefitOrderNo(normalizedScene, request);
         String requestId = RequestIdUtil.nextId("xa");
         UserTokenResponse tokenResponse = validateJointToken(requestId, benefitOrderNo, request.token());
         String externalUserId = requiredValue(tokenResponse.cid(), "JOINT_LOGIN_CID_REQUIRED", "Xiaohua cid is required");
@@ -79,11 +80,26 @@ public class JointLoginServiceImpl implements JointLoginService {
         String jwtToken = jwtUtil.generateToken(memberInfo.getMemberId(), identity.externalUserId());
         return new JointLoginResult(
                 jwtToken,
-                normalizeScene(request.scene()),
-                targetPageResolver.resolve(request.scene()),
+                normalizedScene,
+                targetPageResolver.resolve(normalizedScene),
                 benefitOrderNo,
+                identity.externalUserId(),
                 true
         );
+    }
+
+    private String resolveBenefitOrderNo(String normalizedScene, JointLoginRequest request) {
+        if ("push".equals(normalizedScene)) {
+            return null;
+        }
+        String benefitOrderNo = firstNonBlank(request.benefitOrderNo(), request.orderNo());
+        if (benefitOrderNo == null || benefitOrderNo.isBlank()) {
+            throw new BizException(
+                    "JOINT_LOGIN_BENEFIT_ORDER_REQUIRED",
+                    "Benefit order number is required for " + normalizedScene + " scene"
+            );
+        }
+        return benefitOrderNo;
     }
 
     private UserTokenResponse validateJointToken(String requestId, String benefitOrderNo, String token) {

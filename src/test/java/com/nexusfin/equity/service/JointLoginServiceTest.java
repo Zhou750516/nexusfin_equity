@@ -49,7 +49,7 @@ class JointLoginServiceTest {
     private MemberChannelRepository memberChannelRepository;
 
     @Test
-    void shouldCreateJwtAndResolveDispatchPageForPushScene() throws Exception {
+    void shouldCreateJwtAndResolveLandingPageForPushSceneWithoutBenefitOrder() throws Exception {
         AuthProperties authProperties = authProperties();
         JointLoginServiceImpl jointLoginService = new JointLoginServiceImpl(
                 xiaohuaGatewayService,
@@ -64,7 +64,7 @@ class JointLoginServiceTest {
                 "joint-token-001",
                 "push",
                 null,
-                "BEN-20260417-001",
+                null,
                 "HUXUAN_CARD"
         );
 
@@ -96,8 +96,9 @@ class JointLoginServiceTest {
         assertThat(memberCaptor.getValue().getMobileEncrypted()).isNotEqualTo("13800138000");
         assertThat(result.jwtToken()).isNotBlank();
         assertThat(result.scene()).isEqualTo("push");
-        assertThat(result.targetPage()).isEqualTo("joint-dispatch");
-        assertThat(result.benefitOrderNo()).isEqualTo("BEN-20260417-001");
+        assertThat(result.targetPage()).isEqualTo("landing");
+        assertThat(result.benefitOrderNo()).isNull();
+        assertThat(result.externalUserId()).isEqualTo("xh-cid-001");
         assertThat(result.localUserReady()).isTrue();
     }
 
@@ -147,6 +148,61 @@ class JointLoginServiceTest {
                         && "xh-cid-001".equals(userQueryRequest.cid())));
         assertThat(result.targetPage()).isEqualTo("joint-refund-entry");
         assertThat(result.scene()).isEqualTo("refund");
+        assertThat(result.externalUserId()).isEqualTo("xh-cid-001");
+    }
+
+    @Test
+    void shouldRejectExerciseSceneWhenBenefitOrderIsMissing() {
+        AuthProperties authProperties = authProperties();
+        JointLoginServiceImpl jointLoginService = new JointLoginServiceImpl(
+                xiaohuaGatewayService,
+                memberInfoRepository,
+                memberChannelRepository,
+                new JwtUtil(authProperties),
+                authProperties,
+                sensitiveDataCipher,
+                new JointLoginTargetPageResolver()
+        );
+
+        JointLoginRequest request = new JointLoginRequest(
+                "joint-token-005",
+                "exercise",
+                null,
+                null,
+                null
+        );
+
+        assertThatThrownBy(() -> jointLoginService.login(request))
+                .isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo("JOINT_LOGIN_BENEFIT_ORDER_REQUIRED");
+    }
+
+    @Test
+    void shouldRejectRefundSceneWhenBenefitOrderIsMissing() {
+        AuthProperties authProperties = authProperties();
+        JointLoginServiceImpl jointLoginService = new JointLoginServiceImpl(
+                xiaohuaGatewayService,
+                memberInfoRepository,
+                memberChannelRepository,
+                new JwtUtil(authProperties),
+                authProperties,
+                sensitiveDataCipher,
+                new JointLoginTargetPageResolver()
+        );
+
+        JointLoginRequest request = new JointLoginRequest(
+                "joint-token-006",
+                "refund",
+                null,
+                null,
+                null
+        );
+
+        assertThatThrownBy(() -> jointLoginService.login(request))
+                .isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo("JOINT_LOGIN_BENEFIT_ORDER_REQUIRED");
     }
 
     @Test

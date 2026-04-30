@@ -14,6 +14,15 @@ describe("parseJointLoginParams", () => {
     });
   });
 
+  it("accepts push scene without benefit order number", () => {
+    expect(
+      parseJointLoginParams("?token=joint-token-push-001&scene=push"),
+    ).toEqual({
+      token: "joint-token-push-001",
+      scene: "push",
+    });
+  });
+
   it("trims token and scene before validation", () => {
     expect(
       parseJointLoginParams("?token=%20joint-token-002%20&scene=%20refund%20&benefitOrderNo=BEN-002"),
@@ -31,17 +40,22 @@ describe("parseJointLoginParams", () => {
   it("returns null when scene is unsupported", () => {
     expect(parseJointLoginParams("?token=joint-token-004&scene=unknown_scene")).toBeNull();
   });
+
+  it("returns null when exercise scene misses benefit order number", () => {
+    expect(parseJointLoginParams("?token=joint-token-005&scene=exercise")).toBeNull();
+  });
 });
 
 describe("resolveJointEntryTarget", () => {
-  it("maps dispatch page for push scene", () => {
+  it("maps landing page for push scene", () => {
     expect(resolveJointEntryTarget({
       loginSuccess: true,
       scene: "push",
-      targetPage: "joint-dispatch",
-      benefitOrderNo: "BEN-20260417-001",
+      targetPage: "landing",
+      benefitOrderNo: null,
+      externalUserId: "xh-cid-001",
       localUserReady: true,
-    })).toEqual("/joint-dispatch?scene=push&benefitOrderNo=BEN-20260417-001");
+    })).toEqual("/landing");
   });
 
   it("maps refund page for refund scene", () => {
@@ -50,6 +64,7 @@ describe("resolveJointEntryTarget", () => {
       scene: "refund",
       targetPage: "joint-refund-entry",
       benefitOrderNo: "BEN-20260417-002",
+      externalUserId: "xh-cid-002",
       localUserReady: true,
     })).toEqual("/joint-refund-entry?scene=refund&benefitOrderNo=BEN-20260417-002");
   });
@@ -60,6 +75,7 @@ describe("resolveJointEntryTarget", () => {
       scene: "unknown",
       targetPage: "joint-unsupported",
       benefitOrderNo: null,
+      externalUserId: null,
       localUserReady: false,
     })).toEqual("/joint-unsupported");
   });
@@ -69,6 +85,12 @@ describe("resolveJointEntryErrorKey", () => {
   it("maps token invalid errors to session expired copy", () => {
     expect(resolveJointEntryErrorKey("JOINT_LOGIN_TOKEN_INVALID:Joint login session expired")).toBe(
       "jointEntry.sessionExpired",
+    );
+  });
+
+  it("maps missing benefit order errors to missing params copy", () => {
+    expect(resolveJointEntryErrorKey("JOINT_LOGIN_BENEFIT_ORDER_REQUIRED:Benefit order number is required")).toBe(
+      "jointEntry.missingParams",
     );
   });
 

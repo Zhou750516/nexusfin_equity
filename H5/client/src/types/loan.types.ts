@@ -236,7 +236,8 @@ export interface JointLoginParams {
 export interface JointLoginResult {
   loginSuccess: boolean;
   scene: string;
-  targetPage: "joint-dispatch" | "joint-refund-entry" | "joint-unsupported";
+  targetPage: "landing" | "joint-dispatch" | "joint-refund-entry" | "joint-unsupported";
   benefitOrderNo: string | null;
+  externalUserId?: string | null;
   localUserReady: boolean;
 }

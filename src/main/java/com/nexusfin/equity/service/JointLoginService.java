@@ -11,6 +11,7 @@ public interface JointLoginService {
             String scene,
             String targetPage,
             String benefitOrderNo,
+            String externalUserId,
             boolean localUserReady
     ) {
     }

@@ -40,13 +40,12 @@ describe("joint-session", () => {
     const params: JointLoginParams = {
       token: "joint-token-001",
       scene: "push",
-      benefitOrderNo: "BEN-001",
       orderNo: "ORD-001",
       productCode: "PROD-001",
     };
 
     expect(resolveJointLoginRecoveryPath(params)).toBe(
-      "/joint-entry?token=joint-token-001&scene=push&orderNo=ORD-001&benefitOrderNo=BEN-001&productCode=PROD-001",
+      "/joint-entry?token=joint-token-001&scene=push&orderNo=ORD-001&productCode=PROD-001",
     );
   });
 

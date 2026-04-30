@@ -56,8 +56,9 @@ class JointLoginControllerIntegrationTest {
                 new JointLoginService.JointLoginResult(
                         "jwt-joint-token",
                         "push",
-                        "joint-dispatch",
-                        "BEN-20260417-001",
+                        "landing",
+                        null,
+                        "xh-cid-001",
                         true
                 )
         );
@@ -67,14 +68,13 @@ class JointLoginControllerIntegrationTest {
                         .content("""
                                 {
                                   "token": "joint-token-001",
-                                  "scene": "push",
-                                  "benefitOrderNo": "BEN-20260417-001"
+                                  "scene": "push"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.scene").value("push"))
-                .andExpect(jsonPath("$.data.targetPage").value("joint-dispatch"))
+                .andExpect(jsonPath("$.data.targetPage").value("landing"))
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("NEXUSFIN_AUTH=")));
     }
 
