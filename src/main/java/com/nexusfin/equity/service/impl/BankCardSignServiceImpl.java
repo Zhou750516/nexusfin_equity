@@ -9,6 +9,7 @@ import com.nexusfin.equity.dto.response.BankCardSignStatusResponse;
 import com.nexusfin.equity.entity.MemberChannel;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.exception.BizException;
+import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.BankCardSignService;
@@ -38,6 +39,7 @@ public class BankCardSignServiceImpl implements BankCardSignService {
     private static final String STATUS_SMS_SENT = "SMS_SENT";
     private static final String PROVIDER_QW_SIGN = "QW_SIGN";
     private static final String QW_SIGN_UPSTREAM_FAILED = "QW_SIGN_UPSTREAM_FAILED";
+    private static final String QW_SIGN_UPSTREAM_TIMEOUT = "QW_SIGN_UPSTREAM_TIMEOUT";
     private static final String QW_SIGN_MERCHANT_ID_MISSING = "QW_SIGN_MERCHANT_ID_MISSING";
 
     private final MemberInfoRepository memberInfoRepository;
@@ -83,6 +85,9 @@ public class BankCardSignServiceImpl implements BankCardSignService {
             log.info("traceId={} bizOrderNo={} requestId={} memberId={} elapsedMs={} status={} bank-card sign status qw request success",
                     TraceIdUtil.getTraceId(), bizOrderNo, requestId, memberId, elapsedMs(startNanos), status);
             return new BankCardSignStatusResponse(accountNo, signed, status);
+        } catch (UpstreamTimeoutException exception) {
+            logFailure("bank-card sign status qw request failed", bizOrderNo, requestId, memberId, startNanos, exception);
+            throw new BizException(QW_SIGN_UPSTREAM_TIMEOUT, "QW sign status temporarily unavailable");
         } catch (RuntimeException exception) {
             logFailure("bank-card sign status qw request failed", bizOrderNo, requestId, memberId, startNanos, exception);
             throw exception;

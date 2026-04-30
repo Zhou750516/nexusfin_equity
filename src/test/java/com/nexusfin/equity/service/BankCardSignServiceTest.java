@@ -8,6 +8,7 @@ import com.nexusfin.equity.dto.response.BankCardSignStatusResponse;
 import com.nexusfin.equity.entity.MemberChannel;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.exception.BizException;
+import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.impl.BankCardSignServiceImpl;
@@ -195,6 +196,27 @@ class BankCardSignServiceTest {
         assertThatThrownBy(() -> bankCardSignService.getSignStatus("mem-missing", "6222020202020208"))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("Member not found");
+    }
+
+    @Test
+    void shouldTranslateSignStatusTimeoutToBizException(CapturedOutput output) {
+        MemberInfo memberInfo = buildMember();
+        when(memberInfoRepository.selectById("mem-1")).thenReturn(memberInfo);
+        when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
+        when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户");
+        when(qwProperties.getDirect()).thenReturn(qwDirectProperties);
+        when(qwDirectProperties.getMerchantId()).thenReturn("200000000007804");
+        when(qwBenefitClient.querySignStatus(any()))
+                .thenThrow(new UpstreamTimeoutException("Mock QW timeout: 6222020202021234_FAULT_TIMEOUT"));
+
+        assertThatThrownBy(() -> bankCardSignService.getSignStatus("mem-1", "6222020202021234_FAULT_TIMEOUT"))
+                .isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo("QW_SIGN_UPSTREAM_TIMEOUT");
+
+        assertThat(output).contains("bank-card sign status qw request begin");
+        assertThat(output).contains("bank-card sign status qw request failed");
+        assertThat(output).contains("errorNo=QW_SIGN_UPSTREAM_FAILED");
     }
 
     @Test
