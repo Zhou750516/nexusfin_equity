@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const http = require("node:http");
+const { supportedPaths } = require("./yunka-paths");
 
 const host = process.env.HOST ?? "127.0.0.1";
 const port = Number(process.env.PORT ?? 18081);
@@ -9,6 +10,7 @@ const timeoutDelayMs = Number(process.env.YUNKA_FAULT_TIMEOUT_DELAY_MS ?? 6500);
 
 const REJECT_PATTERN = /.*_FAULT_REJECT_(\d+)$/;
 const DELAY_PATTERN = /.*_FAULT_DELAY_(\d+)$/;
+const INVALID_TOKEN_PATTERN = /.*_FAULT_(TOKEN_INVALID|SESSION_EXPIRED)$/;
 
 const queryCounts = new Map();
 
@@ -126,10 +128,36 @@ function jointUserQueryPayload(data) {
   };
 }
 
+function protocolAggregationPayload() {
+  return {
+    list: [
+      {
+        title: "联合权益服务协议",
+        isShow: 1,
+        url: "https://mock-yunka.local/protocols/benefits-service",
+      },
+      {
+        title: "联合扣款授权协议",
+        isShow: 1,
+        url: "https://mock-yunka.local/protocols/debit-auth",
+      },
+    ],
+  };
+}
+
+function benefitSyncPayload(data) {
+  return {
+    status: "SUCCESS",
+    msg: "权益订单同步成功",
+    acceptedBenefitUrl: data.benefiturl ?? data.benefitUrl ?? "",
+  };
+}
+
 function handleGatewayRequest(payload) {
   const path = payload.path;
   const data = payload.data ?? {};
   switch (path) {
+    case "/loan/trial":
     case "/loan/trail":
       return gatewaySuccess({
         receiveAmount: Number(data.loanAmount ?? 300000),
@@ -192,6 +220,8 @@ function handleGatewayRequest(payload) {
         bankCardNum: "6222020202028648",
         successTime: "2026-04-29T10:00:00+08:00",
       });
+    case "/protocol/queryProtocolAggregationLink":
+      return gatewaySuccess(protocolAggregationPayload());
     case "/user/token":
       return gatewaySuccess(jointUserTokenPayload(data));
     case "/user/query":
@@ -218,6 +248,8 @@ function handleGatewayRequest(payload) {
         status: "11002",
         msg: "验证码校验成功",
       });
+    case "/benefit/sync":
+      return gatewaySuccess(benefitSyncPayload(data));
     default:
       return {
         code: 10004,
@@ -227,23 +259,6 @@ function handleGatewayRequest(payload) {
         },
       };
   }
-}
-
-function supportedPaths() {
-  return [
-    "/loan/trail",
-    "/loan/apply",
-    "/loan/query",
-    "/loan/repayPlan",
-    "/repay/trial",
-    "/repay/apply",
-    "/repay/query",
-    "/user/token",
-    "/user/query",
-    "/card/userCards",
-    "/card/smsSend",
-    "/card/smsConfirm",
-  ];
 }
 
 function collectFaultCandidates(payload) {
@@ -278,6 +293,19 @@ function collectStrings(value, values) {
 
 function resolveFaultDirective(payload) {
   const candidates = collectFaultCandidates(payload);
+  if (payload.path === "/user/token") {
+    for (const candidate of candidates) {
+      const match = candidate.match(INVALID_TOKEN_PATTERN);
+      if (match) {
+        return {
+          type: "semantic_reject",
+          marker: candidate,
+          code: 40101,
+          message: match[1] === "SESSION_EXPIRED" ? "session expired" : "token invalid",
+        };
+      }
+    }
+  }
   for (const candidate of candidates) {
     if (candidate.includes("_FAULT_TIMEOUT")) {
       return { type: "timeout", marker: candidate, delayMs: timeoutDelayMs };
@@ -313,6 +341,16 @@ function createGatewayPlan(payload) {
     return {
       statusCode: 200,
       body,
+    };
+  }
+  if (fault.type === "semantic_reject") {
+    return {
+      statusCode: 200,
+      body: {
+        code: fault.code,
+        message: fault.message,
+        data: null,
+      },
     };
   }
   if (fault.type === "reject") {

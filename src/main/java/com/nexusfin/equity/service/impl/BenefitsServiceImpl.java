@@ -129,7 +129,9 @@ public class BenefitsServiceImpl implements BenefitsService {
                 request.token(),
                 response.benefitOrderNo()
         )).redirectUrl();
-        log.info("traceId={} bizOrderNo={} benefits sync benefiturl generated applicationId={} benefitUrlPresent={}",
+        // Current benefit sync wiring intentionally reuses the runtime exercise redirect URL source.
+        // This satisfies today's outbound benefiturl contract without claiming a future generic redirect model.
+        log.info("traceId={} bizOrderNo={} benefits sync benefiturl generated from current qw exercise runtime source applicationId={} benefitUrlPresent={}",
                 TraceIdUtil.getTraceId(),
                 response.benefitOrderNo(),
                 request.applicationId(),

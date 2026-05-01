@@ -434,6 +434,8 @@ export default function ConfirmRepaymentPage() {
 
                   <div className="mt-4">
                     <Input
+                      id="repayment-sms-captcha-input"
+                      name="repaymentSmsCaptcha"
                       value={smsCaptcha}
                       onChange={(event) => setSmsCaptcha(event.target.value)}
                       inputMode="numeric"

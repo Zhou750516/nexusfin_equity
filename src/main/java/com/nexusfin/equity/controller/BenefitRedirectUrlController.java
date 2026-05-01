@@ -30,7 +30,7 @@ public class BenefitRedirectUrlController {
             @Valid @RequestBody BenefitRedirectUrlRequest request
     ) {
         BenefitRedirectUrlService.BenefitRedirectUrlResult result = benefitRedirectUrlService.generate(request);
-        log.info("traceId={} bizOrderNo={} benefit redirect url generated",
+        log.info("traceId={} bizOrderNo={} benefit redirect url generated from current qw exercise runtime source",
                 TraceIdUtil.getTraceId(),
                 request.benefitOrderNo());
         return Result.success(new BenefitRedirectUrlResponse(result.redirectUrl()));

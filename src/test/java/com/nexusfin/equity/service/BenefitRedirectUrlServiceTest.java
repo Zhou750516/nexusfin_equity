@@ -4,15 +4,18 @@ import com.nexusfin.equity.dto.request.BenefitRedirectUrlRequest;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.service.impl.BenefitRedirectUrlServiceImpl;
 import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
+import com.nexusfin.equity.thirdparty.qw.QwExerciseUrlRequest;
 import com.nexusfin.equity.thirdparty.qw.QwExerciseUrlResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -25,7 +28,7 @@ class BenefitRedirectUrlServiceTest {
     private QwBenefitClient qwBenefitClient;
 
     @Test
-    void shouldReturnRedirectUrlWhenJointLoginAndQwBothSucceed() {
+    void shouldReturnCurrentQwExerciseRedirectUrlForBenefitSyncContract() {
         BenefitRedirectUrlServiceImpl service = new BenefitRedirectUrlServiceImpl(jointLoginService, qwBenefitClient);
         BenefitRedirectUrlRequest request = new BenefitRedirectUrlRequest("joint-token-redirect-001", "BEN-REDIRECT-001");
         when(jointLoginService.login(any())).thenReturn(new JointLoginService.JointLoginResult(
@@ -47,6 +50,10 @@ class BenefitRedirectUrlServiceTest {
         BenefitRedirectUrlService.BenefitRedirectUrlResult result = service.generate(request);
 
         assertThat(result.redirectUrl()).isEqualTo("https://redirect.test/benefit");
+        ArgumentCaptor<QwExerciseUrlRequest> requestCaptor = ArgumentCaptor.forClass(QwExerciseUrlRequest.class);
+        verify(qwBenefitClient).getExerciseUrl(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().uniqueId()).isEqualTo("xh-cid-redirect-001");
+        assertThat(requestCaptor.getValue().partnerOrderNo()).isEqualTo("BEN-REDIRECT-001");
     }
 
     @Test

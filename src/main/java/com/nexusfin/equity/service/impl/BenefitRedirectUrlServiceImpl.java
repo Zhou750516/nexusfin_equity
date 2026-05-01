@@ -31,6 +31,11 @@ public class BenefitRedirectUrlServiceImpl implements BenefitRedirectUrlService 
 
     @Override
     public BenefitRedirectUrlResult generate(BenefitRedirectUrlRequest request) {
+        // Runtime truth for the current redrect_benefit_url contract:
+        // 1. complete joint-login with exercise scene context
+        // 2. fetch the QW exercise redirect URL
+        // 3. return that URL as the current benefiturl source for benefit sync
+        // This is intentionally narrower than a generic "all benefit scenarios" redirect abstraction.
         JointLoginService.JointLoginResult loginResult;
         try {
             loginResult = jointLoginService.login(new com.nexusfin.equity.dto.request.JointLoginRequest(
@@ -50,22 +55,23 @@ public class BenefitRedirectUrlServiceImpl implements BenefitRedirectUrlService 
         }
 
         try {
-            // Current business assumption: benefit redirect URL is satisfied by the QW exercise redirect URL.
-            // This preserves the external redrect_benefit_url contract while keeping the actual upstream
-            // dependency explicit for later protocol clarification.
+            // Current runtime source is the QW exercise redirect URL, not a fully generalized benefit redirect.
             QwExerciseUrlResponse response = qwBenefitClient.getExerciseUrl(new QwExerciseUrlRequest(
                     loginResult.externalUserId(),
                     request.benefitOrderNo()
             ));
+            log.info("traceId={} bizOrderNo={} benefit redirect url resolved from qw exercise redirect url",
+                    TraceIdUtil.getTraceId(),
+                    request.benefitOrderNo());
             return new BenefitRedirectUrlResult(response.redirectUrl());
         } catch (UpstreamTimeoutException exception) {
-            log.error("traceId={} bizOrderNo={} benefit redirect qw redirect url timed out errorMsg={}",
+            log.error("traceId={} bizOrderNo={} benefit redirect qw exercise redirect url timed out errorMsg={}",
                     TraceIdUtil.getTraceId(),
                     request.benefitOrderNo(),
                     exception.getMessage());
             throw new BizException("REDRECT_BENEFIT_URL_UPSTREAM_TIMEOUT", "Benefit redirect url temporarily unavailable");
         } catch (BizException exception) {
-            log.warn("traceId={} bizOrderNo={} benefit redirect qw redirect url failed errorNo={} errorMsg={}",
+            log.warn("traceId={} bizOrderNo={} benefit redirect qw exercise redirect url failed errorNo={} errorMsg={}",
                     TraceIdUtil.getTraceId(),
                     request.benefitOrderNo(),
                     exception.getErrorNo(),

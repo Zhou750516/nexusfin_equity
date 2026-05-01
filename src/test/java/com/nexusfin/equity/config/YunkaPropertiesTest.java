@@ -1,48 +1,24 @@
 package com.nexusfin.equity.config;
 
+import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.ConfigurationPropertySource;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.env.PropertySource;
+import org.springframework.core.io.ClassPathResource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class YunkaPropertiesTest {
 
     @Test
-    void shouldBindExtendedYunkaPathsFromConfiguration() {
-        MapConfigurationPropertySource source = new MapConfigurationPropertySource(Map.ofEntries(
-                Map.entry("nexusfin.third-party.yunka.enabled", "true"),
-                Map.entry("nexusfin.third-party.yunka.mode", "REST"),
-                Map.entry("nexusfin.third-party.yunka.base-url", "https://yunka.test"),
-                Map.entry("nexusfin.third-party.yunka.gateway-path", "/api/gateway/proxy"),
-                Map.entry("nexusfin.third-party.yunka.connect-timeout-ms", "2000"),
-                Map.entry("nexusfin.third-party.yunka.read-timeout-ms", "3000"),
-                Map.entry("nexusfin.third-party.yunka.channel-code", "ABS"),
-                Map.entry("nexusfin.third-party.yunka.signature", "abs-signature"),
-                Map.entry("nexusfin.third-party.yunka.paths.loan-calculate", "/loan/trial"),
-                Map.entry("nexusfin.third-party.yunka.paths.loan-query", "/loan/query"),
-                Map.entry("nexusfin.third-party.yunka.paths.loan-apply", "/loan/apply"),
-                Map.entry("nexusfin.third-party.yunka.paths.repay-trial", "/repay/trial"),
-                Map.entry("nexusfin.third-party.yunka.paths.repay-apply", "/repay/apply"),
-                Map.entry("nexusfin.third-party.yunka.paths.repay-query", "/repay/query"),
-                Map.entry("nexusfin.third-party.yunka.paths.protocol-query", "/protocol/queryProtocolAggregationLink"),
-                Map.entry("nexusfin.third-party.yunka.paths.user-token", "/user/token"),
-                Map.entry("nexusfin.third-party.yunka.paths.user-query", "/user/query"),
-                Map.entry("nexusfin.third-party.yunka.paths.loan-repay-plan", "/loan/repayPlan"),
-                Map.entry("nexusfin.third-party.yunka.paths.card-sms-send", "/card/smsSend"),
-                Map.entry("nexusfin.third-party.yunka.paths.card-sms-confirm", "/card/smsConfirm"),
-                Map.entry("nexusfin.third-party.yunka.paths.card-user-cards", "/card/userCards"),
-                Map.entry("nexusfin.third-party.yunka.paths.credit-image-query", "/credit/image/query"),
-                Map.entry("nexusfin.third-party.yunka.paths.benefit-sync", "/benefit/sync")
-        ));
+    void shouldBindYunkaPathDefaultsFromApplicationYaml() throws IOException {
+        YunkaProperties properties = bindApplicationDefaults();
 
-        YunkaProperties properties = new Binder(source)
-                .bind("nexusfin.third-party.yunka", YunkaProperties.class)
-                .orElseThrow(IllegalStateException::new);
-
-        assertThat(properties.channelCode()).isEqualTo("ABS");
-        assertThat(properties.signature()).isEqualTo("abs-signature");
         assertThat(properties.paths().loanCalculate()).isEqualTo("/loan/trial");
         assertThat(properties.paths().loanQuery()).isEqualTo("/loan/query");
         assertThat(properties.paths().loanApply()).isEqualTo("/loan/apply");
@@ -58,5 +34,51 @@ class YunkaPropertiesTest {
         assertThat(properties.paths().cardUserCards()).isEqualTo("/card/userCards");
         assertThat(properties.paths().creditImageQuery()).isEqualTo("/credit/image/query");
         assertThat(properties.paths().benefitSync()).isEqualTo("/benefit/sync");
+    }
+
+    @Test
+    void shouldKeepApplicationDefaultsAlignedWithLocalStubContractPaths() throws IOException {
+        YunkaProperties.Paths paths = bindApplicationDefaults().paths();
+
+        assertThat(List.of(
+                paths.loanCalculate(),
+                paths.loanApply(),
+                paths.loanQuery(),
+                paths.protocolQuery(),
+                paths.benefitSync(),
+                paths.userToken(),
+                paths.userQuery(),
+                paths.repayTrial(),
+                paths.repayApply(),
+                paths.repayQuery()
+        )).containsExactly(
+                "/loan/trial",
+                "/loan/apply",
+                "/loan/query",
+                "/protocol/queryProtocolAggregationLink",
+                "/benefit/sync",
+                "/user/token",
+                "/user/query",
+                "/repay/trial",
+                "/repay/apply",
+                "/repay/query"
+        );
+    }
+
+    private YunkaProperties bindApplicationDefaults() throws IOException {
+        YamlPropertySourceLoader loader = new YamlPropertySourceLoader();
+        List<PropertySource<?>> sources = loader.load("application.yml", new ClassPathResource("application.yml"));
+        Map<String, Object> flattened = new java.util.LinkedHashMap<>();
+        for (PropertySource<?> source : sources) {
+            if (source.getSource() instanceof Map<?, ?> map) {
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    flattened.put(String.valueOf(entry.getKey()), String.valueOf(entry.getValue()));
+                }
+            }
+        }
+        MapConfigurationPropertySource source = new MapConfigurationPropertySource(flattened);
+        return new Binder(new ConfigurationPropertySource[]{source})
+                .bind("nexusfin.third-party.yunka", YunkaProperties.class)
+                .orElseThrow(IllegalStateException::new);
     }
 }

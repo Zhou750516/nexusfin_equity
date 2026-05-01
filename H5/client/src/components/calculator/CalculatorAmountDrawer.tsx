@@ -50,6 +50,8 @@ export default function CalculatorAmountDrawer({
 
         <div className="px-5 pb-2">
           <input
+            id="calculator-amount-draft-input"
+            name="calculatorAmount"
             type="number"
             inputMode="numeric"
             min={amountRangeMin}
