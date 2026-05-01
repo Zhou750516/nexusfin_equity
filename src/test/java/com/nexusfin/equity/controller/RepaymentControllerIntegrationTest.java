@@ -28,12 +28,15 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -207,8 +210,21 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     @Test
     void shouldReturnControlledErrorWhenRepaymentSubmitTimesOut() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-timeout", "user-repay-timeout");
+        createApplicationMapping(memberInfo, "APP-REPAY-TIMEOUT-001", "LN-REPAY-TIMEOUT-001");
         when(yunkaGatewayClient.proxy(any()))
-                .thenThrow(new UpstreamTimeoutException("Yunka gateway timeout"));
+                .thenAnswer(invocation -> {
+                    YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
+                    if ("/repay/trial".equals(gatewayRequest.path())) {
+                        return new YunkaGatewayClient.YunkaGatewayResponse(
+                                0,
+                                "SUCCESS",
+                                objectMapper.readTree("""
+                                        {"repayAmount":101850}
+                                        """)
+                        );
+                    }
+                    throw new UpstreamTimeoutException("Yunka gateway timeout");
+                });
 
         mockMvc.perform(post("/api/repayment/submit")
                         .cookie(authCookie(memberInfo))
@@ -224,6 +240,96 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(-1))
                 .andExpect(jsonPath("$.message").value("YUNKA_UPSTREAM_TIMEOUT:Repayment submit temporarily unavailable"));
+    }
+
+    @Test
+    void shouldReturnControlledErrorWhenRepaymentAmountExceedsCurrentRepayableAmount() throws Exception {
+        MemberInfo memberInfo = createMember("mem-repay-overpay", "user-repay-overpay");
+        createApplicationMapping(memberInfo, "APP-REPAY-OVERPAY-001", "LN-REPAY-OVERPAY-001");
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                        0,
+                        "SUCCESS",
+                        objectMapper.readTree("""
+                                {"repayAmount":101850}
+                                """)
+                ));
+
+        mockMvc.perform(post("/api/repayment/submit")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "loanId": "LN-REPAY-OVERPAY-001",
+                                  "amount": 2000.00,
+                                  "bankCardId": "acc_001",
+                                  "repaymentType": "early"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(-1))
+                .andExpect(jsonPath("$.message").value("REPAYMENT_AMOUNT_EXCEEDED:Repayment amount exceeds current repayable amount"));
+
+        verify(yunkaGatewayClient, times(1)).proxy(any());
+    }
+
+    @Test
+    void shouldReturnControlledErrorForDuplicateRepaymentSubmitWithoutSecondRepayApplyCall() throws Exception {
+        MemberInfo memberInfo = createMember("mem-repay-duplicate", "user-repay-duplicate");
+        createApplicationMapping(memberInfo, "APP-REPAY-DUP-001", "LN-REPAY-DUP-001");
+        when(yunkaGatewayClient.proxy(any()))
+                .thenAnswer(invocation -> {
+                    YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
+                    if ("/repay/trial".equals(gatewayRequest.path())) {
+                        return new YunkaGatewayClient.YunkaGatewayResponse(
+                                0,
+                                "SUCCESS",
+                                objectMapper.readTree("""
+                                        {"repayAmount":101850}
+                                        """)
+                        );
+                    }
+                    return new YunkaGatewayClient.YunkaGatewayResponse(
+                            0,
+                            "SUCCESS",
+                            objectMapper.readTree("""
+                                    {"swiftNumber":"RP-LN-REPAY-DUP-001","status":"8004","remark":"processing"}
+                                    """)
+                    );
+                });
+
+        String payload = """
+                {
+                  "loanId": "LN-REPAY-DUP-001",
+                  "amount": 1018.50,
+                  "bankCardId": "acc_001",
+                  "repaymentType": "early"
+                }
+                """;
+
+        mockMvc.perform(post("/api/repayment/submit")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.repaymentId").value("RP-LN-REPAY-DUP-001"));
+
+        mockMvc.perform(post("/api/repayment/submit")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(-1))
+                .andExpect(jsonPath("$.message").value("REPAYMENT_SUBMIT_DUPLICATED:Repayment request is duplicated"));
+
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> captor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient, times(3)).proxy(captor.capture());
+        long repayApplyCalls = captor.getAllValues().stream()
+                .filter(request -> "/repay/apply".equals(request.path()))
+                .count();
+        org.assertj.core.api.Assertions.assertThat(repayApplyCalls).isEqualTo(1);
     }
 
     private void createApplicationMapping(MemberInfo memberInfo, String applicationId, String loanId) {

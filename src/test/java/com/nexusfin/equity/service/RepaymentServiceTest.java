@@ -16,9 +16,11 @@ import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.ErrorCodes;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.dto.request.RepaymentSubmitRequest;
+import com.nexusfin.equity.repository.IdempotencyRecordRepository;
 import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.impl.RepaymentServiceImpl;
+import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient.YunkaGatewayRequest;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.CardSmsConfirmResponse;
 import com.nexusfin.equity.thirdparty.yunka.CardSmsSendResponse;
@@ -41,9 +43,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import org.springframework.dao.DuplicateKeyException;
 
 @ExtendWith(MockitoExtension.class)
 class RepaymentServiceTest {
@@ -66,6 +70,9 @@ class RepaymentServiceTest {
     private LoanApplicationMappingRepository loanApplicationMappingRepository;
 
     @Mock
+    private IdempotencyRecordRepository idempotencyRecordRepository;
+
+    @Mock
     private SensitiveDataCipher sensitiveDataCipher;
 
     private RepaymentService repaymentService;
@@ -81,6 +88,7 @@ class RepaymentServiceTest {
                 xiaohuaGatewayService,
                 memberInfoRepository,
                 loanApplicationMappingRepository,
+                idempotencyRecordRepository,
                 sensitiveDataCipher,
                 new YunkaCallTemplate(yunkaGatewayClient)
         );
@@ -222,8 +230,21 @@ class RepaymentServiceTest {
 
     @Test
     void shouldTranslateRepaymentSubmitTimeoutToBizException() {
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("user-001", "LN-REPAY-TIMEOUT-001"));
         when(yunkaGatewayClient.proxy(any()))
-                .thenThrow(new UpstreamTimeoutException("Yunka gateway timeout"));
+                .thenAnswer(invocation -> {
+                    YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
+                    if ("/repay/trial".equals(gatewayRequest.path())) {
+                        return new YunkaGatewayClient.YunkaGatewayResponse(
+                                0,
+                                "SUCCESS",
+                                objectMapper.readTree("""
+                                        {"repayAmount":101850}
+                                        """)
+                        );
+                    }
+                    throw new UpstreamTimeoutException("Yunka gateway timeout");
+                });
 
         assertThatThrownBy(() -> repaymentService.submit(
                 "user-001",
@@ -238,6 +259,89 @@ class RepaymentServiceTest {
                         ErrorCodes.YUNKA_UPSTREAM_TIMEOUT,
                         "Repayment submit temporarily unavailable"
                 );
+    }
+
+    @Test
+    void shouldRejectRepaymentSubmitWhenAmountExceedsCurrentRepayableAmount() throws Exception {
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("user-001", "LN-REPAY-OVERPAY-001"));
+        when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                0,
+                "SUCCESS",
+                objectMapper.readTree("""
+                        {"repayAmount":101850}
+                        """)
+        ));
+
+        assertThatThrownBy(() -> repaymentService.submit(
+                "user-001",
+                new RepaymentSubmitRequest("LN-REPAY-OVERPAY-001", BigDecimal.valueOf(2000.00), "acc_001", "early")
+        ))
+                .isInstanceOf(BizException.class)
+                .extracting(
+                        throwable -> ((BizException) throwable).getErrorNo(),
+                        throwable -> ((BizException) throwable).getErrorMsg()
+                )
+                .containsExactly(
+                        "REPAYMENT_AMOUNT_EXCEEDED",
+                        "Repayment amount exceeds current repayable amount"
+                );
+
+        ArgumentCaptor<YunkaGatewayRequest> captor = ArgumentCaptor.forClass(YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(captor.capture());
+        assertThat(captor.getValue().path()).isEqualTo("/repay/trial");
+    }
+
+    @Test
+    void shouldRejectDuplicateRepaymentSubmitBeforeSecondRepayApplyCall() throws Exception {
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("user-001", "LN-REPAY-DUP-001"));
+        when(yunkaGatewayClient.proxy(any()))
+                .thenAnswer(invocation -> {
+                    YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
+                    if ("/repay/trial".equals(gatewayRequest.path())) {
+                        return new YunkaGatewayClient.YunkaGatewayResponse(
+                                0,
+                                "SUCCESS",
+                                objectMapper.readTree("""
+                                        {"repayAmount":101850}
+                                        """)
+                        );
+                    }
+                    return new YunkaGatewayClient.YunkaGatewayResponse(
+                            0,
+                            "SUCCESS",
+                            objectMapper.readTree("""
+                                    {"swiftNumber":"RP-LN-REPAY-DUP-001","status":"8004","remark":"processing"}
+                                    """)
+                    );
+                });
+        when(idempotencyRecordRepository.insert(any()))
+                .thenReturn(1)
+                .thenThrow(new DuplicateKeyException("duplicate repayment submit"));
+
+        repaymentService.submit(
+                "user-001",
+                new RepaymentSubmitRequest("LN-REPAY-DUP-001", BigDecimal.valueOf(1018.50), "acc_001", "early")
+        );
+
+        assertThatThrownBy(() -> repaymentService.submit(
+                "user-001",
+                new RepaymentSubmitRequest("LN-REPAY-DUP-001", BigDecimal.valueOf(1018.50), "acc_001", "early")
+        ))
+                .isInstanceOf(BizException.class)
+                .extracting(
+                        throwable -> ((BizException) throwable).getErrorNo(),
+                        throwable -> ((BizException) throwable).getErrorMsg()
+                )
+                .containsExactly(
+                        "REPAYMENT_SUBMIT_DUPLICATED",
+                        "Repayment request is duplicated"
+                );
+
+        ArgumentCaptor<YunkaGatewayRequest> captor = ArgumentCaptor.forClass(YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient, times(3)).proxy(captor.capture());
+        assertThat(captor.getAllValues().stream()
+                .filter(request -> "/repay/apply".equals(request.path())))
+                .hasSize(1);
     }
 
     private LoanApplicationMapping loanMapping(String externalUserId, String loanId) {

@@ -2,6 +2,7 @@ package com.nexusfin.equity.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.nexusfin.equity.entity.IdempotencyRecord;
 import com.nexusfin.equity.config.H5LoanProperties;
 import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.dto.request.RepaymentSmsConfirmRequest;
@@ -18,6 +19,7 @@ import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.ErrorCodes;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
+import com.nexusfin.equity.repository.IdempotencyRecordRepository;
 import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.H5I18nService;
@@ -35,14 +37,17 @@ import static com.nexusfin.equity.util.JsonNodes.readRemark;
 import static com.nexusfin.equity.util.JsonNodes.readText;
 import static com.nexusfin.equity.util.MoneyUnits.centsToYuan;
 import static com.nexusfin.equity.util.MoneyUnits.yuanToCent;
+import com.nexusfin.equity.util.SensitiveDataUtil;
 import com.nexusfin.equity.util.SensitiveDataCipher;
 import com.nexusfin.equity.util.TraceIdUtil;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -51,6 +56,10 @@ public class RepaymentServiceImpl implements RepaymentService {
     private static final Logger log = LoggerFactory.getLogger(RepaymentServiceImpl.class);
     private static final String DEFAULT_REPAY_TYPE = "EARLY";
     private static final int REPAYMENT_SMS_TYPE = 2;
+    private static final String REPAYMENT_AMOUNT_EXCEEDED = "REPAYMENT_AMOUNT_EXCEEDED";
+    private static final String REPAYMENT_SUBMIT_DUPLICATED = "REPAYMENT_SUBMIT_DUPLICATED";
+    private static final String REPAYMENT_SUBMIT_BIZ_TYPE = "REPAYMENT_SUBMIT";
+    private static final int REPAYMENT_SUBMIT_DUPLICATE_WINDOW_SECONDS = 120;
 
     private final H5LoanProperties h5LoanProperties;
     private final YunkaProperties yunkaProperties;
@@ -59,6 +68,7 @@ public class RepaymentServiceImpl implements RepaymentService {
     private final XiaohuaGatewayService xiaohuaGatewayService;
     private final MemberInfoRepository memberInfoRepository;
     private final LoanApplicationMappingRepository loanApplicationMappingRepository;
+    private final IdempotencyRecordRepository idempotencyRecordRepository;
     private final SensitiveDataCipher sensitiveDataCipher;
     private final YunkaCallTemplate yunkaCallTemplate;
 
@@ -70,6 +80,7 @@ public class RepaymentServiceImpl implements RepaymentService {
             XiaohuaGatewayService xiaohuaGatewayService,
             MemberInfoRepository memberInfoRepository,
             LoanApplicationMappingRepository loanApplicationMappingRepository,
+            IdempotencyRecordRepository idempotencyRecordRepository,
             SensitiveDataCipher sensitiveDataCipher,
             YunkaCallTemplate yunkaCallTemplate
     ) {
@@ -80,6 +91,7 @@ public class RepaymentServiceImpl implements RepaymentService {
         this.xiaohuaGatewayService = xiaohuaGatewayService;
         this.memberInfoRepository = memberInfoRepository;
         this.loanApplicationMappingRepository = loanApplicationMappingRepository;
+        this.idempotencyRecordRepository = idempotencyRecordRepository;
         this.sensitiveDataCipher = sensitiveDataCipher;
         this.yunkaCallTemplate = yunkaCallTemplate;
     }
@@ -162,9 +174,13 @@ public class RepaymentServiceImpl implements RepaymentService {
     @Override
     public RepaymentSubmitResponse submit(String uid, RepaymentSubmitRequest request) {
         String requestId = next("RS");
-        String bankCardNum = resolveBankCardNumber(uid, request.loanId(), request.bankCardId());
+        validateKnownLoanId(uid, request.loanId());
+        long requestedRepayAmount = yuanToCent(request.amount());
         JsonNode data;
         try {
+            validateRepaymentAmount(uid, request.loanId(), request.repaymentType(), requestedRepayAmount);
+            reserveRepaymentSubmit(uid, request.loanId(), requestedRepayAmount);
+            String bankCardNum = resolveBankCardNumber(uid, request.loanId(), request.bankCardId());
             data = yunkaCallTemplate.executeForData(
                     YunkaCallTemplate.YunkaCall.of(
                             "repayment submit",
@@ -177,7 +193,7 @@ public class RepaymentServiceImpl implements RepaymentService {
                                     mapRepayType(request.repaymentType()),
                                     List.of(),
                                     bankCardNum,
-                                    yuanToCent(request.amount())
+                                    requestedRepayAmount
                             )
                     )
             );
@@ -190,6 +206,78 @@ public class RepaymentServiceImpl implements RepaymentService {
                 mapSubmitStatus(readText(data, "status", "")),
                 readRemark(data, "还款请求已提交，正在处理中")
         );
+    }
+
+    private void validateRepaymentAmount(String uid, String loanId, String repaymentType, long requestedRepayAmount) {
+        JsonNode trialData = yunkaCallTemplate.executeForData(
+                YunkaCallTemplate.YunkaCall.of(
+                        "repayment submit amount validation",
+                        next("RTS"),
+                        yunkaProperties.paths().repayTrial(),
+                        loanId,
+                        new RepayTrialForwardData(uid, loanId, mapRepayType(repaymentType), List.of())
+                )
+        );
+        long repayableAmount = readLong(trialData, "repayAmount", "amount");
+        if (requestedRepayAmount <= repayableAmount) {
+            return;
+        }
+        log.warn("traceId={} bizOrderNo={} errorNo={} requestedRepayAmount={} repayableAmount={} errorMsg={}",
+                TraceIdUtil.getTraceId(),
+                loanId,
+                REPAYMENT_AMOUNT_EXCEEDED,
+                requestedRepayAmount,
+                repayableAmount,
+                "Repayment amount exceeds current repayable amount");
+        throw new BizException(REPAYMENT_AMOUNT_EXCEEDED, "Repayment amount exceeds current repayable amount");
+    }
+
+    private void reserveRepaymentSubmit(String uid, String loanId, long requestedRepayAmount) {
+        LocalDateTime now = LocalDateTime.now();
+        String bizKey = repaymentSubmitBizKey(uid, loanId, requestedRepayAmount);
+        IdempotencyRecord existing = idempotencyRecordRepository.selectOne(
+                Wrappers.<IdempotencyRecord>lambdaQuery()
+                        .eq(IdempotencyRecord::getBizType, REPAYMENT_SUBMIT_BIZ_TYPE)
+                        .eq(IdempotencyRecord::getBizKey, bizKey)
+                        .ge(IdempotencyRecord::getProcessedTs, now.minusSeconds(REPAYMENT_SUBMIT_DUPLICATE_WINDOW_SECONDS))
+                        .orderByDesc(IdempotencyRecord::getProcessedTs)
+                        .last("limit 1")
+        );
+        if (existing != null) {
+            log.warn("traceId={} bizOrderNo={} requestId={} errorNo={} errorMsg={}",
+                    TraceIdUtil.getTraceId(),
+                    loanId,
+                    existing.getRequestId(),
+                    REPAYMENT_SUBMIT_DUPLICATED,
+                    "Repayment request is duplicated");
+            throw new BizException(REPAYMENT_SUBMIT_DUPLICATED, "Repayment request is duplicated");
+        }
+        IdempotencyRecord guardRecord = new IdempotencyRecord();
+        guardRecord.setRequestId(repaymentSubmitGuardRequestId(bizKey, now));
+        guardRecord.setBizType(REPAYMENT_SUBMIT_BIZ_TYPE);
+        guardRecord.setBizKey(bizKey);
+        guardRecord.setResponseBody("IN_FLIGHT");
+        guardRecord.setProcessedTs(now);
+        try {
+            idempotencyRecordRepository.insert(guardRecord);
+        } catch (DuplicateKeyException exception) {
+            log.warn("traceId={} bizOrderNo={} requestId={} errorNo={} errorMsg={}",
+                    TraceIdUtil.getTraceId(),
+                    loanId,
+                    guardRecord.getRequestId(),
+                    REPAYMENT_SUBMIT_DUPLICATED,
+                    "Repayment request is duplicated");
+            throw new BizException(REPAYMENT_SUBMIT_DUPLICATED, "Repayment request is duplicated");
+        }
+    }
+
+    private String repaymentSubmitBizKey(String uid, String loanId, long requestedRepayAmount) {
+        return uid + ":" + loanId + ":" + requestedRepayAmount;
+    }
+
+    private String repaymentSubmitGuardRequestId(String bizKey, LocalDateTime now) {
+        long bucket = now.atZone(ZoneOffset.UTC).toEpochSecond() / REPAYMENT_SUBMIT_DUPLICATE_WINDOW_SECONDS;
+        return "repay-submit-" + bucket + "-" + SensitiveDataUtil.sha256(bizKey).substring(0, 24);
     }
 
     @Override
