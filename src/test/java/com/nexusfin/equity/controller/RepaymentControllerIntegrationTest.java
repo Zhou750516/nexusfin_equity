@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.enums.MemberStatusEnum;
+import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.repository.ContractArchiveRepository;
 import com.nexusfin.equity.repository.IdempotencyRecordRepository;
@@ -201,6 +202,28 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(404))
                 .andExpect(jsonPath("$.message").value("repayment reference not found"));
+    }
+
+    @Test
+    void shouldReturnControlledErrorWhenRepaymentSubmitTimesOut() throws Exception {
+        MemberInfo memberInfo = createMember("mem-repay-timeout", "user-repay-timeout");
+        when(yunkaGatewayClient.proxy(any()))
+                .thenThrow(new UpstreamTimeoutException("Yunka gateway timeout"));
+
+        mockMvc.perform(post("/api/repayment/submit")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "loanId": "LN-REPAY-TIMEOUT-001",
+                                  "amount": 1018.50,
+                                  "bankCardId": "acc_001",
+                                  "repaymentType": "early"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(-1))
+                .andExpect(jsonPath("$.message").value("YUNKA_UPSTREAM_TIMEOUT:Repayment submit temporarily unavailable"));
     }
 
     private void createApplicationMapping(MemberInfo memberInfo, String applicationId, String loanId) {

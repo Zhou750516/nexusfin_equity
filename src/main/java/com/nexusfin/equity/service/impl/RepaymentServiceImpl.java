@@ -16,6 +16,8 @@ import com.nexusfin.equity.dto.response.RepaymentSubmitResponse;
 import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.exception.BizException;
+import com.nexusfin.equity.exception.ErrorCodes;
+import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.H5I18nService;
@@ -161,22 +163,27 @@ public class RepaymentServiceImpl implements RepaymentService {
     public RepaymentSubmitResponse submit(String uid, RepaymentSubmitRequest request) {
         String requestId = next("RS");
         String bankCardNum = resolveBankCardNumber(uid, request.loanId(), request.bankCardId());
-        JsonNode data = yunkaCallTemplate.executeForData(
-                YunkaCallTemplate.YunkaCall.of(
-                        "repayment submit",
-                        requestId,
-                        yunkaProperties.paths().repayApply(),
-                        request.loanId(),
-                        new RepayApplyForwardData(
-                                uid,
-                                request.loanId(),
-                                mapRepayType(request.repaymentType()),
-                                List.of(),
-                                bankCardNum,
-                                yuanToCent(request.amount())
-                        )
-                )
-        );
+        JsonNode data;
+        try {
+            data = yunkaCallTemplate.executeForData(
+                    YunkaCallTemplate.YunkaCall.of(
+                            "repayment submit",
+                            requestId,
+                            yunkaProperties.paths().repayApply(),
+                            request.loanId(),
+                            new RepayApplyForwardData(
+                                    uid,
+                                    request.loanId(),
+                                    mapRepayType(request.repaymentType()),
+                                    List.of(),
+                                    bankCardNum,
+                                    yuanToCent(request.amount())
+                            )
+                    )
+            );
+        } catch (UpstreamTimeoutException exception) {
+            throw new BizException(ErrorCodes.YUNKA_UPSTREAM_TIMEOUT, "Repayment submit temporarily unavailable");
+        }
         String swiftNumber = readText(data, "swiftNumber", request.loanId());
         return new RepaymentSubmitResponse(
                 swiftNumber,

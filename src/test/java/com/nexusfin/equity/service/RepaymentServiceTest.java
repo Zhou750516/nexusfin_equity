@@ -13,6 +13,9 @@ import com.nexusfin.equity.dto.response.RepaymentSmsSendResponse;
 import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.exception.BizException;
+import com.nexusfin.equity.exception.ErrorCodes;
+import com.nexusfin.equity.exception.UpstreamTimeoutException;
+import com.nexusfin.equity.dto.request.RepaymentSubmitRequest;
 import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.impl.RepaymentServiceImpl;
@@ -215,6 +218,26 @@ class RepaymentServiceTest {
 
         verifyNoInteractions(yunkaGatewayClient);
         verify(xiaohuaGatewayService, never()).queryUserCards(any(), any(), any());
+    }
+
+    @Test
+    void shouldTranslateRepaymentSubmitTimeoutToBizException() {
+        when(yunkaGatewayClient.proxy(any()))
+                .thenThrow(new UpstreamTimeoutException("Yunka gateway timeout"));
+
+        assertThatThrownBy(() -> repaymentService.submit(
+                "user-001",
+                new RepaymentSubmitRequest("LN-REPAY-TIMEOUT-001", BigDecimal.valueOf(1018.50), "acc_001", "early")
+        ))
+                .isInstanceOf(BizException.class)
+                .extracting(
+                        throwable -> ((BizException) throwable).getErrorNo(),
+                        throwable -> ((BizException) throwable).getErrorMsg()
+                )
+                .containsExactly(
+                        ErrorCodes.YUNKA_UPSTREAM_TIMEOUT,
+                        "Repayment submit temporarily unavailable"
+                );
     }
 
     private LoanApplicationMapping loanMapping(String externalUserId, String loanId) {
