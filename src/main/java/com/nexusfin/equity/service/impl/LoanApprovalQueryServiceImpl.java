@@ -31,6 +31,7 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
     private static final String LOAN_STATUS_SUCCESS = "7001";
     private static final String LOAN_STATUS_PROCESSING = "7002";
     private static final String LOAN_STATUS_FAILURE = "7003";
+    private static final String YUNKA_RESPONSE_INVALID = "YUNKA_RESPONSE_INVALID";
 
     private final H5BenefitsProperties h5BenefitsProperties;
     private final YunkaProperties yunkaProperties;
@@ -58,8 +59,8 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
     @Override
     public LoanApprovalStatusResponse getApprovalStatus(String memberId, String applicationId) {
         LoanApplicationMapping mapping = findMapping(memberId, applicationId);
-        JsonNode data = queryLoan(mapping);
-        String h5Status = mapApprovalStatus(data.path("status").asText());
+        LoanQuerySnapshot snapshot = queryLoan(mapping);
+        String h5Status = mapApprovalStatus(snapshot.status());
         return new LoanApprovalStatusResponse(
                 applicationId,
                 h5Status,
@@ -72,24 +73,24 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
     @Override
     public LoanApprovalResultResponse getApprovalResult(String memberId, String applicationId) {
         LoanApplicationMapping mapping = findMapping(memberId, applicationId);
-        JsonNode data = queryLoan(mapping);
+        LoanQuerySnapshot snapshot = queryLoan(mapping);
         log.info("traceId={} bizOrderNo={} loanId={} upstreamStatus={} approval result resolved",
                 TraceIdUtil.getTraceId(),
                 applicationId,
                 mapping.getUpstreamQueryValue(),
-                data.path("status").asText());
-        String h5Status = mapApprovalStatus(data.path("status").asText());
+                snapshot.status());
+        String h5Status = mapApprovalStatus(snapshot.status());
         boolean approved = "approved".equals(h5Status);
         boolean reviewing = "reviewing".equals(h5Status);
         return new LoanApprovalResultResponse(
                 applicationId,
                 h5Status,
                 mapping.getPurpose(),
-                approved ? centsToYuan(data.path("loanAmount").asLong(0L)) : BigDecimal.ZERO,
+                approved ? centsToYuan(snapshot.loanAmount()) : BigDecimal.ZERO,
                 approved || reviewing ? h5I18nService.text("loan.approval.arrivalTime", "30分钟") : "--",
                 buildApprovalStatusSteps(h5Status),
                 true,
-                resolveApprovalResultTip(data, h5Status),
+                resolveApprovalResultTip(snapshot.remark(), h5Status),
                 approved ? mapping.getUpstreamQueryValue() : null,
                 approved ? queryRepayPlan(mapping) : List.of()
         );
@@ -104,9 +105,9 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
         return mapping;
     }
 
-    private JsonNode queryLoan(LoanApplicationMapping mapping) {
+    private LoanQuerySnapshot queryLoan(LoanApplicationMapping mapping) {
         String requestId = next("LQ");
-        return yunkaCallTemplate.executeForData(
+        JsonNode data = yunkaCallTemplate.executeForData(
                 YunkaCallTemplate.YunkaCall.of(
                         "loan query",
                         requestId,
@@ -115,6 +116,7 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
                         new LoanQueryForwardData(mapping.getExternalUserId(), mapping.getUpstreamQueryValue())
                 ).withMemberId(mapping.getMemberId())
         );
+        return validateLoanQueryData(data);
     }
 
     private LoanApprovalStatusResponse.BenefitsCardPreview buildBenefitsCardPreview() {
@@ -206,13 +208,12 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
         };
     }
 
-    private String resolveApprovalResultTip(JsonNode data, String h5Status) {
+    private String resolveApprovalResultTip(String remark, String h5Status) {
         String fallback = switch (h5Status) {
             case "approved" -> h5I18nService.text("loan.approval.result.tip.approved", "审批通过，预计30分钟内到账");
             case "reviewing" -> h5I18nService.text("loan.approval.reviewing.description", "正在进行资质审核...");
             default -> h5I18nService.text("loan.approval.tip.rejected", "借款申请未通过，权益已购买成功。");
         };
-        String remark = readText(data, "remark", "");
         if (remark.isBlank()) {
             return fallback;
         }
@@ -265,9 +266,51 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
                 || "Đã phê duyệt, dự kiến tiền sẽ đến trong vòng 30 phút.".equals(remark);
     }
 
+    private LoanQuerySnapshot validateLoanQueryData(JsonNode data) {
+        if (data == null || data.isNull() || data.isMissingNode() || data.isEmpty()) {
+            throw new BizException("YUNKA_RESPONSE_EMPTY", "Yunka loan query response is empty");
+        }
+        String status = requiredText(data, "status");
+        String loanId = requiredText(data, "loanId");
+        String remark = readText(data, "remark", "");
+        long loanAmount = 0L;
+        if (LOAN_STATUS_SUCCESS.equals(status)) {
+            loanAmount = requiredPositiveLong(data, "loanAmount");
+        }
+        return new LoanQuerySnapshot(status, loanId, loanAmount, remark);
+    }
+
+    private String requiredText(JsonNode data, String field) {
+        String value = readText(data, field, "");
+        if (value.isBlank()) {
+            throw new BizException(YUNKA_RESPONSE_INVALID, "Yunka loan query response is invalid");
+        }
+        return value;
+    }
+
+    private long requiredPositiveLong(JsonNode data, String field) {
+        JsonNode valueNode = data.get(field);
+        if (valueNode == null || valueNode.isNull() || valueNode.isMissingNode() || !valueNode.canConvertToLong()) {
+            throw new BizException(YUNKA_RESPONSE_INVALID, "Yunka loan query response is invalid");
+        }
+        long value = valueNode.asLong();
+        if (value <= 0L) {
+            throw new BizException(YUNKA_RESPONSE_INVALID, "Yunka loan query response is invalid");
+        }
+        return value;
+    }
+
     private record LoanQueryForwardData(
             String uid,
             String loanId
+    ) {
+    }
+
+    private record LoanQuerySnapshot(
+            String status,
+            String loanId,
+            long loanAmount,
+            String remark
     ) {
     }
 }

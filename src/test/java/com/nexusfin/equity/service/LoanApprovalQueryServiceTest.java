@@ -64,6 +64,7 @@ class LoanApprovalQueryServiceTest {
                 .thenReturn(mapping("APP-003", "LN-003", "rent"));
         when(yunkaCallTemplate.executeForData(any()))
                 .thenReturn(objectMapper.createObjectNode()
+                        .put("loanId", "LN-003")
                         .put("status", "7003")
                         .put("remark", "invalid state"));
 
@@ -87,6 +88,7 @@ class LoanApprovalQueryServiceTest {
         when(yunkaCallTemplate.executeForData(any()))
                 .thenReturn(objectMapper.readTree("""
                         {
+                          "loanId": "LN-001",
                           "status": "7001",
                           "loanAmount": 300000,
                           "remark": "放款成功"
@@ -117,6 +119,7 @@ class LoanApprovalQueryServiceTest {
         when(yunkaCallTemplate.executeForData(any()))
                 .thenReturn(objectMapper.readTree("""
                         {
+                          "loanId": "LN-002",
                           "status": "7001",
                           "loanAmount": 280000,
                           "remark": "审批通过，预计30分钟内到账"
@@ -143,6 +146,59 @@ class LoanApprovalQueryServiceTest {
                         throwable -> ((BizException) throwable).getErrorMsg()
                 )
                 .containsExactly(404, "application mapping not found");
+    }
+
+    @Test
+    void shouldRejectLoanApprovalStatusWhenLoanQueryDataIsEmpty() {
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-001", "APP-EMPTY"))
+                .thenReturn(mapping("APP-EMPTY", "LN-EMPTY", "rent"));
+        when(yunkaCallTemplate.executeForData(any()))
+                .thenReturn(objectMapper.createObjectNode());
+
+        assertThatThrownBy(() -> loanApprovalQueryService.getApprovalStatus("mem-001", "APP-EMPTY"))
+                .isInstanceOf(BizException.class)
+                .extracting(
+                        throwable -> ((BizException) throwable).getErrorNo(),
+                        throwable -> ((BizException) throwable).getErrorMsg()
+                )
+                .containsExactly("YUNKA_RESPONSE_EMPTY", "Yunka loan query response is empty");
+    }
+
+    @Test
+    void shouldRejectLoanApprovalStatusWhenLoanQueryStatusIsMissing() {
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-001", "APP-MISSING-STATUS"))
+                .thenReturn(mapping("APP-MISSING-STATUS", "LN-MISSING-STATUS", "rent"));
+        when(yunkaCallTemplate.executeForData(any()))
+                .thenReturn(objectMapper.createObjectNode()
+                        .put("loanId", "LN-MISSING-STATUS")
+                        .put("remark", "missing status"));
+
+        assertThatThrownBy(() -> loanApprovalQueryService.getApprovalStatus("mem-001", "APP-MISSING-STATUS"))
+                .isInstanceOf(BizException.class)
+                .extracting(
+                        throwable -> ((BizException) throwable).getErrorNo(),
+                        throwable -> ((BizException) throwable).getErrorMsg()
+                )
+                .containsExactly("YUNKA_RESPONSE_INVALID", "Yunka loan query response is invalid");
+    }
+
+    @Test
+    void shouldRejectLoanApprovalResultWhenApprovedLoanQueryLoanIdIsMissing() {
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-001", "APP-MISSING-LOANID"))
+                .thenReturn(mapping("APP-MISSING-LOANID", "LN-MISSING-LOANID", "rent"));
+        when(yunkaCallTemplate.executeForData(any()))
+                .thenReturn(objectMapper.createObjectNode()
+                        .put("status", "7001")
+                        .put("loanAmount", 300000L)
+                        .put("remark", "放款成功"));
+
+        assertThatThrownBy(() -> loanApprovalQueryService.getApprovalResult("mem-001", "APP-MISSING-LOANID"))
+                .isInstanceOf(BizException.class)
+                .extracting(
+                        throwable -> ((BizException) throwable).getErrorNo(),
+                        throwable -> ((BizException) throwable).getErrorMsg()
+                )
+                .containsExactly("YUNKA_RESPONSE_INVALID", "Yunka loan query response is invalid");
     }
 
     private LoanApplicationMapping mapping(String applicationId, String loanId, String purpose) {

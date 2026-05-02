@@ -92,6 +92,7 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
         createApplicationMapping(memberInfo, "APP-LOAN-001", "LN-LOAN-001");
         JsonNode loanQueryData = objectMapper.readTree("""
                 {
+                  "loanId": "LN-LOAN-001",
                   "status": "7001",
                   "loanAmount": 300000,
                   "remark": "放款成功"
@@ -120,6 +121,7 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
         createApplicationMapping(memberInfo, "APP-LOAN-002", "LN-LOAN-002");
         JsonNode loanQueryData = objectMapper.readTree("""
                 {
+                  "loanId": "LN-LOAN-002",
                   "status": "7003",
                   "loanAmount": 300000,
                   "remark": "审核失败"
@@ -134,6 +136,65 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.status").value("rejected"))
                 .andExpect(jsonPath("$.data.loanId").isEmpty());
+    }
+
+    @Test
+    void shouldReturnControlledErrorWhenLoanQueryDataIsEmpty() throws Exception {
+        MemberInfo memberInfo = createMember("mem-loan-empty", "user-loan-empty");
+        createApplicationMapping(memberInfo, "APP-LOAN-EMPTY", "LN-LOAN-EMPTY");
+
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", objectMapper.createObjectNode()));
+
+        mockMvc.perform(get("/api/loan/approval-status/APP-LOAN-EMPTY")
+                        .cookie(authCookie(memberInfo)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(-1))
+                .andExpect(jsonPath("$.message").value("YUNKA_RESPONSE_EMPTY:Yunka loan query response is empty"));
+    }
+
+    @Test
+    void shouldReturnControlledErrorWhenLoanQueryStatusIsMissing() throws Exception {
+        MemberInfo memberInfo = createMember("mem-loan-missing-status", "user-loan-missing-status");
+        createApplicationMapping(memberInfo, "APP-LOAN-MISSING-STATUS", "LN-LOAN-MISSING-STATUS");
+        JsonNode loanQueryData = objectMapper.readTree("""
+                {
+                  "loanId": "LN-LOAN-MISSING-STATUS",
+                  "loanAmount": 300000,
+                  "remark": "missing status"
+                }
+                """);
+
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", loanQueryData));
+
+        mockMvc.perform(get("/api/loan/approval-status/APP-LOAN-MISSING-STATUS")
+                        .cookie(authCookie(memberInfo)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(-1))
+                .andExpect(jsonPath("$.message").value("YUNKA_RESPONSE_INVALID:Yunka loan query response is invalid"));
+    }
+
+    @Test
+    void shouldReturnControlledErrorWhenApprovedLoanQueryLoanIdIsMissing() throws Exception {
+        MemberInfo memberInfo = createMember("mem-loan-missing-loanid", "user-loan-missing-loanid");
+        createApplicationMapping(memberInfo, "APP-LOAN-MISSING-LOANID", "LN-LOAN-MISSING-LOANID");
+        JsonNode loanQueryData = objectMapper.readTree("""
+                {
+                  "status": "7001",
+                  "loanAmount": 300000,
+                  "remark": "放款成功"
+                }
+                """);
+
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", loanQueryData));
+
+        mockMvc.perform(get("/api/loan/approval-result/APP-LOAN-MISSING-LOANID")
+                        .cookie(authCookie(memberInfo)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(-1))
+                .andExpect(jsonPath("$.message").value("YUNKA_RESPONSE_INVALID:Yunka loan query response is invalid"));
     }
 
     private void createApplicationMapping(MemberInfo memberInfo, String applicationId, String loanId) {
