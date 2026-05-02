@@ -1,6 +1,8 @@
 package com.nexusfin.equity.controller;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.entity.MemberChannel;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.entity.MemberPaymentProtocol;
@@ -18,6 +20,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -31,6 +34,9 @@ class BankCardSignControllerIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Autowired
     private MemberInfoRepository memberInfoRepository;
@@ -185,6 +191,61 @@ class BankCardSignControllerIntegrationTest {
         assertThat(memberPaymentProtocolRepository.selectCount(null)).isZero();
         assertThat(memberPaymentProtocolRepository.selectCount(Wrappers.<MemberPaymentProtocol>lambdaQuery()
                 .eq(MemberPaymentProtocol::getSignRequestNo, "5678"))).isZero();
+    }
+
+    @Test
+    void shouldReuseExistingAgreementWhenConfirmSignIsRepeated() throws Exception {
+        MemberInfo memberInfo = createMember("mem-sign-confirm-duplicate", "tech-user-sign-confirm-duplicate");
+        createChannel(memberInfo.getMemberId(), memberInfo.getExternalUserId());
+
+        MvcResult firstConfirm = mockMvc.perform(post("/api/bank-card/sign-confirm")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Trace-Id", "TRACE_CASE_EX_C5_CONFIRM_DUP_001")
+                        .content("""
+                                {
+                                  "userSignId": 3579,
+                                  "verificationCode": "123456"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.userSignId").value(3579))
+                .andReturn();
+        JsonNode firstBody = objectMapper.readTree(firstConfirm.getResponse().getContentAsString());
+        String firstAgreementNo = firstBody.path("data").path("agreementNo").asText();
+        assertThat(firstAgreementNo).startsWith("mock-agreement-3579");
+
+        mockMvc.perform(post("/api/bank-card/sign-confirm")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Trace-Id", "TRACE_CASE_EX_C5_CONFIRM_DUP_002")
+                        .content("""
+                                {
+                                  "userSignId": 3579,
+                                  "verificationCode": "123456"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.userSignId").value(3579))
+                .andExpect(jsonPath("$.data.agreementNo").value(firstAgreementNo))
+                .andExpect(jsonPath("$.data.signed").value(true))
+                .andExpect(jsonPath("$.data.status").value("SIGNED"));
+
+        assertThat(memberPaymentProtocolRepository.selectCount(Wrappers.<MemberPaymentProtocol>lambdaQuery()
+                .eq(MemberPaymentProtocol::getMemberId, memberInfo.getMemberId())
+                .eq(MemberPaymentProtocol::getProviderCode, "QW_SIGN")
+                .eq(MemberPaymentProtocol::getSignRequestNo, "3579")
+                .eq(MemberPaymentProtocol::getProtocolStatus, "ACTIVE"))).isEqualTo(1);
+
+        MemberPaymentProtocol protocol = memberPaymentProtocolRepository.selectOne(Wrappers.<MemberPaymentProtocol>lambdaQuery()
+                .eq(MemberPaymentProtocol::getMemberId, memberInfo.getMemberId())
+                .eq(MemberPaymentProtocol::getProviderCode, "QW_SIGN")
+                .eq(MemberPaymentProtocol::getSignRequestNo, "3579")
+                .last("limit 1"));
+        assertThat(protocol).isNotNull();
+        assertThat(protocol.getProtocolNo()).isEqualTo(firstAgreementNo);
     }
 
     private MemberInfo createMember(String memberId, String externalUserId) {

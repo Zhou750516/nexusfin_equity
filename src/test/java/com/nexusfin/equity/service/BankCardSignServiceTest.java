@@ -7,10 +7,12 @@ import com.nexusfin.equity.dto.response.BankCardSignConfirmResponse;
 import com.nexusfin.equity.dto.response.BankCardSignStatusResponse;
 import com.nexusfin.equity.entity.MemberChannel;
 import com.nexusfin.equity.entity.MemberInfo;
+import com.nexusfin.equity.entity.MemberPaymentProtocol;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
+import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.service.impl.BankCardSignServiceImpl;
 import com.nexusfin.equity.config.QwDirectProperties;
 import com.nexusfin.equity.config.QwProperties;
@@ -47,6 +49,9 @@ class BankCardSignServiceTest {
 
     @Mock
     private MemberChannelRepository memberChannelRepository;
+
+    @Mock
+    private MemberPaymentProtocolRepository memberPaymentProtocolRepository;
 
     @Mock
     private SensitiveDataCipher sensitiveDataCipher;
@@ -191,6 +196,33 @@ class BankCardSignServiceTest {
         assertThat(output).contains("bizOrderNo=bank-card-sign-5678");
         assertThat(output).contains("userSignId=5678");
         assertThat(output).contains("agreementNo=AGRM-5678");
+        assertThat(output).doesNotContain("123456");
+    }
+
+    @Test
+    void shouldReuseExistingActiveProtocolWhenConfirmingSameUserSignIdAgain(CapturedOutput output) {
+        MemberInfo memberInfo = buildMember();
+        MemberPaymentProtocol existingProtocol = new MemberPaymentProtocol();
+        existingProtocol.setMemberId("mem-1");
+        existingProtocol.setProviderCode("QW_SIGN");
+        existingProtocol.setProtocolNo("AGRM-EX-C5-001");
+        existingProtocol.setSignRequestNo("3579");
+        existingProtocol.setProtocolStatus("ACTIVE");
+        when(memberInfoRepository.selectById("mem-1")).thenReturn(memberInfo);
+        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-1", "QW_SIGN")).thenReturn(existingProtocol);
+
+        BankCardSignConfirmResponse response = bankCardSignService.confirmSign(
+                "mem-1",
+                new BankCardSignConfirmRequest(3579L, "123456")
+        );
+
+        assertThat(response.signed()).isTrue();
+        assertThat(response.status()).isEqualTo("SIGNED");
+        assertThat(response.userSignId()).isEqualTo(3579L);
+        assertThat(response.agreementNo()).isEqualTo("AGRM-EX-C5-001");
+        verify(qwBenefitClient, never()).confirmSign(any());
+        verify(paymentProtocolService, never()).saveActiveProtocol(any());
+        assertThat(output).contains("bank-card sign confirm duplicated, reused local active protocol");
         assertThat(output).doesNotContain("123456");
     }
 

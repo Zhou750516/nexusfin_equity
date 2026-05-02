@@ -12,6 +12,7 @@ import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
+import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.service.BankCardSignService;
 import com.nexusfin.equity.service.PaymentProtocolService;
 import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
@@ -44,6 +45,7 @@ public class BankCardSignServiceImpl implements BankCardSignService {
 
     private final MemberInfoRepository memberInfoRepository;
     private final MemberChannelRepository memberChannelRepository;
+    private final MemberPaymentProtocolRepository memberPaymentProtocolRepository;
     private final SensitiveDataCipher sensitiveDataCipher;
     private final QwBenefitClient qwBenefitClient;
     private final PaymentProtocolService paymentProtocolService;
@@ -52,6 +54,7 @@ public class BankCardSignServiceImpl implements BankCardSignService {
     public BankCardSignServiceImpl(
             MemberInfoRepository memberInfoRepository,
             MemberChannelRepository memberChannelRepository,
+            MemberPaymentProtocolRepository memberPaymentProtocolRepository,
             SensitiveDataCipher sensitiveDataCipher,
             QwBenefitClient qwBenefitClient,
             PaymentProtocolService paymentProtocolService,
@@ -59,6 +62,7 @@ public class BankCardSignServiceImpl implements BankCardSignService {
     ) {
         this.memberInfoRepository = memberInfoRepository;
         this.memberChannelRepository = memberChannelRepository;
+        this.memberPaymentProtocolRepository = memberPaymentProtocolRepository;
         this.sensitiveDataCipher = sensitiveDataCipher;
         this.qwBenefitClient = qwBenefitClient;
         this.paymentProtocolService = paymentProtocolService;
@@ -136,6 +140,28 @@ public class BankCardSignServiceImpl implements BankCardSignService {
                 TraceIdUtil.getTraceId(), bizOrderNo, requestId, memberId);
         try {
             MemberInfo memberInfo = resolveMember(memberId);
+            var currentProtocol = memberPaymentProtocolRepository.selectActiveByMemberId(memberInfo.getMemberId(), PROVIDER_QW_SIGN);
+            if (currentProtocol != null
+                    && request.userSignId() != null
+                    && String.valueOf(request.userSignId()).equals(currentProtocol.getSignRequestNo())
+                    && currentProtocol.getProtocolNo() != null
+                    && !currentProtocol.getProtocolNo().isBlank()) {
+                log.info("traceId={} bizOrderNo={} requestId={} userSignId={} agreementNo={} memberId={} elapsedMs={} status={} bank-card sign confirm duplicated, reused local active protocol",
+                        TraceIdUtil.getTraceId(),
+                        bizOrderNo,
+                        requestId,
+                        request.userSignId(),
+                        currentProtocol.getProtocolNo(),
+                        memberId,
+                        elapsedMs(startNanos),
+                        STATUS_SIGNED);
+                return new BankCardSignConfirmResponse(
+                        request.userSignId(),
+                        currentProtocol.getProtocolNo(),
+                        true,
+                        STATUS_SIGNED
+                );
+            }
             QwSignConfirmResponse response = qwBenefitClient.confirmSign(new QwSignConfirmRequest(
                     request.userSignId(),
                     request.verificationCode()
