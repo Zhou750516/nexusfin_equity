@@ -277,6 +277,75 @@ test("should support semantic invalid-token fault on /user/token", () => {
   assert.equal(expiredPlan.body.message, "session expired");
 });
 
+test("should support token tamper semantic fault on /user/token", () => {
+  const tamperedPlan = createGatewayPlan({
+    traceId: "TRACE_EX_A_3_TOKEN_TAMPER_001",
+    requestId: "REQ_USER_TOKEN_TAMPERED_001",
+    path: "/user/token",
+    bizOrderNo: "JOINT-LOGIN-TAMPERED",
+    data: {
+      token: "joint-token-push-runtime-001_TAMPERED",
+    },
+  });
+
+  assert.equal(tamperedPlan.statusCode, 200);
+  assert.equal(tamperedPlan.body.code, 40101);
+  assert.equal(tamperedPlan.body.message, "token invalid: tampered");
+  assert.equal(tamperedPlan.body.data, null);
+});
+
+test("should support loan query rejected semantic fault from traceId marker", () => {
+  const plan = createGatewayPlan({
+    traceId: "TRACE_EX_D_4_LOAN_QUERY_FAULT_LOAN_REJECTED",
+    requestId: "REQ_LOAN_QUERY_REJECTED_001",
+    path: "/loan/query",
+    bizOrderNo: "APP-QUERY-REJECTED-001",
+    data: {
+      loanId: "LN-QUERY-REJECTED-001",
+    },
+  });
+
+  assert.equal(plan.statusCode, 200);
+  assert.equal(plan.body.code, 0);
+  assert.equal(plan.body.data.loanId, "LN-QUERY-REJECTED-001");
+  assert.equal(plan.body.data.status, "7003");
+  assert.equal(plan.body.data.remark, "借款申请未通过审核");
+});
+
+test("should support null-data fault injection from traceId marker", () => {
+  const plan = createGatewayPlan({
+    traceId: "TRACE_EX_F_3_DATA_FAULT_DATA_NULL",
+    requestId: "REQ_DATA_NULL_001",
+    path: "/loan/query",
+    bizOrderNo: "APP-DATA-NULL-001",
+    data: {
+      loanId: "LN-DATA-NULL-001",
+    },
+  });
+
+  assert.equal(plan.statusCode, 200);
+  assert.equal(plan.body.code, 0);
+  assert.equal(plan.body.data, null);
+});
+
+test("should support missing-field fault injection from traceId marker", () => {
+  const plan = createGatewayPlan({
+    traceId: "TRACE_EX_F_3_DATA_FAULT_MISSING_status",
+    requestId: "REQ_DATA_MISSING_STATUS_001",
+    path: "/loan/query",
+    bizOrderNo: "APP-DATA-MISSING-001",
+    data: {
+      loanId: "LN-DATA-MISSING-001",
+    },
+  });
+
+  assert.equal(plan.statusCode, 200);
+  assert.equal(plan.body.code, 0);
+  assert.equal(plan.body.data.loanId, "LN-DATA-MISSING-001");
+  assert.equal(Object.hasOwn(plan.body.data, "status"), false);
+  assert.equal(plan.body.data.remark !== undefined, true);
+});
+
 test("should support current local baseline paths for loan calculate and benefits sync", () => {
   const trialPlan = createGatewayPlan({
     requestId: "REQ_LOAN_TRIAL_001",

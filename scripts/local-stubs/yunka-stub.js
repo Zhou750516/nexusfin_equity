@@ -10,7 +10,11 @@ const timeoutDelayMs = Number(process.env.YUNKA_FAULT_TIMEOUT_DELAY_MS ?? 6500);
 
 const REJECT_PATTERN = /.*_FAULT_REJECT_(\d+)$/;
 const DELAY_PATTERN = /.*_FAULT_DELAY_(\d+)$/;
-const INVALID_TOKEN_PATTERN = /.*_FAULT_(TOKEN_INVALID|SESSION_EXPIRED)$/;
+const INVALID_TOKEN_PATTERN = /.*_FAULT_(TOKEN_INVALID|SESSION_EXPIRED|TOKEN_TAMPERED)$/;
+const TAMPERED_TOKEN_PATTERN = /.*_TAMPERED$/;
+const LOAN_QUERY_REJECTED_PATTERN = /.*_FAULT_LOAN_REJECTED$/;
+const NULL_DATA_PATTERN = /.*_FAULT_DATA_NULL$/;
+const MISSING_FIELD_PATTERN = /.*_FAULT_MISSING_([A-Za-z0-9_]+)$/;
 
 const queryCounts = new Map();
 
@@ -93,6 +97,15 @@ function loanQueryPayload(data) {
     status: "7001",
     loanAmount: 300000,
     remark: "审批通过，预计30分钟内到账",
+  };
+}
+
+function rejectedLoanQueryPayload(data) {
+  return {
+    loanId: data.loanId ?? "LN-STUB-001",
+    status: "7003",
+    loanAmount: 300000,
+    remark: "借款申请未通过审核",
   };
 }
 
@@ -263,6 +276,7 @@ function handleGatewayRequest(payload) {
 
 function collectFaultCandidates(payload) {
   const values = [];
+  collectStrings(payload.traceId, values);
   collectStrings(payload.requestId, values);
   collectStrings(payload.bizOrderNo, values);
   collectStrings(payload.path, values);
@@ -304,6 +318,14 @@ function resolveFaultDirective(payload) {
           message: match[1] === "SESSION_EXPIRED" ? "session expired" : "token invalid",
         };
       }
+      if (candidate.match(TAMPERED_TOKEN_PATTERN)) {
+        return {
+          type: "semantic_reject",
+          marker: candidate,
+          code: 40101,
+          message: "token invalid: tampered",
+        };
+      }
     }
   }
   for (const candidate of candidates) {
@@ -331,12 +353,67 @@ function resolveFaultDirective(payload) {
       };
     }
   }
+  if (payload.path === "/loan/query") {
+    for (const candidate of candidates) {
+      if (candidate.match(LOAN_QUERY_REJECTED_PATTERN)) {
+        return {
+          type: "loan_query_rejected",
+          marker: candidate,
+        };
+      }
+    }
+  }
+  for (const candidate of candidates) {
+    if (candidate.match(NULL_DATA_PATTERN)) {
+      return {
+        type: "null_data",
+        marker: candidate,
+      };
+    }
+  }
+  for (const candidate of candidates) {
+    const match = candidate.match(MISSING_FIELD_PATTERN);
+    if (match) {
+      return {
+        type: "missing_field",
+        marker: candidate,
+        field: match[1],
+      };
+    }
+  }
   return null;
+}
+
+function applySemanticFault(body, payload, fault) {
+  if (!fault) {
+    return body;
+  }
+  if (fault.type === "loan_query_rejected") {
+    return gatewaySuccess(rejectedLoanQueryPayload(payload.data ?? {}));
+  }
+  if (fault.type === "null_data") {
+    return {
+      ...body,
+      data: null,
+    };
+  }
+  if (fault.type === "missing_field") {
+    if (body == null || typeof body !== "object" || body.data == null || typeof body.data !== "object" || Array.isArray(body.data)) {
+      return body;
+    }
+    const mutatedData = { ...body.data };
+    delete mutatedData[fault.field];
+    return {
+      ...body,
+      data: mutatedData,
+    };
+  }
+  return body;
 }
 
 function createGatewayPlan(payload) {
   const fault = resolveFaultDirective(payload);
-  const body = handleGatewayRequest(payload);
+  const body = applySemanticFault(handleGatewayRequest(payload), payload, fault);
   if (!fault) {
     return {
       statusCode: 200,
@@ -415,7 +492,10 @@ function createServer() {
     }
 
     try {
-      const payload = await parseBody(request);
+      const payload = {
+        ...(await parseBody(request)),
+        traceId: request.headers["x-trace-id"] ?? "",
+      };
       const plan = createGatewayPlan(payload);
       if (plan.delayMs && plan.delayMs > 0) {
         setTimeout(() => {
@@ -448,6 +528,7 @@ module.exports = {
   createServer,
   gatewaySuccess,
   handleGatewayRequest,
+  applySemanticFault,
   resolveFaultDirective,
   supportedPaths,
 };
