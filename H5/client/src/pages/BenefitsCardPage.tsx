@@ -97,6 +97,7 @@ export default function BenefitsCardPage() {
 
   const applicationId = getQueryParam("applicationId") ?? loan.applicationId;
   const pendingPath = applicationId ? buildPath("/approval-pending", { applicationId }) : "/approval-pending";
+  const jointLoginToken = readJointLoginParams()?.token ?? null;
 
   useEffect(() => {
     if (!shouldRequestLocalizedData({ locale, loadedLocale })) {
@@ -125,7 +126,6 @@ export default function BenefitsCardPage() {
       setError(MISSING_CONTEXT_COPY[locale]);
       return;
     }
-    const jointLoginToken = readJointLoginParams()?.token;
     if (!jointLoginToken) {
       setError(MISSING_JOINT_TOKEN_COPY[locale]);
       return;
@@ -171,6 +171,7 @@ export default function BenefitsCardPage() {
   const activationAllowed = detail ? canActivateBenefits({
     applicationId,
     protocolReady: detail.protocolReady,
+    hasJointLoginToken: Boolean(jointLoginToken),
   }) : false;
 
   return (
@@ -444,6 +445,14 @@ export default function BenefitsCardPage() {
               <section className="bg-[#fff7e6] border border-[#ffe4b3] rounded-[14px] px-4 py-4">
                 <p className="text-[#ad6800] text-[13px] leading-[21px]">
                   {PROTOCOL_NOT_READY_COPY[locale]}
+                </p>
+              </section>
+            ) : null}
+
+            {detail.protocolReady && !jointLoginToken ? (
+              <section className="bg-[#fff7e6] border border-[#ffe4b3] rounded-[14px] px-4 py-4">
+                <p className="text-[#ad6800] text-[13px] leading-[21px]">
+                  {MISSING_JOINT_TOKEN_COPY[locale]}
                 </p>
               </section>
             ) : null}

@@ -6,6 +6,7 @@ describe("approval pending benefits entry", () => {
     expect(shouldShowPendingBenefitsEntry({
       available: true,
       dismissed: false,
+      hasJointLoginToken: true,
     })).toBe(true);
   });
 
@@ -13,6 +14,7 @@ describe("approval pending benefits entry", () => {
     expect(shouldShowPendingBenefitsEntry({
       available: true,
       dismissed: true,
+      hasJointLoginToken: true,
     })).toBe(false);
   });
 
@@ -20,6 +22,15 @@ describe("approval pending benefits entry", () => {
     expect(shouldShowPendingBenefitsEntry({
       available: false,
       dismissed: false,
+      hasJointLoginToken: true,
+    })).toBe(false);
+  });
+
+  it("hides the benefits entry when the current flow has no joint-login token", () => {
+    expect(shouldShowPendingBenefitsEntry({
+      available: true,
+      dismissed: false,
+      hasJointLoginToken: false,
     })).toBe(false);
   });
 });

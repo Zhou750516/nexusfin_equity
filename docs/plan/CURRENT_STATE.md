@@ -2,7 +2,7 @@
 
 > 这是项目的当前口径入口。开工先看这里，再看当天 plan 和 checklist。
 
-**最后更新**：2026-04-29
+**最后更新**：2026-05-01
 **维护人**：协调 / 审查会话
 **下次复审**：2026-05-03
 
@@ -10,14 +10,15 @@
 
 ## 1. 主线状态
 
-- **当前阶段**：重构降摩擦主线已完成 Phase 0、1A、1B、2A、2B、2C、2D、2E、5、3、4；当前进入稳态维护阶段。
+- **当前阶段**：重构降摩擦主线已完成；当前处于“本地联调主链稳定 + 联调前硬化收尾 + 外部阻塞隔离”阶段。
 - **本周聚焦**：
-  1. 维护 `docs/plan` 与 AGENTS 入口的真实状态，避免回填失真
-  2. 保持收敛后的测试 context 与 H5 结构，不回退到高摩擦形态
-  3. 后续新需求优先沿已拆出的 service / gateway / H5 section 边界扩展
+  1. 保持 Yunka local stub + QW MOCK + tech-user stub 的唯一联调基线
+  2. 保持 `joint-login / benefit redirect / benefiturl / loan / repayment` 夜间回归结论稳定
+  3. 通过 stub 契约测试和前端小型收尾，降低 2026-05-07 对外联调前回归风险
+  4. 将云卡公网问题和电子签章待定项继续与内部异常线隔离管理
 - **本周不做**：
-  - 不重做已完成的重构阶段
-  - 不在存在产品歧义的情况下擅自删除 H5 路由或页面
+  - 不回滚已完成的重构阶段
+  - 不把公网云卡阻塞与本地 mock 结论混用
 
 ## 2. 重构主线状态
 
@@ -39,16 +40,40 @@
 
 ### 3.0 当前真实阻塞
 
-当前无主线阻塞项。
+当前无重构主线阻塞，但有 4 条独立边界待继续处理：
 
-`2026-04-29` 已确认：
+1. callback P0 线已闭合：
+   - `B-P0-3.1 ~ B-P0-3.4` 已形成运行时证据
+   - 坏签名拒绝且无副作用已验证
+2. joint-login / benefit redirect 接口级能力已通过运行态验证：
+   - `push` 不再依赖 `benefitOrderNo`
+   - `exercise / refund` 缺单号会受控失败
+   - `POST /api/auth/redrect_benefit_url` 已可正常返回 URL，timeout / reject 不落通用 500
+3. 当前未闭合项：
+   - `benefiturl` 的字段语义仍偏向当前 QW exercise redirect runtime source，不能自动泛化为“所有权益场景通用联登 URL”
+   - H5 仍有低优先级浏览器 issue：部分表单控件需继续补 `id/name`
+4. 云卡真实联调仍存在外部阻塞：
+   - real Yunka 已可真实接收 ABS 请求
+   - 当前真实阻塞为 `KJ_NOT_READY / kj.private-key 配置无效`
+   - 电子签章接入方案也尚未定稿
 
-- `AllinpayDirectQwBenefitClient` duplicated `@Autowired` constructors` 回归已在 `32722e7` 修复
-- `MySqlAsyncCompensationIntegrationTest` 已恢复通过
-- 当前可以宣称：
-  - 单测通过
-  - H5 类型检查通过
-  - 可选 MySQL IT 也已恢复通过
+`2026-04-29 ~ 2026-04-30` 已确认：
+
+- `32722e7` 已修复 QW Spring 构造器装配回归
+- `1abcf4a` 已修复 clean 用户 `QW_SIGN` mock 协议号唯一性问题
+- `896c4c2` 已补第二个隔离 clean 用户 `mock-tech-token-clean-2`
+- callback P0 线已闭合
+- `794de0e` 已将 ABS -> Yunka 协议对齐到 `2026-04-10` 文档并补齐完整 JSON 出站日志
+- `e768257` / `edbb7f2` 已完成 joint-login 场景拆分、`redrect_benefit_url` 能力和本地 stub 收口
+- `b4b0fd5` 已将 `benefiturl` 接到 `BenefitsServiceImpl.activate -> XiaohuaGatewayService.syncBenefitOrder` 主链，并强制要求 `activate` 请求携带 token
+- `2026-05-01` 夜间自动化回归 Round 12 已确认：
+  - `joint-login`、`redrect_benefit_url`、`loan/calculate`、`benefits/card-detail`、`benefits/activate`、`repayment` 代表性链路本地稳定
+  - invalid token 运行态语义已闭环
+  - `benefiturl` 主链运行态实发证据已拿到
+- `4a8e5b9` 已完成联调前硬化：
+  - Yunka stub 契约测试防漂移
+  - `benefiturl` 语义注释 / 日志硬化
+  - H5 关键表单 `id/name` 补齐第一轮收口
 
 ### 3.1 无外部阻塞的工作
 
@@ -80,9 +105,9 @@
 ## 5. 当前入口导航
 
 - `docs/plan/README.md`：根入口规则
-- `docs/plan/20260429.md`：当天计划
-- `docs/plan/20260428.md`：上一日已执行完成的计划记录
-- `docs/plan/20260428_checklist.md`：上一日 checklist
+- `docs/plan/20260501.md`：当天计划
+- `docs/plan/20260501_checklist.md`：当天 checklist
+- `docs/plan/20260429.md`：上一日计划记录
 - `docs/plan/20260427_重构降摩擦.md`：重构总方案
 - `docs/plan/topics/重构降摩擦/20260428_phase0_baseline.md`：Phase 0 基线与结果快照
 - `docs/test-performance-analysis.md`：Phase 5 测试收敛参考

@@ -20,6 +20,7 @@ describe("benefits card page logic", () => {
     expect(canActivateBenefits({
       applicationId: null,
       protocolReady: true,
+      hasJointLoginToken: true,
     })).toBe(false);
   });
 
@@ -27,13 +28,23 @@ describe("benefits card page logic", () => {
     expect(canActivateBenefits({
       applicationId: "APP-001",
       protocolReady: false,
+      hasJointLoginToken: true,
     })).toBe(false);
   });
 
-  it("allows activation only when both application id and protocol readiness are present", () => {
+  it("blocks activation when the joint-login token is missing", () => {
     expect(canActivateBenefits({
       applicationId: "APP-001",
       protocolReady: true,
+      hasJointLoginToken: false,
+    })).toBe(false);
+  });
+
+  it("allows activation only when application id, protocol readiness, and joint-login token are all present", () => {
+    expect(canActivateBenefits({
+      applicationId: "APP-001",
+      protocolReady: true,
+      hasJointLoginToken: true,
     })).toBe(true);
   });
 });

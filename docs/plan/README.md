@@ -3,16 +3,16 @@
 ## 1. 今天先看什么
 
 1. `CURRENT_STATE.md`
-2. `20260428.md`
-3. `20260428_checklist.md`
+2. `20260501.md`
+3. `20260501_checklist.md`
 4. `20260427_重构降摩擦.md`
 
 ## 2. 根目录保留规则
 
 - `README.md`
 - `CURRENT_STATE.md`
-- `20260428.md`
-- `20260428_checklist.md`
+- `20260501.md`
+- `20260501_checklist.md`
 - `20260427_重构降摩擦.md`
 
 ## 3. 主题目录

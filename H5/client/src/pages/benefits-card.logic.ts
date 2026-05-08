@@ -10,9 +10,11 @@ export function resolveDefaultBenefitsUserCard<T extends BenefitsUserCardOption>
 export function canActivateBenefits({
   applicationId,
   protocolReady,
+  hasJointLoginToken,
 }: {
   applicationId: string | null | undefined;
   protocolReady: boolean;
+  hasJointLoginToken: boolean;
 }) {
-  return Boolean(applicationId) && protocolReady;
+  return Boolean(applicationId) && protocolReady && hasJointLoginToken;
 }

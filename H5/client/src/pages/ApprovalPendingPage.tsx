@@ -5,6 +5,7 @@ import { useLoan } from "@/contexts/LoanContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { Locale } from "@/i18n/locale";
 import { formatCurrency } from "@/lib/format";
+import { readJointLoginParams } from "@/lib/joint-session";
 import { getApprovalStatus } from "@/lib/loan-api";
 import { toLoanPurposeKey } from "@/lib/loan-purpose";
 import { shouldRequestLocalizedData } from "@/lib/localized-request";
@@ -136,6 +137,7 @@ export default function ApprovalPendingPage() {
   const shouldShowBenefits = shouldShowPendingBenefitsEntry({
     available: Boolean(benefitsCard?.available),
     dismissed: benefitDismissed,
+    hasJointLoginToken: Boolean(readJointLoginParams()?.token),
   });
   const benefitsPath = applicationId
     ? buildPath("/benefits-card", { applicationId })
