@@ -182,7 +182,7 @@ export default function LandingPage() {
           <p className="text-white">惠聚平台</p>
           <p className="text-[#99a1af]">合作持牌金融机构提供贷款服务</p>
           <p className="text-[#99a1af]">理性借贷 · 诚信守约 · 保护个人信息安全</p>
-          <p className="text-[#99a1af] mt-3">© 2026 惠聚平台 | 京ICP备XXXXXXXX号</p>
+          <p className="text-[#99a1af] mt-3">© 2026 惠聚平台 | 鄂ICP备2026015712号-1</p>
         </footer>
       </div>
     </div>
