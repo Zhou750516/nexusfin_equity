@@ -1,4 +1,4 @@
-import { buildPath } from "@/lib/route";
+import { buildPath, resolveAppHref } from "@/lib/route";
 import type { JointLoginParams } from "@/types/loan.types";
 
 export const JOINT_LOGIN_PARAMS_STORAGE_KEY = "nexusfin.h5.joint-login.params";
@@ -39,6 +39,6 @@ export function recoverJointLoginSession(): boolean {
   if (!params) {
     return false;
   }
-  window.location.assign(resolveJointLoginRecoveryPath(params));
+  window.location.assign(resolveAppHref(resolveJointLoginRecoveryPath(params)));
   return true;
 }

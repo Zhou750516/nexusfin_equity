@@ -1,8 +1,9 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { normalizeAppBase } from "@/lib/route";
 import NotFound from "@/pages/NotFound";
 import { useEffect } from "react";
-import { Route, Switch, useLocation } from "wouter";
+import { Route, Router as WouterRouter, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { LoanProvider } from "./contexts/LoanContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -19,6 +20,8 @@ import JointUnsupportedPage from "./pages/JointUnsupportedPage";
 import LandingPage from "./pages/LandingPage";
 import RepaymentSuccessPage from "./pages/RepaymentSuccessPage";
 
+const ROUTER_BASE = normalizeAppBase();
+
 function RootEntryRedirect() {
   const [, navigate] = useLocation();
 
@@ -29,10 +32,11 @@ function RootEntryRedirect() {
   return null;
 }
 
-function Router() {
+function AppRoutes() {
   return (
     <Switch>
       <Route path={"/"} component={RootEntryRedirect} />
+      <Route path={"/index"} component={RootEntryRedirect} />
       <Route path={"/joint-entry"} component={JointEntryPage} />
       <Route path={"/joint-dispatch"} component={JointDispatchPage} />
       <Route path={"/joint-refund-entry"} component={JointRefundEntryPage} />
@@ -53,16 +57,18 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="light">
-        <I18nProvider>
-          <LoanProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Router />
-            </TooltipProvider>
-          </LoanProvider>
-        </I18nProvider>
-      </ThemeProvider>
+      <WouterRouter base={ROUTER_BASE}>
+        <ThemeProvider defaultTheme="light">
+          <I18nProvider>
+            <LoanProvider>
+              <TooltipProvider>
+                <Toaster />
+                <AppRoutes />
+              </TooltipProvider>
+            </LoanProvider>
+          </I18nProvider>
+        </ThemeProvider>
+      </WouterRouter>
     </ErrorBoundary>
   );
 }

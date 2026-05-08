@@ -5,7 +5,8 @@ import { defineConfig } from "vite";
 
 const plugins = [react(), tailwindcss()];
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  base: command === "build" ? "/equity/" : "/",
   plugins,
   resolve: {
     alias: {
@@ -36,4 +37,4 @@ export default defineConfig({
       deny: ["**/.*"],
     },
   },
-});
+}));
