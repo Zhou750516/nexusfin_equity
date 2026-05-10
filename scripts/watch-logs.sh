@@ -3,15 +3,52 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-RUNTIME_DIR="${RUNTIME_DIR:-$ROOT_DIR/runtime/aliyun}"
-BACKEND_LOG_FILE="${BACKEND_LOG_FILE:-$RUNTIME_DIR/backend.log}"
-H5_LOG_FILE="${H5_LOG_FILE:-$RUNTIME_DIR/h5.log}"
 NGINX_ERROR_LOG="${NGINX_ERROR_LOG:-/var/log/nginx/error.log}"
 NGINX_ACCESS_LOG="${NGINX_ACCESS_LOG:-/var/log/nginx/access.log}"
 TAIL_BIN="${TAIL_BIN:-tail}"
 AWK_BIN="${AWK_BIN:-awk}"
 TAIL_LINES="${TAIL_LINES:-200}"
 MODE="${1:-core}"
+DEFAULT_RUNTIME_DIR="$ROOT_DIR/runtime/aliyun"
+
+has_project_logs() {
+  local runtime_dir="$1"
+  [[ -f "$runtime_dir/backend.log" || -f "$runtime_dir/h5.log" ]]
+}
+
+append_runtime_candidate() {
+  local candidate="$1"
+  if [[ -n "$candidate" && -d "$candidate" ]]; then
+    runtime_candidates+=("$candidate")
+  fi
+}
+
+detect_runtime_dir() {
+  if [[ -n "${RUNTIME_DIR:-}" ]]; then
+    echo "$RUNTIME_DIR"
+    return
+  fi
+
+  append_runtime_candidate "$DEFAULT_RUNTIME_DIR"
+
+  local tmp_root="${TMPDIR:-/tmp}"
+  append_runtime_candidate "${tmp_root%/}/nexusfin-h5-fullflow"
+  append_runtime_candidate "/tmp/nexusfin-h5-fullflow"
+
+  local candidate
+  for candidate in "${tmp_root%/}"/nexusfin-* /tmp/nexusfin-*; do
+    append_runtime_candidate "$candidate"
+  done
+
+  for candidate in "${runtime_candidates[@]}"; do
+    if has_project_logs "$candidate"; then
+      echo "$candidate"
+      return
+    fi
+  done
+
+  echo "$DEFAULT_RUNTIME_DIR"
+}
 
 usage() {
   cat <<'EOF'
@@ -120,6 +157,7 @@ cleanup() {
 require_command "$TAIL_BIN"
 require_command "$AWK_BIN"
 
+declare -a runtime_candidates=()
 declare -a selected_labels=()
 declare -a selected_paths=()
 declare -a available_labels=()
@@ -131,6 +169,10 @@ declare -a invalid_paths=()
 declare -a unreadable_labels=()
 declare -a unreadable_paths=()
 declare -a tail_pids=()
+
+RUNTIME_DIR="$(detect_runtime_dir)"
+BACKEND_LOG_FILE="${BACKEND_LOG_FILE:-$RUNTIME_DIR/backend.log}"
+H5_LOG_FILE="${H5_LOG_FILE:-$RUNTIME_DIR/h5.log}"
 
 case "$MODE" in
   core)
@@ -178,6 +220,40 @@ print_skipped_logs
 if [[ "$MODE" == "core" ]]; then
   backend_available=false
   h5_available=false
+
+  if [[ "${#available_labels[@]}" -gt 0 ]]; then
+    for label in "${available_labels[@]}"; do
+      if [[ "$label" == "backend" ]]; then
+        backend_available=true
+      fi
+      if [[ "$label" == "h5" ]]; then
+        h5_available=true
+      fi
+    done
+  fi
+
+  if [[ "$backend_available" == "false" && "$h5_available" == "false" ]]; then
+    echo "core 模式至少需要 backend 或 h5 日志之一，当前两者都不可用。" >&2
+  fi
+fi
+
+if [[ "${#available_paths[@]}" -eq 0 ]]; then
+  if [[ "$MODE" != "core" ]]; then
+    echo "当前模式 $MODE 没有可用日志文件。" >&2
+  elif [[ -f "$NGINX_ERROR_LOG" && ! -f "$BACKEND_LOG_FILE" && ! -f "$H5_LOG_FILE" ]]; then
+    echo "core 模式下 nginx 只能作为附加日志，不能单独作为唯一输出。" >&2
+  elif [[ -f "$NGINX_ERROR_LOG" && ! -r "$NGINX_ERROR_LOG" && ! -f "$BACKEND_LOG_FILE" && ! -f "$H5_LOG_FILE" ]]; then
+    echo "core 模式下 backend / h5 都不可用，nginx 也无法读取。" >&2
+  fi
+
+  echo "没有可查看的日志文件，请先确认服务是否已启动，或检查日志路径配置。" >&2
+  exit 1
+fi
+
+if [[ "$MODE" == "core" ]]; then
+  backend_available=false
+  h5_available=false
+
   for label in "${available_labels[@]}"; do
     if [[ "$label" == "backend" ]]; then
       backend_available=true
@@ -188,14 +264,10 @@ if [[ "$MODE" == "core" ]]; then
   done
 
   if [[ "$backend_available" == "false" && "$h5_available" == "false" ]]; then
-    echo "core 模式至少需要 backend 或 h5 日志之一，当前两者都不可用。" >&2
+    echo "core 模式下 nginx 只能作为附加日志，不能单独作为唯一输出。" >&2
+    echo "没有可查看的日志文件，请先确认服务是否已启动，或检查日志路径配置。" >&2
     exit 1
   fi
-fi
-
-if [[ "${#available_paths[@]}" -eq 0 ]]; then
-  echo "没有可查看的日志文件，请先确认服务是否已启动，或检查日志路径配置。" >&2
-  exit 1
 fi
 
 echo "[watch-logs] 将跟随以下日志:"
