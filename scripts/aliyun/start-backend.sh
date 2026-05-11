@@ -63,6 +63,24 @@ require_env YUNKA_SIGNATURE
 
 mkdir -p "$RUNTIME_DIR"
 
+log_runtime_summary() {
+  local stage="$1"
+  local timestamp
+  timestamp="$(date '+%Y-%m-%d %H:%M:%S %z')"
+  cat <<EOF | tee -a "$LOG_FILE"
+[backend] $stage
+timestamp=$timestamp
+log=$LOG_FILE
+port=$SERVER_PORT
+yunka_mode=$YUNKA_MODE
+yunka_base_url=$YUNKA_BASE_URL
+qw_mode=$QW_MODE
+tech_platform_auth_base_url=$TECH_PLATFORM_BASE_URL
+tech_platform_api_enabled=$TECH_PLATFORM_API_ENABLED
+tech_platform_api_mode=$TECH_PLATFORM_API_MODE
+EOF
+}
+
 if [[ -f "$PID_FILE" ]]; then
   existing_pid="$(cat "$PID_FILE")"
   if [[ -n "$existing_pid" ]] && is_pid_running "$existing_pid"; then
@@ -90,6 +108,7 @@ fi
 JAVA_OPTS="${JAVA_OPTS:--Xms512m -Xmx1024m}"
 
 echo "[backend] 启动 jar=$BACKEND_JAR"
+log_runtime_summary "config"
 nohup "$JAVA_BIN" $JAVA_OPTS -jar "$BACKEND_JAR" >>"$LOG_FILE" 2>&1 &
 backend_pid=$!
 echo "$backend_pid" >"$PID_FILE"
@@ -102,6 +121,18 @@ if ! is_pid_running "$backend_pid"; then
 fi
 
 cat <<EOF
+[backend] started
+pid=$backend_pid
+log=$LOG_FILE
+port=$SERVER_PORT
+yunka_mode=$YUNKA_MODE
+yunka_base_url=$YUNKA_BASE_URL
+qw_mode=$QW_MODE
+tech_platform_auth_base_url=$TECH_PLATFORM_BASE_URL
+tech_platform_api_enabled=$TECH_PLATFORM_API_ENABLED
+tech_platform_api_mode=$TECH_PLATFORM_API_MODE
+EOF
+cat <<EOF | tee -a "$LOG_FILE"
 [backend] started
 pid=$backend_pid
 log=$LOG_FILE
