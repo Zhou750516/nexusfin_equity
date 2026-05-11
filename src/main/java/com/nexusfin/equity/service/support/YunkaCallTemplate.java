@@ -171,7 +171,7 @@ public class YunkaCallTemplate {
         }
 
         public YunkaGatewayClient.YunkaGatewayRequest toRequest() {
-            return new YunkaGatewayClient.YunkaGatewayRequest(requestId, path, bizOrderNo, payload);
+            return new YunkaGatewayClient.YunkaGatewayRequest(requestId, path, payload);
         }
     }
 }

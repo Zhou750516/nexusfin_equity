@@ -9,7 +9,6 @@ public interface YunkaGatewayClient {
     record YunkaGatewayRequest(
             String requestId,
             String path,
-            String bizOrderNo,
             Object data
     ) {
     }

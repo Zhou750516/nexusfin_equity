@@ -9,7 +9,6 @@ const contractCases = [
     path: "/loan/trial",
     payload: {
       requestId: "REQ_CONTRACT_LOAN_TRIAL_001",
-      bizOrderNo: "LC-CONTRACT-001",
       data: {
         uid: "cid-contract-001",
         applyId: "LC-CONTRACT-001",
@@ -25,7 +24,6 @@ const contractCases = [
     path: "/loan/apply",
     payload: {
       requestId: "REQ_CONTRACT_LOAN_APPLY_001",
-      bizOrderNo: "LA-CONTRACT-001",
       data: {
         platformBenefitOrderNo: "BO-CONTRACT-001",
         loanId: "LN-CONTRACT-001",
@@ -39,7 +37,6 @@ const contractCases = [
     path: "/loan/query",
     payload: {
       requestId: "REQ_CONTRACT_LOAN_QUERY_001",
-      bizOrderNo: "LQ-CONTRACT-001",
       data: {
         loanId: "LN-CONTRACT-QUERY-001",
       },
@@ -52,7 +49,6 @@ const contractCases = [
     path: "/protocol/queryProtocolAggregationLink",
     payload: {
       requestId: "REQ_CONTRACT_PROTOCOL_001",
-      bizOrderNo: "benefits-card-detail",
       data: {
         userId: "cid-contract-001",
         loanAmount: 300000,
@@ -67,7 +63,6 @@ const contractCases = [
     path: "/benefit/sync",
     payload: {
       requestId: "REQ_CONTRACT_BENEFIT_SYNC_001",
-      bizOrderNo: "ord-contract-001",
       data: {
         userId: "cid-contract-001",
         platformBenefitOrderNo: "APP-CONTRACT-001",
@@ -85,7 +80,6 @@ const contractCases = [
     path: "/user/token",
     payload: {
       requestId: "REQ_CONTRACT_USER_TOKEN_001",
-      bizOrderNo: "JOINT-CONTRACT-001",
       data: {
         token: "joint-token-contract-001",
       },
@@ -98,7 +92,6 @@ const contractCases = [
     path: "/user/query",
     payload: {
       requestId: "REQ_CONTRACT_USER_QUERY_001",
-      bizOrderNo: "JOINT-CONTRACT-001",
       data: {
         userId: "mem-contract-001",
         cid: "cid-joint-token-contract-001",
@@ -112,7 +105,6 @@ const contractCases = [
     path: "/repay/trial",
     payload: {
       requestId: "REQ_CONTRACT_REPAY_TRIAL_001",
-      bizOrderNo: "RP-TRIAL-CONTRACT-001",
       data: {
         loanId: "LN-CONTRACT-REPAY-001",
       },
@@ -125,7 +117,6 @@ const contractCases = [
     path: "/repay/apply",
     payload: {
       requestId: "REQ_CONTRACT_REPAY_APPLY_001",
-      bizOrderNo: "RP-APPLY-CONTRACT-001",
       data: {
         loanId: "LN-CONTRACT-REPAY-001",
       },
@@ -138,7 +129,6 @@ const contractCases = [
     path: "/repay/query",
     payload: {
       requestId: "REQ_CONTRACT_REPAY_QUERY_001",
-      bizOrderNo: "RP-QUERY-CONTRACT-001",
       data: {
         swiftNumber: "RP-CONTRACT-001",
       },
@@ -221,7 +211,6 @@ test("should support joint-login user token and user query paths", () => {
   const tokenPlan = createGatewayPlan({
     requestId: "REQ_USER_TOKEN_001",
     path: "/user/token",
-    bizOrderNo: "JOINT-LOGIN-PUSH",
     data: {
       token: "joint-token-push-runtime-001",
     },
@@ -235,7 +224,6 @@ test("should support joint-login user token and user query paths", () => {
   const userPlan = createGatewayPlan({
     requestId: "REQ_USER_QUERY_001",
     path: "/user/query",
-    bizOrderNo: "JOINT-LOGIN-PUSH",
     data: {
       userId: "mem-local-001",
       cid: "cid-joint-token-push-runtime-001",
@@ -255,7 +243,6 @@ test("should support semantic invalid-token fault on /user/token", () => {
   const invalidTokenPlan = createGatewayPlan({
     requestId: "REQ_USER_TOKEN_INVALID_001",
     path: "/user/token",
-    bizOrderNo: "JOINT-LOGIN-INVALID",
     data: {
       token: "joint-token-invalid-runtime-001_FAULT_TOKEN_INVALID",
     },
@@ -267,7 +254,6 @@ test("should support semantic invalid-token fault on /user/token", () => {
   const expiredPlan = createGatewayPlan({
     requestId: "REQ_USER_TOKEN_EXPIRED_001",
     path: "/user/token",
-    bizOrderNo: "JOINT-LOGIN-EXPIRED",
     data: {
       token: "joint-token-expired-runtime-001_FAULT_SESSION_EXPIRED",
     },
@@ -282,7 +268,6 @@ test("should support token tamper semantic fault on /user/token", () => {
     traceId: "TRACE_EX_A_3_TOKEN_TAMPER_001",
     requestId: "REQ_USER_TOKEN_TAMPERED_001",
     path: "/user/token",
-    bizOrderNo: "JOINT-LOGIN-TAMPERED",
     data: {
       token: "joint-token-push-runtime-001_TAMPERED",
     },
@@ -350,7 +335,6 @@ test("should support current local baseline paths for loan calculate and benefit
   const trialPlan = createGatewayPlan({
     requestId: "REQ_LOAN_TRIAL_001",
     path: "/loan/trial",
-    bizOrderNo: "LC-001",
     data: {
       uid: "cid-joint-token-001",
       applyId: "LC-001",
@@ -365,7 +349,6 @@ test("should support current local baseline paths for loan calculate and benefit
   const protocolPlan = createGatewayPlan({
     requestId: "REQ_PROTOCOL_001",
     path: "/protocol/queryProtocolAggregationLink",
-    bizOrderNo: "benefits-card-detail",
     data: {
       userId: "cid-joint-token-001",
       loanAmount: 300000,
@@ -380,7 +363,6 @@ test("should support current local baseline paths for loan calculate and benefit
   const benefitSyncPlan = createGatewayPlan({
     requestId: "REQ_BENEFIT_SYNC_001",
     path: "/benefit/sync",
-    bizOrderNo: "ord-benefit-sync-001",
     data: {
       userId: "cid-joint-token-001",
       platformBenefitOrderNo: "APP-001",

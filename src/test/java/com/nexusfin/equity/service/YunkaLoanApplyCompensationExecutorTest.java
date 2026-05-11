@@ -80,7 +80,7 @@ class YunkaLoanApplyCompensationExecutorTest {
         verify(yunkaGatewayClient).proxy(requestCaptor.capture());
         assertThat(requestCaptor.getValue().requestId()).isEqualTo("LA-001");
         assertThat(requestCaptor.getValue().path()).isEqualTo("/loan/query");
-        assertThat(requestCaptor.getValue().bizOrderNo()).isEqualTo("APP-001");
+        assertThat(new ObjectMapper().valueToTree(requestCaptor.getValue()).has("bizOrderNo")).isFalse();
         assertThat(result.responsePayload()).contains("SUCCESS");
         assertThat(result.responsePayload()).contains("LN-001");
         ArgumentCaptor<LoanApplicationMapping> mappingCaptor = ArgumentCaptor.forClass(LoanApplicationMapping.class);

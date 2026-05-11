@@ -76,7 +76,8 @@ class XiaohuaGatewayServiceTest {
                 ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
         verify(yunkaGatewayClient).proxy(captor.capture());
         assertThat(captor.getValue().path()).isEqualTo("/protocol/queryProtocolAggregationLink");
-        assertThat(captor.getValue().bizOrderNo()).isEqualTo("BIZ-PROTO-001");
+        JsonNode envelope = objectMapper.valueToTree(captor.getValue());
+        assertThat(envelope.has("bizOrderNo")).isFalse();
         JsonNode forwarded = objectMapper.valueToTree(captor.getValue().data());
         assertThat(forwarded.path("userId").asText()).isEqualTo("user-001");
         assertThat(forwarded.path("loanAmount").asLong()).isEqualTo(300000L);
@@ -125,12 +126,21 @@ class XiaohuaGatewayServiceTest {
         UserTokenResponse response = gatewayService.validateUserToken(
                 "REQ-TOKEN-001",
                 "BIZ-TOKEN-001",
-                new UserTokenRequest(null, "joint-token-001")
+                new UserTokenRequest("joint-token-001")
         );
 
         assertThat(response.cid()).isEqualTo("cid-001");
         assertThat(response.name()).isEqualTo("张三");
         assertThat(response.phone()).isEqualTo("13800138000");
+
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> captor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(captor.capture());
+        JsonNode envelope = objectMapper.valueToTree(captor.getValue());
+        JsonNode forwarded = objectMapper.valueToTree(captor.getValue().data());
+        assertThat(envelope.has("bizOrderNo")).isFalse();
+        assertThat(forwarded.has("userId")).isFalse();
+        assertThat(forwarded.path("token").asText()).isEqualTo("joint-token-001");
     }
 
     @Test

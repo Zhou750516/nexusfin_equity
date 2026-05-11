@@ -107,7 +107,7 @@ public class JointLoginServiceImpl implements JointLoginService {
             return xiaohuaGatewayService.validateUserToken(
                     requestId,
                     benefitOrderNo,
-                    new UserTokenRequest(null, token)
+                    new UserTokenRequest(token)
             );
         } catch (UpstreamTimeoutException exception) {
             throw new BizException("JOINT_LOGIN_UPSTREAM_TIMEOUT", "Joint login temporarily unavailable");

@@ -39,7 +39,6 @@ class RestYunkaGatewayClientTest {
         YunkaGatewayClient.YunkaGatewayResponse response = client.proxy(new YunkaGatewayClient.YunkaGatewayRequest(
                 "REQ-MOCK-001",
                 "/loan/query",
-                "APP-MOCK-001",
                 JsonNodeFactory.instance.objectNode()
         ));
 
@@ -59,20 +58,19 @@ class RestYunkaGatewayClientTest {
                 .andExpect(request -> {
                     assertThat(request.getHeaders().getFirst("X-Trace-Id")).isEqualTo("TRACE-REQ-001");
                     assertThat(request.getHeaders().getFirst("X-Request-Id")).isEqualTo("REQ-001");
-                    assertThat(request.getHeaders().getFirst("X-Biz-Order-No")).isEqualTo("APP-001");
+                    assertThat(request.getHeaders().containsKey("X-Biz-Order-No")).isFalse();
                     assertThat(request.getHeaders().getFirst("X-Channel-Code")).isEqualTo("ABS");
                     assertThat(request.getHeaders().getFirst("X-Signature")).isEqualTo("abs-signature");
                     assertThat(request.getHeaders().getFirst("X-Timestamp")).isNotBlank();
                     assertThat(((MockClientHttpRequest) request).getBodyAsString())
                             .contains("\"requestId\":\"REQ-001\"")
                             .contains("\"path\":\"/loan/apply\"")
-                            .contains("\"bizOrderNo\":\"APP-001\"");
+                            .doesNotContain("bizOrderNo");
                 })
                 .andExpect(content().json("""
                         {
                           "requestId": "REQ-001",
                           "path": "/loan/apply",
-                          "bizOrderNo": "APP-001",
                           "data": {}
                         }
                         """))
@@ -98,7 +96,6 @@ class RestYunkaGatewayClientTest {
         YunkaGatewayClient.YunkaGatewayResponse response = client.proxy(new YunkaGatewayClient.YunkaGatewayRequest(
                 "REQ-001",
                 "/loan/apply",
-                "APP-001",
                 JsonNodeFactory.instance.objectNode()
         ));
 
@@ -111,12 +108,12 @@ class RestYunkaGatewayClientTest {
         assertThat(output).contains("yunka gateway request success");
         assertThat(output).contains("requestId=REQ-001");
         assertThat(output).contains("path=/loan/apply");
-        assertThat(output).contains("bizOrderNo=APP-001");
+        assertThat(output).doesNotContain("X-Biz-Order-No");
         assertThat(output).contains("elapsedMs=");
         assertThat(output).contains("requestBodyJson=");
         assertThat(output).contains("\"requestId\":\"REQ-001\"");
         assertThat(output).contains("\"path\":\"/loan/apply\"");
-        assertThat(output).contains("\"bizOrderNo\":\"APP-001\"");
+        assertThat(output).doesNotContain("\"bizOrderNo\"");
         assertThat(output).contains("responseBodyJson=");
         assertThat(output).contains("\"code\":0");
         assertThat(output).contains("\"message\":\"OK\"");

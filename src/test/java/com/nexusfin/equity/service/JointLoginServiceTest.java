@@ -87,7 +87,7 @@ class JointLoginServiceTest {
         verify(memberInfoRepository).insert(memberCaptor.capture());
         verify(memberChannelRepository).insert(any(MemberChannel.class));
         verify(xiaohuaGatewayService).validateUserToken(any(), any(), argThat((UserTokenRequest tokenRequest) ->
-                tokenRequest.userId() == null && "joint-token-001".equals(tokenRequest.token())));
+                "joint-token-001".equals(tokenRequest.token())));
         verify(xiaohuaGatewayService).queryUser(any(), any(), argThat((UserQueryRequest userQueryRequest) ->
                 userQueryRequest.userId() != null
                         && userQueryRequest.userId().startsWith("mem")

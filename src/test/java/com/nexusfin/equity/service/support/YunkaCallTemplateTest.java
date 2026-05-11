@@ -1,6 +1,7 @@
 package com.nexusfin.equity.service.support;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.ErrorCodes;
@@ -22,6 +23,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class YunkaCallTemplateTest {
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Mock
     private YunkaGatewayClient yunkaGatewayClient;
@@ -50,7 +53,8 @@ class YunkaCallTemplateTest {
         verify(yunkaGatewayClient).proxy(captor.capture());
         assertThat(captor.getValue().requestId()).isEqualTo("LQ-001");
         assertThat(captor.getValue().path()).isEqualTo("/loan/query");
-        assertThat(captor.getValue().bizOrderNo()).isEqualTo("APP-001");
+        JsonNode forwarded = objectMapper.valueToTree(captor.getValue());
+        assertThat(forwarded.has("bizOrderNo")).isFalse();
     }
 
     @Test
