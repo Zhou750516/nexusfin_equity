@@ -152,6 +152,53 @@ class RestYunkaGatewayClientTest {
                 .hasMessageContaining("BROKEN");
     }
 
+    @Test
+    void shouldLogUtf8ProviderMessageWithoutGarbledCharacters(CapturedOutput output) {
+        TraceIdUtil.bindTraceId("TRACE-UTF8-001");
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        server.expect(requestTo("http://127.0.0.1:18081/api/gateway/proxy"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess(
+                        """
+                        {
+                          "code": 1002,
+                          "message": "SIGNATURE_INVALID",
+                          "traceId": "TRACE-UTF8-001",
+                          "requestId": "REQ-UTF8-001",
+                          "data": {
+                            "status": "UNKNOWN",
+                            "providerMessage": "签名IP未授权",
+                            "retryable": false,
+                            "errorType": "SIGNATURE_INVALID",
+                            "payload": null
+                          }
+                        }
+                        """.getBytes(StandardCharsets.UTF_8),
+                        MediaType.APPLICATION_JSON
+                ));
+        RestClient restClient = restClientBuilder
+                .baseUrl("http://127.0.0.1:18081")
+                .build();
+        RestYunkaGatewayClient client = new RestYunkaGatewayClient(
+                yunkaProperties("REST", "http://127.0.0.1:18081"),
+                restClient,
+                () -> "1746955200999",
+                () -> "nonceutf8001"
+        );
+
+        YunkaGatewayClient.YunkaGatewayResponse response = client.proxy(new YunkaGatewayClient.YunkaGatewayRequest(
+                "REQ-UTF8-001",
+                "/user/token",
+                JsonNodeFactory.instance.objectNode()
+        ));
+
+        assertThat(response.code()).isEqualTo(1002);
+        assertThat(output).contains("\"providerMessage\":\"签名IP未授权\"");
+        assertThat(output).doesNotContain("???IP??????");
+        server.verify();
+    }
+
     private YunkaProperties yunkaProperties(String mode, String baseUrl) {
         return new YunkaProperties(
                 true,

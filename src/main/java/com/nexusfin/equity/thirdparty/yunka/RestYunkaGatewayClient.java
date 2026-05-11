@@ -114,7 +114,7 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                 nonce,
                 requestBodyJson);
         try {
-            String responseBody = restClient.post()
+            byte[] responseBodyBytes = restClient.post()
                     .uri(yunkaProperties.gatewayPath())
                     .contentType(MediaType.APPLICATION_JSON)
                     .header(TraceIdUtil.TRACE_ID_HEADER, traceId)
@@ -125,7 +125,8 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                     .header(SIGNATURE_HEADER, signature)
                     .body(requestBodyJson)
                     .retrieve()
-                    .body(String.class);
+                    .body(byte[].class);
+            String responseBody = decodeResponseBody(responseBodyBytes);
             YunkaGatewayResponse response = parseResponse(responseBody);
             long elapsedMs = elapsedMs(startNanos);
             if (response == null) {
@@ -199,6 +200,13 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
 
     private String headerValue(String value) {
         return value == null ? "" : value;
+    }
+
+    private String decodeResponseBody(byte[] responseBodyBytes) {
+        if (responseBodyBytes == null || responseBodyBytes.length == 0) {
+            return null;
+        }
+        return new String(responseBodyBytes, StandardCharsets.UTF_8);
     }
 
     private YunkaGatewayResponse parseResponse(String responseBody) {
