@@ -17,7 +17,10 @@ export YUNKA_GATEWAY_PATH="${YUNKA_GATEWAY_PATH:-/api/gateway/proxy}"
 export QW_MODE="${QW_MODE:-MOCK}"
 export QW_ENABLED="${QW_ENABLED:-true}"
 export AUTH_COOKIE_SECURE="${AUTH_COOKIE_SECURE:-true}"
+# 仅用于 SSO / /api/users/me 这类 ABS 自身直连 auth 边界，不属于今天 Yunka 主链默认下游。
 export TECH_PLATFORM_BASE_URL="${TECH_PLATFORM_BASE_URL:-http://127.0.0.1:18080}"
+export TECH_PLATFORM_API_ENABLED="${TECH_PLATFORM_API_ENABLED:-false}"
+export TECH_PLATFORM_API_MODE="${TECH_PLATFORM_API_MODE:-MOCK}"
 
 require_command() {
   local command_name="$1"
@@ -106,4 +109,7 @@ port=$SERVER_PORT
 yunka_mode=$YUNKA_MODE
 yunka_base_url=$YUNKA_BASE_URL
 qw_mode=$QW_MODE
+tech_platform_auth_base_url=$TECH_PLATFORM_BASE_URL
+tech_platform_api_enabled=$TECH_PLATFORM_API_ENABLED
+tech_platform_api_mode=$TECH_PLATFORM_API_MODE
 EOF
