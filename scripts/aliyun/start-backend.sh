@@ -58,8 +58,8 @@ require_env MYSQL_PASSWORD
 require_env AUTH_JWT_SECRET
 require_env NEXUSFIN_APP_SECRET
 require_env YUNKA_BASE_URL
-require_env YUNKA_CHANNEL_CODE
-require_env YUNKA_SIGNATURE
+require_env YUNKA_APP_ID
+require_env YUNKA_APP_SECRET
 
 mkdir -p "$RUNTIME_DIR"
 
@@ -74,6 +74,7 @@ log=$LOG_FILE
 port=$SERVER_PORT
 yunka_mode=$YUNKA_MODE
 yunka_base_url=$YUNKA_BASE_URL
+yunka_app_id=$YUNKA_APP_ID
 qw_mode=$QW_MODE
 tech_platform_auth_base_url=$TECH_PLATFORM_BASE_URL
 tech_platform_api_enabled=$TECH_PLATFORM_API_ENABLED
@@ -127,6 +128,7 @@ log=$LOG_FILE
 port=$SERVER_PORT
 yunka_mode=$YUNKA_MODE
 yunka_base_url=$YUNKA_BASE_URL
+yunka_app_id=$YUNKA_APP_ID
 qw_mode=$QW_MODE
 tech_platform_auth_base_url=$TECH_PLATFORM_BASE_URL
 tech_platform_api_enabled=$TECH_PLATFORM_API_ENABLED
@@ -139,6 +141,7 @@ log=$LOG_FILE
 port=$SERVER_PORT
 yunka_mode=$YUNKA_MODE
 yunka_base_url=$YUNKA_BASE_URL
+yunka_app_id=$YUNKA_APP_ID
 qw_mode=$QW_MODE
 tech_platform_auth_base_url=$TECH_PLATFORM_BASE_URL
 tech_platform_api_enabled=$TECH_PLATFORM_API_ENABLED

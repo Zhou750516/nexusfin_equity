@@ -3,6 +3,10 @@ package com.nexusfin.equity.thirdparty.yunka;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.util.TraceIdUtil;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +27,9 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 @ExtendWith(OutputCaptureExtension.class)
 class RestYunkaGatewayClientTest {
+
+    private static final String TEST_APP_ID = "ABS-YUNKA-TEST";
+    private static final String TEST_APP_SECRET = "yunka-test-secret";
 
     @AfterEach
     void tearDown() {
@@ -51,17 +58,25 @@ class RestYunkaGatewayClientTest {
     @Test
     void shouldLogBeginAndSuccessWithTraceableGatewayFields(CapturedOutput output) {
         TraceIdUtil.bindTraceId("TRACE-REQ-001");
+        String timestamp = "1746955200123";
+        String nonce = "noncefixed001";
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
         server.expect(requestTo("http://127.0.0.1:18081/api/gateway/proxy"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(request -> {
                     assertThat(request.getHeaders().getFirst("X-Trace-Id")).isEqualTo("TRACE-REQ-001");
+                    assertThat(request.getHeaders().getFirst("AppID")).isEqualTo(TEST_APP_ID);
+                    assertThat(request.getHeaders().getFirst("Timestamp")).isEqualTo(timestamp);
+                    assertThat(request.getHeaders().getFirst("Nonce")).isEqualTo(nonce);
+                    assertThat(request.getHeaders().getFirst("Signature")).isEqualTo(
+                            sign("{}", "REQ-001", timestamp, TEST_APP_SECRET)
+                    );
                     assertThat(request.getHeaders().getFirst("X-Request-Id")).isEqualTo("REQ-001");
                     assertThat(request.getHeaders().containsKey("X-Biz-Order-No")).isFalse();
-                    assertThat(request.getHeaders().getFirst("X-Channel-Code")).isEqualTo("ABS");
-                    assertThat(request.getHeaders().getFirst("X-Signature")).isEqualTo("abs-signature");
-                    assertThat(request.getHeaders().getFirst("X-Timestamp")).isNotBlank();
+                    assertThat(request.getHeaders().containsKey("X-Channel-Code")).isFalse();
+                    assertThat(request.getHeaders().containsKey("X-Signature")).isFalse();
+                    assertThat(request.getHeaders().containsKey("X-Timestamp")).isFalse();
                     assertThat(((MockClientHttpRequest) request).getBodyAsString())
                             .contains("\"requestId\":\"REQ-001\"")
                             .contains("\"path\":\"/loan/apply\"")
@@ -90,7 +105,9 @@ class RestYunkaGatewayClientTest {
                 .build();
         RestYunkaGatewayClient client = new RestYunkaGatewayClient(
                 yunkaProperties("REST", "http://127.0.0.1:18081"),
-                restClient
+                restClient,
+                timestamp::toString,
+                () -> nonce
         );
 
         YunkaGatewayClient.YunkaGatewayResponse response = client.proxy(new YunkaGatewayClient.YunkaGatewayRequest(
@@ -108,6 +125,9 @@ class RestYunkaGatewayClientTest {
         assertThat(output).contains("yunka gateway request success");
         assertThat(output).contains("requestId=REQ-001");
         assertThat(output).contains("path=/loan/apply");
+        assertThat(output).contains("timestamp=" + timestamp);
+        assertThat(output).contains("nonce=" + nonce);
+        assertThat(output).contains("yunka_app_id=" + TEST_APP_ID);
         assertThat(output).doesNotContain("X-Biz-Order-No");
         assertThat(output).contains("elapsedMs=");
         assertThat(output).contains("requestBodyJson=");
@@ -157,8 +177,19 @@ class RestYunkaGatewayClientTest {
                         "/credit/image/query",
                         "/benefit/sync"
                 ),
-                "ABS",
-                "abs-signature"
+                TEST_APP_ID,
+                TEST_APP_SECRET
         );
+    }
+
+    private String sign(String dataJson, String requestId, String timestamp, String secret) {
+        try {
+            String payload = "data=" + dataJson + "&requestId=" + requestId + "&timestamp=" + timestamp;
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return Base64.getEncoder().encodeToString(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 }

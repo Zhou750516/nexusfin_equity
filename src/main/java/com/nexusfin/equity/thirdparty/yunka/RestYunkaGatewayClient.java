@@ -9,10 +9,13 @@ import com.nexusfin.equity.exception.ErrorCodes;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.util.TraceIdUtil;
 import com.nexusfin.equity.util.UpstreamTimeoutDetector;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Locale;
+import java.util.UUID;
+import java.util.function.Supplier;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,16 +29,18 @@ import org.springframework.web.client.RestClientException;
 public class RestYunkaGatewayClient implements YunkaGatewayClient {
 
     private static final Logger log = LoggerFactory.getLogger(RestYunkaGatewayClient.class);
+    private static final String APP_ID_HEADER = "AppID";
     private static final String REQUEST_ID_HEADER = "X-Request-Id";
-    private static final String TIMESTAMP_HEADER = "X-Timestamp";
-    private static final String CHANNEL_CODE_HEADER = "X-Channel-Code";
-    private static final String SIGNATURE_HEADER = "X-Signature";
-    private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+    private static final String TIMESTAMP_HEADER = "Timestamp";
+    private static final String NONCE_HEADER = "Nonce";
+    private static final String SIGNATURE_HEADER = "Signature";
 
     private final YunkaProperties yunkaProperties;
     private final YunkaMode mode;
     private final RestClient restClient;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
+    private final Supplier<String> timestampSupplier;
+    private final Supplier<String> nonceSupplier;
 
     @Autowired
     public RestYunkaGatewayClient(
@@ -47,19 +52,41 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                 restClientBuilder
                         .baseUrl(yunkaProperties.baseUrl())
                         .requestFactory(requestFactory(yunkaProperties))
-                        .build()
+                        .build(),
+                new ObjectMapper(),
+                () -> Long.toString(System.currentTimeMillis()),
+                () -> UUID.randomUUID().toString().replace("-", "")
         );
     }
 
-    RestYunkaGatewayClient(YunkaProperties yunkaProperties, RestClient restClient) {
+    RestYunkaGatewayClient(
+            YunkaProperties yunkaProperties,
+            RestClient restClient,
+            Supplier<String> timestampSupplier,
+            Supplier<String> nonceSupplier
+    ) {
+        this(yunkaProperties, restClient, new ObjectMapper(), timestampSupplier, nonceSupplier);
+    }
+
+    RestYunkaGatewayClient(
+            YunkaProperties yunkaProperties,
+            RestClient restClient,
+            ObjectMapper objectMapper,
+            Supplier<String> timestampSupplier,
+            Supplier<String> nonceSupplier
+    ) {
         this.yunkaProperties = yunkaProperties;
         this.mode = YunkaMode.from(yunkaProperties.mode());
         this.restClient = restClient;
-        log.info("yunka gateway client initialized enabled={} mode={} baseUrl={} gatewayPath={}",
+        this.objectMapper = objectMapper;
+        this.timestampSupplier = timestampSupplier;
+        this.nonceSupplier = nonceSupplier;
+        log.info("yunka gateway client initialized enabled={} mode={} baseUrl={} gatewayPath={} yunka_app_id={}",
                 yunkaProperties.enabled(),
                 mode,
                 yunkaProperties.baseUrl(),
-                yunkaProperties.gatewayPath());
+                yunkaProperties.gatewayPath(),
+                maskAppId(yunkaProperties.appId()));
     }
 
     @Override
@@ -74,24 +101,32 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
         }
         long startNanos = System.nanoTime();
         String traceId = TraceIdUtil.getTraceId();
-        String timestamp = currentTimestamp();
-        log.info("traceId={} requestId={} path={} requestBodyJson={} yunka gateway request begin",
+        String timestamp = timestampSupplier.get();
+        String nonce = nonceSupplier.get();
+        String dataJson = toJson(request.data());
+        String requestBodyJson = toJson(request);
+        String signature = sign(dataJson, request.requestId(), timestamp);
+        log.info("traceId={} requestId={} path={} timestamp={} nonce={} requestBodyJson={} yunka gateway request begin",
                 traceId,
                 request.requestId(),
                 request.path(),
-                toJson(request));
+                timestamp,
+                nonce,
+                requestBodyJson);
         try {
-            YunkaGatewayResponse response = restClient.post()
+            String responseBody = restClient.post()
                     .uri(yunkaProperties.gatewayPath())
                     .contentType(MediaType.APPLICATION_JSON)
                     .header(TraceIdUtil.TRACE_ID_HEADER, traceId)
+                    .header(APP_ID_HEADER, headerValue(yunkaProperties.appId()))
                     .header(REQUEST_ID_HEADER, headerValue(request.requestId()))
                     .header(TIMESTAMP_HEADER, timestamp)
-                    .header(CHANNEL_CODE_HEADER, headerValue(yunkaProperties.channelCode()))
-                    .header(SIGNATURE_HEADER, headerValue(yunkaProperties.signature()))
-                    .body(request)
+                    .header(NONCE_HEADER, nonce)
+                    .header(SIGNATURE_HEADER, signature)
+                    .body(requestBodyJson)
                     .retrieve()
-                    .body(YunkaGatewayResponse.class);
+                    .body(String.class);
+            YunkaGatewayResponse response = parseResponse(responseBody);
             long elapsedMs = elapsedMs(startNanos);
             if (response == null) {
                 log.warn("traceId={} requestId={} path={} elapsedMs={} errorNo={} errorMsg={} responseBodyJson={}",
@@ -166,8 +201,33 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
         return value == null ? "" : value;
     }
 
-    private String currentTimestamp() {
-        return OffsetDateTime.now(ZoneOffset.ofHours(8)).format(TIMESTAMP_FORMATTER);
+    private YunkaGatewayResponse parseResponse(String responseBody) {
+        if (responseBody == null || responseBody.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(responseBody, YunkaGatewayResponse.class);
+        } catch (JsonProcessingException exception) {
+            throw new BizException(ErrorCodes.YUNKA_UPSTREAM_FAILED, "Failed to parse Yunka gateway response");
+        }
+    }
+
+    private String sign(String dataJson, String requestId, String timestamp) {
+        try {
+            String payload = "data=" + dataJson + "&requestId=" + requestId + "&timestamp=" + timestamp;
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(yunkaProperties.appSecret().getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return Base64.getEncoder().encodeToString(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception exception) {
+            throw new BizException(ErrorCodes.YUNKA_UPSTREAM_FAILED, "Failed to build Yunka signature");
+        }
+    }
+
+    private static String maskAppId(String appId) {
+        if (appId == null || appId.isBlank()) {
+            return "-";
+        }
+        return appId;
     }
 
     private static SimpleClientHttpRequestFactory requestFactory(YunkaProperties yunkaProperties) {

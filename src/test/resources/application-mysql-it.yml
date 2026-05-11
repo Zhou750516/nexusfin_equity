@@ -10,6 +10,31 @@ spring:
 
 nexusfin:
   third-party:
+    yunka:
+      enabled: true
+      mode: MOCK
+      base-url: https://yunka.test
+      gateway-path: /api/gateway/proxy
+      connect-timeout-ms: 2000
+      read-timeout-ms: 3000
+      app-id: test-yunka-app-id
+      app-secret: test-yunka-app-secret
+      paths:
+        loan-calculate: /loan/trial
+        loan-query: /loan/query
+        loan-apply: /loan/apply
+        repay-trial: /repay/trial
+        repay-apply: /repay/apply
+        repay-query: /repay/query
+        protocol-query: /protocol/queryProtocolAggregationLink
+        user-token: /user/token
+        user-query: /user/query
+        loan-repay-plan: /loan/repayPlan
+        card-sms-send: /card/smsSend
+        card-sms-confirm: /card/smsConfirm
+        card-user-cards: /card/userCards
+        credit-image-query: /credit/image/query
+        benefit-sync: /benefit/sync
     tech-platform:
       enabled: true
       mode: MOCK

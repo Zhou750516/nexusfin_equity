@@ -388,8 +388,8 @@ class YunkaLoanApplyCompensationExecutorTest {
                         "/credit/image/query",
                         "/benefit/sync"
                 ),
-                "ABS",
-                "abs-signature"
+                "ABS-YUNKA-TEST",
+                "yunka-test-secret"
         );
     }
 }
