@@ -11,8 +11,8 @@ public record YunkaProperties(
         int connectTimeoutMs,
         int readTimeoutMs,
         Paths paths,
-        String appId,
-        String appSecret
+        String channelCode,
+        String signSecret
 ) {
 
     public record Paths(
