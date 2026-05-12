@@ -125,8 +125,11 @@ class RestYunkaGatewayClientTest {
         assertThat(output).contains("yunka gateway request success");
         assertThat(output).contains("requestId=REQ-001");
         assertThat(output).contains("path=/loan/apply");
+        assertThat(output).contains("appId=" + TEST_APP_ID);
+        assertThat(output).contains("xRequestId=REQ-001");
         assertThat(output).contains("timestamp=" + timestamp);
         assertThat(output).contains("nonce=" + nonce);
+        assertThat(output).contains("signaturePrefix=");
         assertThat(output).contains("yunka_app_id=" + TEST_APP_ID);
         assertThat(output).doesNotContain("X-Biz-Order-No");
         assertThat(output).contains("elapsedMs=");
@@ -134,6 +137,7 @@ class RestYunkaGatewayClientTest {
         assertThat(output).contains("\"requestId\":\"REQ-001\"");
         assertThat(output).contains("\"path\":\"/loan/apply\"");
         assertThat(output).doesNotContain("\"bizOrderNo\"");
+        assertThat(output).doesNotContain(sign("{}", "REQ-001", timestamp, TEST_APP_SECRET));
         assertThat(output).contains("responseBodyJson=");
         assertThat(output).contains("\"code\":0");
         assertThat(output).contains("\"message\":\"OK\"");
@@ -194,6 +198,13 @@ class RestYunkaGatewayClientTest {
         ));
 
         assertThat(response.code()).isEqualTo(1002);
+        assertThat(output).contains("requestId=REQ-UTF8-001");
+        assertThat(output).contains("path=/user/token");
+        assertThat(output).contains("appId=" + TEST_APP_ID);
+        assertThat(output).contains("xRequestId=REQ-UTF8-001");
+        assertThat(output).contains("timestamp=1746955200999");
+        assertThat(output).contains("nonce=nonceutf8001");
+        assertThat(output).contains("signaturePrefix=");
         assertThat(output).contains("\"providerMessage\":\"签名IP未授权\"");
         assertThat(output).doesNotContain("???IP??????");
         server.verify();
