@@ -30,6 +30,7 @@ interface CalculatorPageContentProps {
   partnersDialogOpen: boolean;
   onOpenPartnersDialog: (open: boolean) => void;
   onOpenAmountDrawer: () => void;
+  isAmountEditDisabled: boolean;
   onOpenPurposeDrawer: () => void;
   onOpenProtocolDrawer: () => void;
   onRetryCalculation: () => void;
@@ -55,6 +56,7 @@ export default function CalculatorPageContent({
   partnersDialogOpen,
   onOpenPartnersDialog,
   onOpenAmountDrawer,
+  isAmountEditDisabled,
   onOpenPurposeDrawer,
   onOpenProtocolDrawer,
   onRetryCalculation,
@@ -69,6 +71,7 @@ export default function CalculatorPageContent({
           locale={locale}
           amountRangeLabel={amountRangeLabel}
           onEdit={onOpenAmountDrawer}
+          isAmountEditDisabled={isAmountEditDisabled}
           t={t}
         />
         <CalculatorTermSection

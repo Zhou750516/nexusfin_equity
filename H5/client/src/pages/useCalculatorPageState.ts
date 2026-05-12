@@ -50,6 +50,7 @@ export function useCalculatorPageState() {
     : t("calculator.amountRange");
   const drawerStep = config?.amountRange.step ?? 100;
   const isSubmitDisabled = !calculateResult || isSubmitting || isCalculating;
+  const isAmountEditDisabled = true;
 
   const drawerQuickActions = useMemo(() => {
     if (!config) {
@@ -187,6 +188,7 @@ export function useCalculatorPageState() {
     receivingAccountLabel,
     amountRangeLabel,
     drawerStep,
+    isAmountEditDisabled,
     isSubmitDisabled,
     drawerQuickActions,
     setSelectedTerm,
@@ -199,6 +201,12 @@ export function useCalculatorPageState() {
     loadConfig,
     loadCalculation,
     handleSubmit,
+    openAmountDrawer() {
+      if (isAmountEditDisabled) {
+        return;
+      }
+      setDrawerOpen(true);
+    },
     confirmDraftAmount() {
       if (!config) {
         return;

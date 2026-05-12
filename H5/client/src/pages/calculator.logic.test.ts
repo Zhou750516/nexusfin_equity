@@ -1,6 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import CalculatorHero from "@/components/calculator/CalculatorHero";
 import { buildApplyLoanPayload } from "./calculator.logic";
 import { useCalculatorPageState } from "./useCalculatorPageState";
 
@@ -60,6 +61,9 @@ describe("calculator apply payload", () => {
     expect(hookState).not.toBeNull();
     expect("setViewedProtocols" in hookState!).toBe(false);
     expect("setPurposeKey" in hookState!).toBe(false);
+    expect(hookState!.isAmountEditDisabled).toBe(true);
+    hookState!.openAmountDrawer();
+    expect(hookState!.drawerOpen).toBe(false);
   });
 
   it("maps selected purpose key into apply payload purpose", () => {
@@ -78,5 +82,22 @@ describe("calculator apply payload", () => {
       agreedProtocols: ["user_agreement", "loan_agreement"],
       purpose: "rent",
     });
+  });
+
+  it("renders edit amount entry as disabled while keeping it visible", () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(CalculatorHero, {
+        amount: 3000,
+        locale: "zh-CN",
+        amountRangeLabel: "¥100 - ¥5000",
+        onEdit: vi.fn(),
+        isAmountEditDisabled: true,
+        t: (key: string) => key,
+      }),
+    );
+
+    expect(markup).toContain("calculator.editAmount");
+    expect(markup).toContain("disabled");
+    expect(markup).toContain("cursor-not-allowed");
   });
 });

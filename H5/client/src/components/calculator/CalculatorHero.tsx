@@ -8,6 +8,7 @@ interface CalculatorHeroProps {
   locale: Locale;
   amountRangeLabel: string;
   onEdit: () => void;
+  isAmountEditDisabled: boolean;
   t: Translate;
 }
 
@@ -16,6 +17,7 @@ export default function CalculatorHero({
   locale,
   amountRangeLabel,
   onEdit,
+  isAmountEditDisabled,
   t,
 }: CalculatorHeroProps) {
   return (
@@ -31,7 +33,16 @@ export default function CalculatorHero({
           <span className="text-[64px] font-bold leading-[64px] tracking-[0.2px] text-white">
             {formatCurrency(amount, locale, { includeSymbol: false })}
           </span>
-          <button className="mb-1 ml-auto text-[13px] tracking-tight text-white/60" onClick={onEdit}>
+          <button
+            className={`mb-1 ml-auto text-[13px] tracking-tight transition-colors ${
+              isAmountEditDisabled
+                ? "cursor-not-allowed text-white/35"
+                : "text-white/60"
+            }`}
+            onClick={onEdit}
+            disabled={isAmountEditDisabled}
+            aria-disabled={isAmountEditDisabled}
+          >
             {t("calculator.editAmount")}
           </button>
         </div>

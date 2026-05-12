@@ -37,6 +37,7 @@ export default function CalculatorPage() {
     receivingAccountLabel,
     amountRangeLabel,
     drawerStep,
+    isAmountEditDisabled,
     isSubmitDisabled,
     drawerQuickActions,
     setSelectedTerm,
@@ -49,6 +50,7 @@ export default function CalculatorPage() {
     loadConfig,
     loadCalculation,
     handleSubmit,
+    openAmountDrawer,
     confirmDraftAmount,
     selectPurpose,
     viewProtocol,
@@ -98,7 +100,8 @@ export default function CalculatorPage() {
         purposeLabel={t(purposeKey)}
         partnersDialogOpen={partnersDialogOpen}
         onOpenPartnersDialog={setPartnersDialogOpen}
-        onOpenAmountDrawer={() => setDrawerOpen(true)}
+        onOpenAmountDrawer={openAmountDrawer}
+        isAmountEditDisabled={isAmountEditDisabled}
         onOpenPurposeDrawer={() => setPurposeDrawerOpen(true)}
         onOpenProtocolDrawer={() => setProtocolDrawerOpen(true)}
         onRetryCalculation={() => void loadCalculation(amount, selectedTerm)}
@@ -123,8 +126,8 @@ export default function CalculatorPage() {
       />
 
       <CalculatorAmountDrawer
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
+        open={isAmountEditDisabled ? false : drawerOpen}
+        onOpenChange={isAmountEditDisabled ? () => undefined : setDrawerOpen}
         amountRangeLabel={amountRangeLabel}
         drawerStep={drawerStep}
         amountRangeMin={config?.amountRange.min}
