@@ -11,7 +11,9 @@ import com.nexusfin.equity.util.TraceIdUtil;
 import com.nexusfin.equity.util.UpstreamTimeoutDetector;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.function.Supplier;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -105,8 +107,9 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
         String xChannelCode = headerValue(yunkaProperties.channelCode());
         String appId = headerValue(yunkaProperties.appId());
         String signaturePrefix = maskSignature(signature);
+        String headerJson = headerJson(traceId, xRequestId, xTimestamp, xChannelCode, appId, signaturePrefix);
         // X-Request-Id is the idempotency key. Same-business retries should reuse it instead of generating a new value.
-        log.info("traceId={} requestId={} path={} appId={} xTimestamp={} xChannelCode={} xRequestId={} signaturePrefix={} requestBodyJson={} yunka gateway request begin",
+        log.info("traceId={} requestId={} path={} appId={} xTimestamp={} xChannelCode={} xRequestId={} signaturePrefix={} headerJson={} requestBodyJson={} yunka gateway request begin",
                 traceId,
                 request.requestId(),
                 request.path(),
@@ -115,6 +118,7 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                 xChannelCode,
                 xRequestId,
                 signaturePrefix,
+                headerJson,
                 requestBodyJson);
         try {
             byte[] responseBodyBytes = restClient.post()
@@ -133,7 +137,7 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
             YunkaGatewayResponse response = parseResponse(responseBody);
             long elapsedMs = elapsedMs(startNanos);
             if (response == null) {
-                log.warn("traceId={} requestId={} path={} appId={} xTimestamp={} xChannelCode={} xRequestId={} elapsedMs={} errorNo={} errorMsg={} responseBodyJson={}",
+                log.warn("traceId={} requestId={} path={} appId={} xTimestamp={} xChannelCode={} xRequestId={} elapsedMs={} errorNo={} errorMsg={} headerJson={} requestBodyJson={} responseBodyJson={}",
                         traceId,
                         request.requestId(),
                         request.path(),
@@ -144,11 +148,14 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                         elapsedMs,
                         ErrorCodes.YUNKA_RESPONSE_EMPTY,
                         "Yunka gateway returned empty response",
+                        headerJson,
+                        requestBodyJson,
                         "null");
                 return null;
             }
+            String responseBodyJson = toJson(response);
             if (response.code() == 0) {
-                log.info("traceId={} requestId={} path={} appId={} xTimestamp={} xChannelCode={} xRequestId={} elapsedMs={} yunkaCode={} responseBodyJson={} yunka gateway request success",
+                log.info("traceId={} requestId={} path={} appId={} xTimestamp={} xChannelCode={} xRequestId={} elapsedMs={} yunkaCode={} headerJson={} requestBodyJson={} responseBodyJson={} yunka gateway request success",
                         traceId,
                         request.requestId(),
                         request.path(),
@@ -158,9 +165,11 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                         xRequestId,
                         elapsedMs,
                         response.code(),
-                        toJson(response));
+                        headerJson,
+                        requestBodyJson,
+                        responseBodyJson);
             } else {
-                log.warn("traceId={} requestId={} path={} appId={} xTimestamp={} xChannelCode={} xRequestId={} elapsedMs={} yunkaCode={} errorNo={} errorMsg={} responseBodyJson={}",
+                log.warn("traceId={} requestId={} path={} appId={} xTimestamp={} xChannelCode={} xRequestId={} elapsedMs={} yunkaCode={} errorNo={} errorMsg={} headerJson={} requestBodyJson={} responseBodyJson={}",
                         traceId,
                         request.requestId(),
                         request.path(),
@@ -172,13 +181,15 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                         response.code(),
                         ErrorCodes.YUNKA_UPSTREAM_REJECTED,
                         response.message(),
-                        toJson(response));
+                        headerJson,
+                        requestBodyJson,
+                        responseBodyJson);
             }
             return response;
         } catch (RestClientException exception) {
             long elapsedMs = elapsedMs(startNanos);
             if (UpstreamTimeoutDetector.isTimeout(exception)) {
-                log.error("traceId={} requestId={} path={} appId={} xTimestamp={} xChannelCode={} xRequestId={} elapsedMs={} errorNo={} errorMsg={}",
+                log.error("traceId={} requestId={} path={} appId={} xTimestamp={} xChannelCode={} xRequestId={} elapsedMs={} errorNo={} errorMsg={} headerJson={} requestBodyJson={} responseBodyJson={}",
                         traceId,
                         request.requestId(),
                         request.path(),
@@ -188,10 +199,13 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                         xRequestId,
                         elapsedMs,
                         ErrorCodes.YUNKA_UPSTREAM_TIMEOUT,
-                        "Yunka gateway timeout");
+                        "Yunka gateway timeout",
+                        headerJson,
+                        requestBodyJson,
+                        "null");
                 throw new UpstreamTimeoutException("Yunka gateway timeout", exception);
             }
-            log.error("traceId={} requestId={} path={} appId={} xTimestamp={} xChannelCode={} xRequestId={} elapsedMs={} errorNo={} errorMsg={}",
+            log.error("traceId={} requestId={} path={} appId={} xTimestamp={} xChannelCode={} xRequestId={} elapsedMs={} errorNo={} errorMsg={} headerJson={} requestBodyJson={} responseBodyJson={}",
                     traceId,
                     request.requestId(),
                     request.path(),
@@ -201,7 +215,10 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                     xRequestId,
                     elapsedMs,
                     ErrorCodes.YUNKA_UPSTREAM_FAILED,
-                    exception.getMessage());
+                    exception.getMessage(),
+                    headerJson,
+                    requestBodyJson,
+                    "null");
             throw new BizException(ErrorCodes.YUNKA_UPSTREAM_FAILED, "Failed to call Yunka gateway");
         }
     }
@@ -223,6 +240,24 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
 
     private String headerValue(String value) {
         return value == null ? "" : value;
+    }
+
+    private String headerJson(
+            String traceId,
+            String xRequestId,
+            String xTimestamp,
+            String xChannelCode,
+            String appId,
+            String signaturePrefix
+    ) {
+        Map<String, String> headers = new LinkedHashMap<>();
+        headers.put(TraceIdUtil.TRACE_ID_HEADER, traceId);
+        headers.put(REQUEST_ID_HEADER, xRequestId);
+        headers.put(TIMESTAMP_HEADER, xTimestamp);
+        headers.put(CHANNEL_CODE_HEADER, xChannelCode);
+        headers.put(APP_ID_HEADER, appId);
+        headers.put("signaturePrefix", signaturePrefix);
+        return toJson(headers);
     }
 
     private String decodeResponseBody(byte[] responseBodyBytes) {

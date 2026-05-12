@@ -129,6 +129,15 @@ class RestYunkaGatewayClientTest {
         assertThat(output).contains("xRequestId=REQ-001");
         assertThat(output).contains("xTimestamp=" + timestamp);
         assertThat(output).contains("signaturePrefix=");
+        assertThat(output).contains("headerJson=");
+        assertThat(output).contains("\"X-Trace-Id\":\"TRACE-REQ-001\"");
+        assertThat(output).contains("\"X-Request-Id\":\"REQ-001\"");
+        assertThat(output).contains("\"X-Timestamp\":\"" + timestamp + "\"");
+        assertThat(output).contains("\"X-Channel-Code\":\"" + TEST_CHANNEL_CODE + "\"");
+        assertThat(output).contains("\"AppID\":\"" + TEST_APP_ID + "\"");
+        assertThat(output).contains("\"signaturePrefix\":");
+        assertThat(output).doesNotContain("\"X-Signature\"");
+        assertThat(output).doesNotContain(TEST_APP_SECRET);
         assertThat(output).contains("yunka_app_id=" + TEST_APP_ID);
         assertThat(output).contains("yunka_channel_code=" + TEST_CHANNEL_CODE);
         assertThat(output).doesNotContain("X-Biz-Order-No");
@@ -204,7 +213,20 @@ class RestYunkaGatewayClientTest {
         assertThat(output).contains("xRequestId=REQ-UTF8-001");
         assertThat(output).contains("xTimestamp=1746955200999");
         assertThat(output).contains("signaturePrefix=");
+        assertThat(output).contains("headerJson=");
+        assertThat(output).contains("\"X-Trace-Id\":\"TRACE-UTF8-001\"");
+        assertThat(output).contains("\"X-Request-Id\":\"REQ-UTF8-001\"");
+        assertThat(output).contains("\"X-Timestamp\":\"1746955200999\"");
+        assertThat(output).contains("\"X-Channel-Code\":\"" + TEST_CHANNEL_CODE + "\"");
+        assertThat(output).contains("\"AppID\":\"" + TEST_APP_ID + "\"");
+        assertThat(output).contains("\"signaturePrefix\":");
+        assertThat(output).contains("requestBodyJson=");
+        assertThat(output).contains("\"requestId\":\"REQ-UTF8-001\"");
+        assertThat(output).contains("\"path\":\"/user/token\"");
+        assertThat(output).contains("responseBodyJson=");
         assertThat(output).contains("\"providerMessage\":\"签名IP未授权\"");
+        assertThat(output).doesNotContain("\"X-Signature\"");
+        assertThat(output).doesNotContain(TEST_APP_SECRET);
         assertThat(output).doesNotContain("???IP??????");
         server.verify();
     }
