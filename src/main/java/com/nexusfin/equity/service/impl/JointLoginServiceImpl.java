@@ -21,16 +21,20 @@ import com.nexusfin.equity.util.JwtUtil;
 import com.nexusfin.equity.util.RequestIdUtil;
 import com.nexusfin.equity.util.SensitiveDataCipher;
 import com.nexusfin.equity.util.SensitiveDataUtil;
+import com.nexusfin.equity.util.TraceIdUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class JointLoginServiceImpl implements JointLoginService {
 
+    private static final Logger log = LoggerFactory.getLogger(JointLoginServiceImpl.class);
     private static final Pattern PHONE_PATTERN = Pattern.compile("^1\\d{10}$");
     private static final Pattern ID_CARD_PATTERN = Pattern.compile("^[1-9]\\d{16}[\\dX]$");
 
@@ -75,6 +79,7 @@ public class JointLoginServiceImpl implements JointLoginService {
         String memberId = existingMember != null ? existingMember.getMemberId() : RequestIdUtil.nextId("mem");
         UserQueryResponse userQueryResponse = queryJointUser(requestId, benefitOrderNo, memberId, externalUserId);
         JointIdentity identity = mapToIdentity(tokenResponse, userQueryResponse);
+        logIdCardStatus(requestId, normalizedScene, identity);
         MemberInfo memberInfo = findOrCreateMember(existingMember, memberId, identity);
         ensureChannelBinding(memberInfo, identity.externalUserId(), resolveChannelCode(identity.channelCode()));
         String jwtToken = jwtUtil.generateToken(memberInfo.getMemberId(), identity.externalUserId());
@@ -173,7 +178,7 @@ public class JointLoginServiceImpl implements JointLoginService {
         boolean newMember = memberInfo.getCreatedTs() == null;
         String channelCode = resolveChannelCode(identity.channelCode());
         String phone = normalizePhone(identity.phone(), newMember);
-        String idCard = normalizeIdCard(identity.idCard(), newMember);
+        String idCard = normalizeIdCard(identity.idCard(), false);
         String realName = normalizeRealName(identity.realName(), newMember);
         memberInfo.setTechPlatformUserId(identity.externalUserId());
         memberInfo.setExternalUserId(identity.externalUserId());
@@ -197,18 +202,48 @@ public class JointLoginServiceImpl implements JointLoginService {
     private JointIdentity mapToIdentity(UserTokenResponse tokenResponse, UserQueryResponse userQueryResponse) {
         JsonNode payload = userQueryResponse.payload();
         JsonNode idInfo = payload.path("idInfo");
+        ResolvedIdentityField resolvedIdCard = resolveIdCard(idInfo, payload);
         return new JointIdentity(
                 requiredValue(tokenResponse.cid(), "JOINT_LOGIN_CID_REQUIRED", "Xiaohua cid is required"),
                 firstNonBlank(tokenResponse.phone(), text(payload, "phone"), text(payload.path("basicInfo"), "phone")),
                 firstNonBlank(tokenResponse.name(), text(idInfo, "name"), text(payload, "name")),
-                firstNonBlank(
-                        text(idInfo, "idno"),
-                        text(idInfo, "idCard"),
-                        text(idInfo, "idCardNo"),
-                        text(payload, "idno")
-                ),
+                resolvedIdCard.value(),
+                resolvedIdCard.fieldName(),
                 authProperties.getDefaultChannelCode()
         );
+    }
+
+    private ResolvedIdentityField resolveIdCard(JsonNode idInfo, JsonNode payload) {
+        for (String fieldName : new String[]{"idno", "idCard", "idCardNo"}) {
+            String value = text(idInfo, fieldName);
+            if (value != null && !value.isBlank()) {
+                return new ResolvedIdentityField(value, fieldName);
+            }
+        }
+        for (String fieldName : new String[]{"idno", "idCard", "idCardNo"}) {
+            String value = text(payload, fieldName);
+            if (value != null && !value.isBlank()) {
+                return new ResolvedIdentityField(value, fieldName);
+            }
+        }
+        return new ResolvedIdentityField(null, null);
+    }
+
+    private void logIdCardStatus(String requestId, String scene, JointIdentity identity) {
+        if (identity.idCard() == null || identity.idCard().isBlank()) {
+            log.warn("traceId={} requestId={} externalUserId={} scene={} temporarily allowing joint login without id card",
+                    TraceIdUtil.getTraceId(),
+                    requestId,
+                    identity.externalUserId(),
+                    scene);
+            return;
+        }
+        log.info("traceId={} requestId={} externalUserId={} scene={} idCardField={} joint login id card resolved",
+                TraceIdUtil.getTraceId(),
+                requestId,
+                identity.externalUserId(),
+                scene,
+                identity.idCardField());
     }
 
     private void ensureChannelBinding(MemberInfo memberInfo, String externalUserId, String channelCode) {
@@ -306,7 +341,14 @@ public class JointLoginServiceImpl implements JointLoginService {
             String phone,
             String realName,
             String idCard,
+            String idCardField,
             String channelCode
+    ) {
+    }
+
+    private record ResolvedIdentityField(
+            String value,
+            String fieldName
     ) {
     }
 }

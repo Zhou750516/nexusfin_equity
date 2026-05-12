@@ -21,6 +21,8 @@ import com.nexusfin.equity.util.SensitiveDataCipher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -33,7 +35,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class JointLoginServiceTest {
 
     private final SensitiveDataCipher sensitiveDataCipher = new SensitiveDataCipher(new CryptoProperties());
@@ -49,7 +51,7 @@ class JointLoginServiceTest {
     private MemberChannelRepository memberChannelRepository;
 
     @Test
-    void shouldCreateJwtAndResolveLandingPageForPushSceneWithoutBenefitOrder() throws Exception {
+    void shouldCreateJwtAndResolveLandingPageForPushSceneWithoutBenefitOrder(CapturedOutput output) throws Exception {
         AuthProperties authProperties = authProperties();
         JointLoginServiceImpl jointLoginService = new JointLoginServiceImpl(
                 xiaohuaGatewayService,
@@ -94,12 +96,68 @@ class JointLoginServiceTest {
                         && "xh-cid-001".equals(userQueryRequest.cid())));
         assertThat(memberCaptor.getValue().getExternalUserId()).isEqualTo("xh-cid-001");
         assertThat(memberCaptor.getValue().getMobileEncrypted()).isNotEqualTo("13800138000");
+        assertThat(sensitiveDataCipher.decrypt(memberCaptor.getValue().getIdCardEncrypted()))
+                .isEqualTo("310101199001011111");
         assertThat(result.jwtToken()).isNotBlank();
         assertThat(result.scene()).isEqualTo("push");
         assertThat(result.targetPage()).isEqualTo("landing");
         assertThat(result.benefitOrderNo()).isNull();
         assertThat(result.externalUserId()).isEqualTo("xh-cid-001");
         assertThat(result.localUserReady()).isTrue();
+        assertThat(output)
+                .contains("scene=push")
+                .contains("requestId=")
+                .contains("externalUserId=xh-cid-001")
+                .contains("idCardField=idno");
+    }
+
+    @Test
+    void shouldAllowPushJointLoginWhenIdCardIsTemporarilyMissing(CapturedOutput output) throws Exception {
+        AuthProperties authProperties = authProperties();
+        JointLoginServiceImpl jointLoginService = new JointLoginServiceImpl(
+                xiaohuaGatewayService,
+                memberInfoRepository,
+                memberChannelRepository,
+                new JwtUtil(authProperties),
+                authProperties,
+                sensitiveDataCipher,
+                new JointLoginTargetPageResolver()
+        );
+        JointLoginRequest request = new JointLoginRequest(
+                "joint-token-001-missing-id",
+                "push",
+                null,
+                null,
+                "HUXUAN_CARD"
+        );
+
+        when(xiaohuaGatewayService.validateUserToken(any(), any(), any()))
+                .thenReturn(new UserTokenResponse("xh-cid-002", "李四", "13800138001"));
+        when(xiaohuaGatewayService.queryUser(any(), any(), any()))
+                .thenReturn(new UserQueryResponse(objectMapper.readTree("""
+                        {
+                          "idInfo": {
+                            "name": "李四"
+                          }
+                        }
+                        """)));
+        when(memberInfoRepository.selectByExternalUserId("xh-cid-002")).thenReturn(null);
+        when(memberChannelRepository.selectByChannelAndExternalUserId("KJ", "xh-cid-002")).thenReturn(null);
+
+        JointLoginService.JointLoginResult result = jointLoginService.login(request);
+
+        ArgumentCaptor<MemberInfo> memberCaptor = ArgumentCaptor.forClass(MemberInfo.class);
+        verify(memberInfoRepository).insert(memberCaptor.capture());
+        assertThat(memberCaptor.getValue().getIdCardEncrypted()).isNull();
+        assertThat(memberCaptor.getValue().getIdCardHash()).isNull();
+        assertThat(result.scene()).isEqualTo("push");
+        assertThat(result.targetPage()).isEqualTo("landing");
+        assertThat(result.externalUserId()).isEqualTo("xh-cid-002");
+        assertThat(output)
+                .contains("scene=push")
+                .contains("requestId=")
+                .contains("externalUserId=xh-cid-002")
+                .contains("temporarily allowing joint login without id card");
     }
 
     @Test
