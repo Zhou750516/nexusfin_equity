@@ -11,6 +11,7 @@ import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.service.impl.YunkaLoanApplyCompensationExecutor;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -265,6 +266,8 @@ class YunkaLoanApplyCompensationExecutorTest {
         verify(yunkaGatewayClient, org.mockito.Mockito.times(2)).proxy(requestCaptor.capture());
         assertThat(requestCaptor.getAllValues().get(0).path()).isEqualTo("/loan/query");
         assertThat(requestCaptor.getAllValues().get(1).path()).isEqualTo("/loan/apply");
+        JsonNode applyPayload = new ObjectMapper().valueToTree(requestCaptor.getAllValues().get(1).data());
+        assertThat(applyPayload.path("loanAmount").decimalValue()).isEqualByComparingTo("3000.00");
     }
 
     @Test
