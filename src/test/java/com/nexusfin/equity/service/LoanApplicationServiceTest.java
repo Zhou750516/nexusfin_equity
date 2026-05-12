@@ -324,6 +324,7 @@ class LoanApplicationServiceTest {
                         "/credit/image/query",
                         "/benefit/sync"
                 ),
+                "ABS",
                 "ABS-YUNKA-TEST",
                 "yunka-test-secret"
         );

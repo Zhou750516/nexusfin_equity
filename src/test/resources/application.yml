@@ -100,7 +100,8 @@ nexusfin:
       connect-timeout-ms: 2000
       read-timeout-ms: 3000
       channel-code: ABS
-      sign-secret: test-yunka-sign-secret
+      app-id: test-yunka-app-id
+      app-secret: test-yunka-app-secret
       paths:
         loan-calculate: /loan/trial
         loan-query: /loan/query

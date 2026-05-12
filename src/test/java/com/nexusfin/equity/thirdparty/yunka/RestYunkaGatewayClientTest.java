@@ -28,8 +28,9 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 @ExtendWith(OutputCaptureExtension.class)
 class RestYunkaGatewayClientTest {
 
+    private static final String TEST_APP_ID = "ABS-YUNKA-TEST";
     private static final String TEST_CHANNEL_CODE = "ABS";
-    private static final String TEST_SIGN_SECRET = "yunka-test-secret";
+    private static final String TEST_APP_SECRET = "yunka-test-secret";
 
     @AfterEach
     void tearDown() {
@@ -65,14 +66,14 @@ class RestYunkaGatewayClientTest {
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(request -> {
                     assertThat(request.getHeaders().getFirst("X-Trace-Id")).isEqualTo("TRACE-REQ-001");
+                    assertThat(request.getHeaders().getFirst("AppID")).isEqualTo(TEST_APP_ID);
                     assertThat(request.getHeaders().getFirst("X-Timestamp")).isEqualTo(timestamp);
                     assertThat(request.getHeaders().getFirst("X-Channel-Code")).isEqualTo(TEST_CHANNEL_CODE);
                     assertThat(request.getHeaders().getFirst("X-Signature")).isEqualTo(
-                            sign("{}", "REQ-001", timestamp, TEST_SIGN_SECRET)
+                            sign("{}", "REQ-001", timestamp, TEST_APP_SECRET)
                     );
                     assertThat(request.getHeaders().getFirst("X-Request-Id")).isEqualTo("REQ-001");
                     assertThat(request.getHeaders().containsKey("X-Biz-Order-No")).isFalse();
-                    assertThat(request.getHeaders().containsKey("AppID")).isFalse();
                     assertThat(request.getHeaders().containsKey("Nonce")).isFalse();
                     assertThat(request.getHeaders().containsKey("Signature")).isFalse();
                     assertThat(request.getHeaders().containsKey("Timestamp")).isFalse();
@@ -123,10 +124,12 @@ class RestYunkaGatewayClientTest {
         assertThat(output).contains("yunka gateway request success");
         assertThat(output).contains("requestId=REQ-001");
         assertThat(output).contains("path=/loan/apply");
+        assertThat(output).contains("appId=" + TEST_APP_ID);
         assertThat(output).contains("xChannelCode=" + TEST_CHANNEL_CODE);
         assertThat(output).contains("xRequestId=REQ-001");
         assertThat(output).contains("xTimestamp=" + timestamp);
         assertThat(output).contains("signaturePrefix=");
+        assertThat(output).contains("yunka_app_id=" + TEST_APP_ID);
         assertThat(output).contains("yunka_channel_code=" + TEST_CHANNEL_CODE);
         assertThat(output).doesNotContain("X-Biz-Order-No");
         assertThat(output).contains("elapsedMs=");
@@ -134,7 +137,7 @@ class RestYunkaGatewayClientTest {
         assertThat(output).contains("\"requestId\":\"REQ-001\"");
         assertThat(output).contains("\"path\":\"/loan/apply\"");
         assertThat(output).doesNotContain("\"bizOrderNo\"");
-        assertThat(output).doesNotContain(sign("{}", "REQ-001", timestamp, TEST_SIGN_SECRET));
+        assertThat(output).doesNotContain(sign("{}", "REQ-001", timestamp, TEST_APP_SECRET));
         assertThat(output).contains("responseBodyJson=");
         assertThat(output).contains("\"code\":0");
         assertThat(output).contains("\"message\":\"OK\"");
@@ -196,6 +199,7 @@ class RestYunkaGatewayClientTest {
         assertThat(response.code()).isEqualTo(1002);
         assertThat(output).contains("requestId=REQ-UTF8-001");
         assertThat(output).contains("path=/user/token");
+        assertThat(output).contains("appId=" + TEST_APP_ID);
         assertThat(output).contains("xChannelCode=" + TEST_CHANNEL_CODE);
         assertThat(output).contains("xRequestId=REQ-UTF8-001");
         assertThat(output).contains("xTimestamp=1746955200999");
@@ -231,7 +235,8 @@ class RestYunkaGatewayClientTest {
                         "/benefit/sync"
                 ),
                 TEST_CHANNEL_CODE,
-                TEST_SIGN_SECRET
+                TEST_APP_ID,
+                TEST_APP_SECRET
         );
     }
 
