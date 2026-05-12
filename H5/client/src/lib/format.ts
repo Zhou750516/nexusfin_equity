@@ -5,9 +5,8 @@ interface FormatCurrencyOptions {
 }
 
 export function formatCurrency(value: number, locale: Locale, options: FormatCurrencyOptions = {}): string {
-  const hasFraction = Math.abs(value % 1) > Number.EPSILON;
   const formatted = new Intl.NumberFormat(locale, {
-    minimumFractionDigits: hasFraction ? 2 : 0,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
 

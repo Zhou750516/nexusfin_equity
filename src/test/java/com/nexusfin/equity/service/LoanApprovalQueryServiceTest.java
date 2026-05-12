@@ -90,7 +90,7 @@ class LoanApprovalQueryServiceTest {
                         {
                           "loanId": "LN-001",
                           "status": "7001",
-                          "loanAmount": 300000,
+                          "loanAmount": 3000.00,
                           "remark": "放款成功"
                         }
                         """));
@@ -121,7 +121,7 @@ class LoanApprovalQueryServiceTest {
                         {
                           "loanId": "LN-002",
                           "status": "7001",
-                          "loanAmount": 280000,
+                          "loanAmount": 2800.00,
                           "remark": "审批通过，预计30分钟内到账"
                         }
                         """));
@@ -189,7 +189,7 @@ class LoanApprovalQueryServiceTest {
         when(yunkaCallTemplate.executeForData(any()))
                 .thenReturn(objectMapper.createObjectNode()
                         .put("status", "7001")
-                        .put("loanAmount", 300000L)
+                        .put("loanAmount", 3000.00)
                         .put("remark", "放款成功"));
 
         assertThatThrownBy(() -> loanApprovalQueryService.getApprovalResult("mem-001", "APP-MISSING-LOANID"))

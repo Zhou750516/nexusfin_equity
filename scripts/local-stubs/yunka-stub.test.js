@@ -12,12 +12,12 @@ const contractCases = [
       data: {
         uid: "cid-contract-001",
         applyId: "LC-CONTRACT-001",
-        loanAmount: 300000,
+        loanAmount: 3000.0,
         loanPeriod: 3,
       },
     },
     assertSuccess(plan) {
-      assert.equal(plan.body.data.receiveAmount, 300000);
+      assert.equal(plan.body.data.receiveAmount, 3000);
     },
   },
   {
@@ -51,7 +51,7 @@ const contractCases = [
       requestId: "REQ_CONTRACT_PROTOCOL_001",
       data: {
         userId: "cid-contract-001",
-        loanAmount: 300000,
+        loanAmount: 3000.0,
         loanPeriod: 3,
       },
     },
@@ -67,7 +67,7 @@ const contractCases = [
         userId: "cid-contract-001",
         platformBenefitOrderNo: "APP-CONTRACT-001",
         benefitStatus: "ACTIVE",
-        benefitAmount: 300000,
+        benefitAmount: 300.0,
         benefiturl: "https://mock-qw.local/exercise?partnerOrderNo=ord-contract-001",
       },
     },
@@ -110,7 +110,7 @@ const contractCases = [
       },
     },
     assertSuccess(plan) {
-      assert.equal(plan.body.data.repayAmount, 101850);
+      assert.equal(plan.body.data.repayAmount, 1018.5);
     },
   },
   {
@@ -338,20 +338,20 @@ test("should support current local baseline paths for loan calculate and benefit
     data: {
       uid: "cid-joint-token-001",
       applyId: "LC-001",
-      loanAmount: 300000,
+      loanAmount: 3000.0,
       loanPeriod: 3,
     },
   });
   assert.equal(trialPlan.statusCode, 200);
   assert.equal(trialPlan.body.code, 0);
-  assert.equal(trialPlan.body.data.receiveAmount, 300000);
+  assert.equal(trialPlan.body.data.receiveAmount, 3000);
 
   const protocolPlan = createGatewayPlan({
     requestId: "REQ_PROTOCOL_001",
     path: "/protocol/queryProtocolAggregationLink",
     data: {
       userId: "cid-joint-token-001",
-      loanAmount: 300000,
+      loanAmount: 3000.0,
       loanPeriod: 3,
     },
   });
@@ -367,7 +367,7 @@ test("should support current local baseline paths for loan calculate and benefit
       userId: "cid-joint-token-001",
       platformBenefitOrderNo: "APP-001",
       benefitStatus: "ACTIVE",
-      benefitAmount: 300000,
+      benefitAmount: 300.0,
       benefiturl: "https://mock-qw.local/exercise?partnerOrderNo=ord-benefit-sync-001",
     },
   });

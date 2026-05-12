@@ -70,23 +70,23 @@ class LoanCalculatorServiceTest {
         when(yunkaCallTemplate.executeForData(any()))
                 .thenReturn(objectMapper.readTree("""
                         {
-                          "receiveAmount": 300000,
-                          "repayAmount": 312345,
+                          "receiveAmount": 3000.00,
+                          "repayAmount": 3123.45,
                           "yearRate": 18.0,
                           "repayPlan": [
                             {
                               "period": 1,
                               "date": "2026-05-07",
-                              "principal": 100000,
-                              "interest": 4500,
-                              "total": 104500
+                              "principal": 1000.00,
+                              "interest": 45.00,
+                              "total": 1045.00
                             },
                             {
                               "period": 2,
                               "date": "2026-06-07",
-                              "principal": 100000,
-                              "interest": 4000,
-                              "total": 104000
+                              "principal": 1000.00,
+                              "interest": 40.00,
+                              "total": 1040.00
                             }
                           ]
                         }
@@ -108,6 +108,8 @@ class LoanCalculatorServiceTest {
         assertThat(captor.getValue().scene()).isEqualTo("loan calculate");
         assertThat(captor.getValue().memberId()).isEqualTo("mem-001");
         assertThat(captor.getValue().path()).isEqualTo("/loan/trial");
+        assertThat(objectMapper.valueToTree(captor.getValue().payload()).path("loanAmount").decimalValue())
+                .isEqualByComparingTo("3000.00");
     }
 
     @Test

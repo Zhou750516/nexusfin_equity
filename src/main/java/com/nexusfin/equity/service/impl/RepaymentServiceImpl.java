@@ -32,14 +32,15 @@ import com.nexusfin.equity.thirdparty.yunka.UserCardListRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserCardSummary;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import static com.nexusfin.equity.util.BizIds.next;
+import static com.nexusfin.equity.util.JsonNodes.readDecimal;
 import static com.nexusfin.equity.util.JsonNodes.readLong;
 import static com.nexusfin.equity.util.JsonNodes.readRemark;
 import static com.nexusfin.equity.util.JsonNodes.readText;
-import static com.nexusfin.equity.util.MoneyUnits.centsToYuan;
 import static com.nexusfin.equity.util.MoneyUnits.yuanToCent;
 import com.nexusfin.equity.util.SensitiveDataUtil;
 import com.nexusfin.equity.util.SensitiveDataCipher;
 import com.nexusfin.equity.util.TraceIdUtil;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -113,7 +114,7 @@ public class RepaymentServiceImpl implements RepaymentService {
         BankAccountResponse selectedCard = bankCards.stream().findFirst().orElseGet(this::fallbackBankAccount);
         return new RepaymentInfoResponse(
                 loanId,
-                centsToYuan(readLong(data, "repayAmount", "amount")),
+                readDecimal(data, "repayAmount", "amount"),
                 h5I18nService.text("repayment.type.early", "提前还款"),
                 selectedCard,
                 bankCards,
@@ -193,7 +194,7 @@ public class RepaymentServiceImpl implements RepaymentService {
                                     mapRepayType(request.repaymentType()),
                                     List.of(),
                                     bankCardNum,
-                                    requestedRepayAmount
+                                    request.amount().setScale(2)
                             )
                     )
             );
@@ -218,7 +219,7 @@ public class RepaymentServiceImpl implements RepaymentService {
                         new RepayTrialForwardData(uid, loanId, mapRepayType(repaymentType), List.of())
                 )
         );
-        long repayableAmount = readLong(trialData, "repayAmount", "amount");
+        long repayableAmount = yuanToCent(readDecimal(trialData, "repayAmount", "amount"));
         if (requestedRepayAmount <= repayableAmount) {
             return;
         }
@@ -299,10 +300,10 @@ public class RepaymentServiceImpl implements RepaymentService {
                 repaymentId,
                 swiftNumber,
                 mapResultStatus(readText(data, "status", "")),
-                centsToYuan(readLong(data, "amount", "repayAmount")),
+                readDecimal(data, "amount", "repayAmount"),
                 resolveRepaymentTime(data),
                 bankCard,
-                centsToYuan(readLong(data, "discount")),
+                readDecimal(data, "discount"),
                 repaymentTips()
         );
     }
@@ -505,7 +506,7 @@ public class RepaymentServiceImpl implements RepaymentService {
             String repayType,
             List<Integer> periods,
             String bankCardNo,
-            Long repayAmount
+            BigDecimal repayAmount
     ) {
     }
 

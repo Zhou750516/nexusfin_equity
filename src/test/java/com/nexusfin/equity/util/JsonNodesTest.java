@@ -40,4 +40,20 @@ class JsonNodesTest {
         assertThat(JsonNodes.readLong(data, "broken")).isZero();
         assertThat(JsonNodes.readLong(data, "missing")).isZero();
     }
+
+    @Test
+    void shouldReadDecimalFromNumberTextAndFallbackToZeroForInvalidValues() throws Exception {
+        var data = objectMapper.readTree("""
+                {
+                  "repayAmount": 1018.5,
+                  "discount": "26.5",
+                  "broken": "oops"
+                }
+                """);
+
+        assertThat(JsonNodes.readDecimal(data, "repayAmount")).isEqualByComparingTo("1018.50");
+        assertThat(JsonNodes.readDecimal(data, "missing", "discount")).isEqualByComparingTo("26.50");
+        assertThat(JsonNodes.readDecimal(data, "broken")).isEqualByComparingTo("0.00");
+        assertThat(JsonNodes.readDecimal(data, "missing")).isEqualByComparingTo("0.00");
+    }
 }

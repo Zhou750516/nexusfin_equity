@@ -21,6 +21,7 @@ import com.nexusfin.equity.service.LoanApplicationGateway;
 import com.nexusfin.equity.service.LoanApplicationService;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
+import java.math.BigDecimal;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -94,7 +95,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                 request.platformBenefitOrderNo(),
                 applicationId,
                 loanId,
-                yuanToCent(request.amount()),
+                BigDecimal.valueOf(request.amount()).setScale(2),
                 request.term(),
                 upstreamBankCardNum,
                 upstreamBankCardNum,
@@ -238,7 +239,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
             String platformBenefitOrderNo,
             String applyId,
             String loanId,
-            Long loanAmount,
+            BigDecimal loanAmount,
             Integer loanPeriod,
             String bankCardNo,
             String bankCardNum,

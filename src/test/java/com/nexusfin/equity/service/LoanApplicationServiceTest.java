@@ -109,7 +109,7 @@ class LoanApplicationServiceTest {
         assertThat(forwardData.path("loanReason").asText()).isEqualTo("DAILY_CONSUMPTION");
         assertThat(forwardData.path("bankCardNum").asText()).isEqualTo("6222020202028648");
         assertThat(forwardData.path("platformBenefitOrderNo").asText()).isEqualTo("PBEN-001");
-        assertThat(forwardData.path("loanAmount").asLong()).isEqualTo(300000L);
+        assertThat(forwardData.path("loanAmount").decimalValue()).isEqualByComparingTo("3000.00");
         assertThat(forwardData.path("basicInfo").path("education").asText()).isEqualTo("BACHELOR");
         assertThat(forwardData.path("contactInfo").isArray()).isTrue();
         assertThat(forwardData.path("imageInfo").isArray()).isTrue();

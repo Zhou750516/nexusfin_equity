@@ -40,6 +40,29 @@ public final class JsonNodes {
         return 0L;
     }
 
+    public static BigDecimal readDecimal(JsonNode data, String... fields) {
+        if (data == null || data.isNull()) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        for (String field : fields) {
+            JsonNode value = data.path(field);
+            if (!value.isMissingNode() && !value.isNull()) {
+                if (value.isNumber()) {
+                    return value.decimalValue().setScale(2, RoundingMode.HALF_UP);
+                }
+                String text = value.asText();
+                if (!text.isBlank()) {
+                    try {
+                        return new BigDecimal(text).setScale(2, RoundingMode.HALF_UP);
+                    } catch (NumberFormatException ignored) {
+                        return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                    }
+                }
+            }
+        }
+        return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    }
+
     public static String readRemark(JsonNode data, String fallback) {
         return readText(data, "remark", fallback);
     }

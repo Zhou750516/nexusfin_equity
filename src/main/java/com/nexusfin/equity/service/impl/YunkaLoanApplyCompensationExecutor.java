@@ -12,7 +12,10 @@ import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.service.AsyncCompensationExecutor;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
+import java.math.BigDecimal;
 import org.springframework.stereotype.Component;
+
+import static com.nexusfin.equity.util.MoneyUnits.centsToYuan;
 
 @Component
 public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExecutor {
@@ -68,7 +71,7 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
                                 payload.benefitOrderNo(),
                                 payload.applyId(),
                                 payload.loanId(),
-                                payload.loanAmount(),
+                                centsToYuan(payload.loanAmount()),
                                 payload.loanPeriod(),
                                 payload.bankCardNo()
                         )
@@ -156,7 +159,7 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
             String benefitOrderNo,
             String applyId,
             String loanId,
-            Long loanAmount,
+            BigDecimal loanAmount,
             Integer loanPeriod,
             String bankCardNo
     ) {

@@ -15,9 +15,8 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import static com.nexusfin.equity.util.BizIds.next;
+import static com.nexusfin.equity.util.JsonNodes.readDecimal;
 import static com.nexusfin.equity.util.LoanInputValidator.validateAmountAndTerm;
-import static com.nexusfin.equity.util.MoneyUnits.centsToYuan;
-import static com.nexusfin.equity.util.MoneyUnits.yuanToCent;
 
 @Service
 public class LoanCalculatorServiceImpl implements LoanCalculatorService {
@@ -64,19 +63,20 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
     public LoanCalculateResponse calculate(String memberId, String uid, LoanCalculateRequest request) {
         validateCalculateRequest(request);
         String requestId = next("LC");
+        BigDecimal requestedAmount = BigDecimal.valueOf(request.amount()).setScale(2, RoundingMode.UNNECESSARY);
         JsonNode data = yunkaCallTemplate.executeForData(
                 YunkaCallTemplate.YunkaCall.of(
                         "loan calculate",
                         requestId,
                         yunkaProperties.paths().loanCalculate(),
                         requestId,
-                        new LoanTrailForwardData(uid, requestId, yuanToCent(request.amount()), request.term())
+                        new LoanTrailForwardData(uid, requestId, requestedAmount, request.term())
                 ).withMemberId(memberId)
         );
-        long receiveAmount = data.path("receiveAmount").asLong(yuanToCent(request.amount()));
-        long repayAmount = data.path("repayAmount").asLong(receiveAmount);
+        BigDecimal receiveAmount = readAmountOrDefault(data, requestedAmount, "receiveAmount");
+        BigDecimal repayAmount = readAmountOrDefault(data, receiveAmount, "repayAmount");
         return new LoanCalculateResponse(
-                centsToYuan(repayAmount - receiveAmount),
+                repayAmount.subtract(receiveAmount).setScale(2, RoundingMode.HALF_UP),
                 readAnnualRate(data),
                 mapRepaymentPlan(data.path("repayPlan"))
         );
@@ -103,11 +103,16 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
                 .map(item -> new LoanCalculateResponse.RepaymentPlanItem(
                         item.path("period").asInt(),
                         item.path("date").asText(),
-                        centsToYuan(item.path("principal").asLong()),
-                        centsToYuan(item.path("interest").asLong()),
-                        centsToYuan(item.path("total").asLong())
+                        readDecimal(item, "principal", "repayPrincipal"),
+                        readDecimal(item, "interest", "repayInterest"),
+                        readDecimal(item, "total", "repayAmount")
                 ))
                 .toList();
+    }
+
+    private BigDecimal readAmountOrDefault(JsonNode data, BigDecimal fallback, String... fields) {
+        BigDecimal value = readDecimal(data, fields);
+        return value.compareTo(BigDecimal.ZERO) == 0 ? fallback : value;
     }
 
     private String readAnnualRate(JsonNode data) {
@@ -125,7 +130,7 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
     private record LoanTrailForwardData(
             String uid,
             String applyId,
-            Long loanAmount,
+            BigDecimal loanAmount,
             Integer loanPeriod
     ) {
     }

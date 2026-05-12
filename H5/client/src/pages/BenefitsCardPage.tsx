@@ -203,7 +203,7 @@ export default function BenefitsCardPage() {
                   </p>
                   <p className="mt-1 leading-none">
                     <span className="text-[#fbaf19] text-[28px] font-bold tracking-[0.4px]">
-                      {detail.price}
+                      {formatCurrency(detail.price, locale, { includeSymbol: false })}
                     </span>
                     <span className="ml-0.5 text-[#fbaf19] text-base font-bold tracking-tight">
                       {t("benefits.priceUnit")}
@@ -329,7 +329,7 @@ export default function BenefitsCardPage() {
                     className="text-xl font-bold leading-[30px] tracking-tight bg-clip-text text-transparent"
                     style={{ backgroundImage: "linear-gradient(90deg, #ff6b00 0%, #fbaf19 100%)" }}
                   >
-                    {detail.totalSaving}
+                    {formatCurrency(detail.totalSaving, locale, { includeSymbol: false })}
                   </span>
                   <span className="text-[#ff6b00] text-[13px] font-medium">
                     {t("benefits.saveSuffix")}

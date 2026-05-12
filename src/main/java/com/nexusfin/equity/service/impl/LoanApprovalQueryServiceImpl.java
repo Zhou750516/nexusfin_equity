@@ -21,8 +21,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import static com.nexusfin.equity.util.BizIds.next;
+import static com.nexusfin.equity.util.JsonNodes.readDecimal;
 import static com.nexusfin.equity.util.JsonNodes.readText;
 import static com.nexusfin.equity.util.MoneyUnits.centsToYuan;
+import static com.nexusfin.equity.util.MoneyUnits.yuanToCent;
 
 @Service
 public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
@@ -275,7 +277,7 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
         String remark = readText(data, "remark", "");
         long loanAmount = 0L;
         if (LOAN_STATUS_SUCCESS.equals(status)) {
-            loanAmount = requiredPositiveLong(data, "loanAmount");
+            loanAmount = requiredPositiveAmountInCent(data, "loanAmount");
         }
         return new LoanQuerySnapshot(status, loanId, loanAmount, remark);
     }
@@ -288,16 +290,16 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
         return value;
     }
 
-    private long requiredPositiveLong(JsonNode data, String field) {
+    private long requiredPositiveAmountInCent(JsonNode data, String field) {
         JsonNode valueNode = data.get(field);
-        if (valueNode == null || valueNode.isNull() || valueNode.isMissingNode() || !valueNode.canConvertToLong()) {
+        if (valueNode == null || valueNode.isNull() || valueNode.isMissingNode()) {
             throw new BizException(YUNKA_RESPONSE_INVALID, "Yunka loan query response is invalid");
         }
-        long value = valueNode.asLong();
-        if (value <= 0L) {
+        BigDecimal value = readDecimal(data, field);
+        if (value.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BizException(YUNKA_RESPONSE_INVALID, "Yunka loan query response is invalid");
         }
-        return value;
+        return yuanToCent(value);
     }
 
     private record LoanQueryForwardData(

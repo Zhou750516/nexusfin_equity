@@ -80,7 +80,7 @@ class XiaohuaGatewayServiceTest {
         assertThat(envelope.has("bizOrderNo")).isFalse();
         JsonNode forwarded = objectMapper.valueToTree(captor.getValue().data());
         assertThat(forwarded.path("userId").asText()).isEqualTo("user-001");
-        assertThat(forwarded.path("loanAmount").asLong()).isEqualTo(300000L);
+        assertThat(forwarded.path("loanAmount").decimalValue()).isEqualByComparingTo("3000.00");
     }
 
     @Test
@@ -208,6 +208,7 @@ class XiaohuaGatewayServiceTest {
         verify(yunkaGatewayClient).proxy(captor.capture());
         JsonNode forwarded = objectMapper.valueToTree(captor.getValue().data());
         assertThat(forwarded.path("benefiturl").asText()).isEqualTo("https://redirect.test/exercise");
+        assertThat(forwarded.path("benefitAmount").decimalValue()).isEqualByComparingTo("300.00");
     }
 
     private YunkaProperties yunkaProperties() {

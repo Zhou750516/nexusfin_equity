@@ -27,9 +27,14 @@ import com.nexusfin.equity.thirdparty.yunka.UserQueryRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserQueryResponse;
 import com.nexusfin.equity.thirdparty.yunka.UserTokenRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserTokenResponse;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
+
+import static com.nexusfin.equity.util.JsonNodes.readDecimal;
+import static com.nexusfin.equity.util.MoneyUnits.centsToYuan;
+import static com.nexusfin.equity.util.MoneyUnits.yuanToCent;
 
 @Service
 public class XiaohuaGatewayServiceImpl implements XiaohuaGatewayService {
@@ -50,7 +55,16 @@ public class XiaohuaGatewayServiceImpl implements XiaohuaGatewayService {
 
     @Override
     public ProtocolQueryResponse queryProtocols(String requestId, String bizOrderNo, ProtocolQueryRequest request) {
-        JsonNode data = execute(requestId, yunkaProperties.paths().protocolQuery(), bizOrderNo, request);
+        JsonNode data = execute(
+                requestId,
+                yunkaProperties.paths().protocolQuery(),
+                bizOrderNo,
+                new ProtocolQueryForwardData(
+                        request.userId(),
+                        request.loanAmount() == null ? null : centsToYuan(request.loanAmount()),
+                        request.loanPeriod()
+                )
+        );
         JsonNode listNode = data.isArray() ? data : data.path("list");
         List<ProtocolLink> links = new ArrayList<>();
         if (listNode.isArray()) {
@@ -119,9 +133,9 @@ public class XiaohuaGatewayServiceImpl implements XiaohuaGatewayService {
                 items.add(new LoanRepayPlanItem(
                         firstInteger(item, "termNo", "period"),
                         firstText(item, "repayDate", "date"),
-                        firstLong(item, "repayPrincipal", "principal"),
-                        firstLong(item, "repayInterest", "interest"),
-                        firstLong(item, "repayAmount", "total")
+                        firstAmountAsInternalCent(item, "repayPrincipal", "principal"),
+                        firstAmountAsInternalCent(item, "repayInterest", "interest"),
+                        firstAmountAsInternalCent(item, "repayAmount", "total")
                 ));
             }
         }
@@ -168,7 +182,18 @@ public class XiaohuaGatewayServiceImpl implements XiaohuaGatewayService {
 
     @Override
     public BenefitOrderSyncResponse syncBenefitOrder(String requestId, String bizOrderNo, BenefitOrderSyncRequest request) {
-        JsonNode data = execute(requestId, yunkaProperties.paths().benefitSync(), bizOrderNo, request);
+        JsonNode data = execute(
+                requestId,
+                yunkaProperties.paths().benefitSync(),
+                bizOrderNo,
+                new BenefitOrderSyncForwardData(
+                        request.userId(),
+                        request.platformBenefitOrderNo(),
+                        request.benefitStatus(),
+                        request.benefitAmount() == null ? null : centsToYuan(request.benefitAmount()),
+                        request.benefitUrl()
+                )
+        );
         return new BenefitOrderSyncResponse(
                 firstText(data, "status", "result"),
                 firstText(data, "msg", "message", "remark")
@@ -220,5 +245,28 @@ public class XiaohuaGatewayServiceImpl implements XiaohuaGatewayService {
             }
         }
         return null;
+    }
+
+    private Long firstAmountAsInternalCent(JsonNode node, String... fieldNames) {
+        BigDecimal amount = readDecimal(node, fieldNames);
+        return amount.compareTo(BigDecimal.ZERO) == 0 ? 0L : yuanToCent(amount);
+    }
+
+    private record ProtocolQueryForwardData(
+            String userId,
+            BigDecimal loanAmount,
+            Integer loanPeriod
+    ) {
+    }
+
+    // Only the outbound Yunka payload is converted to yuan here; ABS internal benefit amount semantics remain unchanged.
+    private record BenefitOrderSyncForwardData(
+            String userId,
+            String platformBenefitOrderNo,
+            String benefitStatus,
+            BigDecimal benefitAmount,
+            @com.fasterxml.jackson.annotation.JsonProperty("benefiturl")
+            String benefitUrl
+    ) {
     }
 }

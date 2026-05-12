@@ -59,23 +59,23 @@ function repayPlan() {
     {
       termNo: 1,
       repayDate: "2026-05-29",
-      repayPrincipal: 100000,
-      repayInterest: 4500,
-      repayAmount: 104500,
+      repayPrincipal: 1000.0,
+      repayInterest: 45.0,
+      repayAmount: 1045.0,
     },
     {
       termNo: 2,
       repayDate: "2026-06-29",
-      repayPrincipal: 100000,
-      repayInterest: 4000,
-      repayAmount: 104000,
+      repayPrincipal: 1000.0,
+      repayInterest: 40.0,
+      repayAmount: 1040.0,
     },
     {
       termNo: 3,
       repayDate: "2026-07-29",
-      repayPrincipal: 100000,
-      repayInterest: 3850,
-      repayAmount: 103850,
+      repayPrincipal: 1000.0,
+      repayInterest: 38.5,
+      repayAmount: 1038.5,
     },
   ];
 }
@@ -88,14 +88,14 @@ function loanQueryPayload(data) {
     return {
       loanId,
       status: "7002",
-      loanAmount: 300000,
+      loanAmount: 3000.0,
       remark: "借款申请已提交，正在审核中",
     };
   }
   return {
     loanId,
     status: "7001",
-    loanAmount: 300000,
+    loanAmount: 3000.0,
     remark: "审批通过，预计30分钟内到账",
   };
 }
@@ -104,7 +104,7 @@ function rejectedLoanQueryPayload(data) {
   return {
     loanId: data.loanId ?? "LN-STUB-001",
     status: "7003",
-    loanAmount: 300000,
+    loanAmount: 3000.0,
     remark: "借款申请未通过审核",
   };
 }
@@ -173,30 +173,30 @@ function handleGatewayRequest(payload) {
     case "/loan/trial":
     case "/loan/trail":
       return gatewaySuccess({
-        receiveAmount: Number(data.loanAmount ?? 300000),
-        repayAmount: 312350,
+        receiveAmount: Number(data.loanAmount ?? 3000),
+        repayAmount: 3123.5,
         yearRate: 18.0,
         repayPlan: [
           {
             period: 1,
             date: "2026-05-29",
-            principal: 100000,
-            interest: 4500,
-            total: 104500,
+            principal: 1000.0,
+            interest: 45.0,
+            total: 1045.0,
           },
           {
             period: 2,
             date: "2026-06-29",
-            principal: 100000,
-            interest: 4000,
-            total: 104000,
+            principal: 1000.0,
+            interest: 40.0,
+            total: 1040.0,
           },
           {
             period: 3,
             date: "2026-07-29",
-            principal: 100000,
-            interest: 3850,
-            total: 103850,
+            principal: 1000.0,
+            interest: 38.5,
+            total: 1038.5,
           },
         ],
       });
@@ -214,8 +214,8 @@ function handleGatewayRequest(payload) {
       });
     case "/repay/trial":
       return gatewaySuccess({
-        repayAmount: 101850,
-        amount: 101850,
+        repayAmount: 1018.5,
+        amount: 1018.5,
       });
     case "/repay/apply":
       return gatewaySuccess({
@@ -226,10 +226,10 @@ function handleGatewayRequest(payload) {
     case "/repay/query":
       return gatewaySuccess({
         status: "8001",
-        amount: 101850,
-        repayAmount: 101850,
+        amount: 1018.5,
+        repayAmount: 1018.5,
         swiftNumber: data.swiftNumber ?? data.loanId ?? "RP-STUB-001",
-        discount: 2650,
+        discount: 26.5,
         bankCardNum: "6222020202028648",
         successTime: "2026-04-29T10:00:00+08:00",
       });

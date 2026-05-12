@@ -101,7 +101,7 @@ class RepaymentServiceTest {
                 0,
                 "SUCCESS",
                 objectMapper.readTree("""
-                        {"repayAmount":101850}
+                        {"repayAmount":1018.50}
                         """)
         ));
         when(xiaohuaGatewayService.queryUserCards(any(), eq("LN-001"), any()))
@@ -185,9 +185,9 @@ class RepaymentServiceTest {
                 objectMapper.readTree("""
                         {
                           "status": "8004",
-                          "amount": 101850,
+                          "amount": 1018.50,
                           "swiftNumber": "RP-LN-001",
-                          "discount": 2650,
+                          "discount": 26.50,
                           "bankCardNum": "6222020202028648"
                         }
                         """)
@@ -239,7 +239,7 @@ class RepaymentServiceTest {
                                 0,
                                 "SUCCESS",
                                 objectMapper.readTree("""
-                                        {"repayAmount":101850}
+                                        {"repayAmount":1018.50}
                                         """)
                         );
                     }
@@ -268,7 +268,7 @@ class RepaymentServiceTest {
                 0,
                 "SUCCESS",
                 objectMapper.readTree("""
-                        {"repayAmount":101850}
+                        {"repayAmount":1018.50}
                         """)
         ));
 
@@ -302,7 +302,7 @@ class RepaymentServiceTest {
                                 0,
                                 "SUCCESS",
                                 objectMapper.readTree("""
-                                        {"repayAmount":101850}
+                                        {"repayAmount":1018.50}
                                         """)
                         );
                     }
@@ -342,6 +342,46 @@ class RepaymentServiceTest {
         assertThat(captor.getAllValues().stream()
                 .filter(request -> "/repay/apply".equals(request.path())))
                 .hasSize(1);
+    }
+
+    @Test
+    void shouldSendRepaymentAmountToYunkaInYuanAtBoundary() throws Exception {
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("user-001", "LN-REPAY-SUBMIT-001"));
+        when(yunkaGatewayClient.proxy(any()))
+                .thenAnswer(invocation -> {
+                    YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
+                    if ("/repay/trial".equals(gatewayRequest.path())) {
+                        return new YunkaGatewayClient.YunkaGatewayResponse(
+                                0,
+                                "SUCCESS",
+                                objectMapper.readTree("""
+                                        {"repayAmount":1018.50}
+                                        """)
+                        );
+                    }
+                    return new YunkaGatewayClient.YunkaGatewayResponse(
+                            0,
+                            "SUCCESS",
+                            objectMapper.readTree("""
+                                    {"swiftNumber":"RP-LN-REPAY-SUBMIT-001","status":"8004","remark":"processing"}
+                                    """)
+                    );
+                });
+        when(idempotencyRecordRepository.insert(any())).thenReturn(1);
+
+        repaymentService.submit(
+                "user-001",
+                new RepaymentSubmitRequest("LN-REPAY-SUBMIT-001", BigDecimal.valueOf(1018.50), "acc_001", "early")
+        );
+
+        ArgumentCaptor<YunkaGatewayRequest> captor = ArgumentCaptor.forClass(YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient, times(2)).proxy(captor.capture());
+        YunkaGatewayRequest repayApplyRequest = captor.getAllValues().stream()
+                .filter(request -> "/repay/apply".equals(request.path()))
+                .findFirst()
+                .orElseThrow();
+        JsonNode repayApplyPayload = objectMapper.valueToTree(repayApplyRequest.data());
+        assertThat(repayApplyPayload.path("repayAmount").decimalValue()).isEqualByComparingTo("1018.50");
     }
 
     private LoanApplicationMapping loanMapping(String externalUserId, String loanId) {
