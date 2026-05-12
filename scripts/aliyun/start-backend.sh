@@ -21,6 +21,7 @@ export AUTH_COOKIE_SECURE="${AUTH_COOKIE_SECURE:-true}"
 export TECH_PLATFORM_BASE_URL="${TECH_PLATFORM_BASE_URL:-http://127.0.0.1:18080}"
 export TECH_PLATFORM_API_ENABLED="${TECH_PLATFORM_API_ENABLED:-false}"
 export TECH_PLATFORM_API_MODE="${TECH_PLATFORM_API_MODE:-MOCK}"
+export LOG_LEVEL_SQL_REPOSITORY="${LOG_LEVEL_SQL_REPOSITORY:-INFO}"
 
 require_command() {
   local command_name="$1"
@@ -78,6 +79,7 @@ yunka_base_url=$YUNKA_BASE_URL
 yunka_app_id=$YUNKA_APP_ID
 yunka_channel_code=$YUNKA_CHANNEL_CODE
 qw_mode=$QW_MODE
+sql_repository_log_level=$LOG_LEVEL_SQL_REPOSITORY
 tech_platform_auth_base_url=$TECH_PLATFORM_BASE_URL
 tech_platform_api_enabled=$TECH_PLATFORM_API_ENABLED
 tech_platform_api_mode=$TECH_PLATFORM_API_MODE
@@ -133,6 +135,7 @@ yunka_base_url=$YUNKA_BASE_URL
 yunka_app_id=$YUNKA_APP_ID
 yunka_channel_code=$YUNKA_CHANNEL_CODE
 qw_mode=$QW_MODE
+sql_repository_log_level=$LOG_LEVEL_SQL_REPOSITORY
 tech_platform_auth_base_url=$TECH_PLATFORM_BASE_URL
 tech_platform_api_enabled=$TECH_PLATFORM_API_ENABLED
 tech_platform_api_mode=$TECH_PLATFORM_API_MODE

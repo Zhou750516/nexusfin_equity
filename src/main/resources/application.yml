@@ -17,17 +17,21 @@ server:
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
   global-config:
     db-config:
       table-underline: true
 
 logging:
+  pattern:
+    level: remoteIp=%X{remoteIp:-} %5p
   level:
     root: ${LOG_LEVEL_ROOT:INFO}
     com.nexusfin.equity: ${LOG_LEVEL_APP:INFO}
     com.nexusfin.equity.thirdparty.yunka: ${LOG_LEVEL_YUNKA:INFO}
     com.nexusfin.equity.thirdparty.qw: ${LOG_LEVEL_QW:INFO}
     com.nexusfin.equity.thirdparty.techplatform: ${LOG_LEVEL_TECH_PLATFORM:INFO}
+    com.nexusfin.equity.repository: ${LOG_LEVEL_SQL_REPOSITORY:INFO}
 
 nexusfin:
   async-compensation:

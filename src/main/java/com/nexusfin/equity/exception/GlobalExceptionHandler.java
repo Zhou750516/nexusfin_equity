@@ -23,16 +23,18 @@ public class GlobalExceptionHandler {
         String errorNo = exception.getErrorNo();
         String errorMsg = exception.getErrorMsg();
         if (shouldLogAsError(exception.getCode())) {
-            log.error("traceId={} bizOrderNo={} method={} path={} errorNo={} errorMsg={}",
+            log.error("traceId={} remoteIp={} bizOrderNo={} method={} path={} errorNo={} errorMsg={}",
                     TraceIdUtil.getTraceId(),
+                    TraceIdUtil.getRemoteIp(),
                     resolveBizOrderNo(request),
                     request.getMethod(),
                     request.getRequestURI(),
                     errorNo,
                     errorMsg);
         } else {
-            log.warn("traceId={} bizOrderNo={} method={} path={} errorNo={} errorMsg={}",
+            log.warn("traceId={} remoteIp={} bizOrderNo={} method={} path={} errorNo={} errorMsg={}",
                     TraceIdUtil.getTraceId(),
+                    TraceIdUtil.getRemoteIp(),
                     resolveBizOrderNo(request),
                     request.getMethod(),
                     request.getRequestURI(),
@@ -54,8 +56,9 @@ public class GlobalExceptionHandler {
                 .findFirst()
                 .map(error -> error.getField() + " " + error.getDefaultMessage())
                 .orElse("Invalid request");
-        log.warn("traceId={} bizOrderNo={} method={} path={} errorNo={} errorMsg={}",
+        log.warn("traceId={} remoteIp={} bizOrderNo={} method={} path={} errorNo={} errorMsg={}",
                 TraceIdUtil.getTraceId(),
+                TraceIdUtil.getRemoteIp(),
                 resolveBizOrderNo(request),
                 request.getMethod(),
                 request.getRequestURI(),
@@ -70,8 +73,9 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         String message = exception.getName() + " format is invalid";
-        log.warn("traceId={} bizOrderNo={} method={} path={} errorNo={} errorMsg={}",
+        log.warn("traceId={} remoteIp={} bizOrderNo={} method={} path={} errorNo={} errorMsg={}",
                 TraceIdUtil.getTraceId(),
+                TraceIdUtil.getRemoteIp(),
                 resolveBizOrderNo(request),
                 request.getMethod(),
                 request.getRequestURI(),
@@ -83,8 +87,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoResourceFoundException.class)
     public Result<Void> handleNotFound(NoResourceFoundException exception, HttpServletRequest request) {
         String message = exception.getMessage();
-        log.warn("traceId={} bizOrderNo={} method={} path={} errorNo={} errorMsg={}",
+        log.warn("traceId={} remoteIp={} bizOrderNo={} method={} path={} errorNo={} errorMsg={}",
                 TraceIdUtil.getTraceId(),
+                TraceIdUtil.getRemoteIp(),
                 resolveBizOrderNo(request),
                 request.getMethod(),
                 request.getRequestURI(),
@@ -95,8 +100,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public Result<Void> handleUnexpected(Exception exception, HttpServletRequest request) {
-        log.error("traceId={} bizOrderNo={} method={} path={} errorNo={} errorMsg={}",
+        log.error("traceId={} remoteIp={} bizOrderNo={} method={} path={} errorNo={} errorMsg={}",
                 TraceIdUtil.getTraceId(),
+                TraceIdUtil.getRemoteIp(),
                 resolveBizOrderNo(request),
                 request.getMethod(),
                 request.getRequestURI(),
