@@ -14,10 +14,14 @@ import org.springframework.stereotype.Component;
 @Component
 public class JwtUtil {
 
+    private static final int MIN_HMAC_KEY_BYTES = 32;
+
     private final AuthProperties authProperties;
+    private final SecretKey signingKey;
 
     public JwtUtil(AuthProperties authProperties) {
         this.authProperties = authProperties;
+        this.signingKey = buildSigningKey(authProperties.getJwt().getSecret());
     }
 
     public String generateToken(String memberId, String techPlatformUserId) {
@@ -30,14 +34,14 @@ public class JwtUtil {
                 .claim("techPlatformUserId", techPlatformUserId)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expireAt))
-                .signWith(getSigningKey())
+                .signWith(signingKey)
                 .compact();
     }
 
     public AuthPrincipal parseToken(String token) {
         try {
             Claims claims = Jwts.parser()
-                    .verifyWith(getSigningKey())
+                    .verifyWith(signingKey)
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
@@ -50,7 +54,17 @@ public class JwtUtil {
         }
     }
 
-    private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(authProperties.getJwt().getSecret().getBytes(StandardCharsets.UTF_8));
+    private SecretKey buildSigningKey(String secret) {
+        byte[] secretBytes = secret == null ? new byte[0] : secret.getBytes(StandardCharsets.UTF_8);
+        if (secretBytes.length < MIN_HMAC_KEY_BYTES) {
+            int bitLength = secretBytes.length * 8;
+            throw new IllegalStateException(
+                    "AUTH_JWT_SECRET is too weak: current length is "
+                            + secretBytes.length + " bytes (" + bitLength + " bits), "
+                            + "but JWT HMAC secret must be at least 32 bytes (256 bits). "
+                            + "Generate a high-entropy secret, for example: openssl rand -base64 32"
+            );
+        }
+        return Keys.hmacShaKeyFor(secretBytes);
     }
 }

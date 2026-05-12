@@ -39,6 +39,17 @@ require_env() {
   fi
 }
 
+validate_jwt_secret() {
+  local secret_bytes
+  secret_bytes="$(printf '%s' "${AUTH_JWT_SECRET}" | wc -c | tr -d ' ')"
+  local secret_bits=$((secret_bytes * 8))
+  if (( secret_bytes < 32 )); then
+    echo "AUTH_JWT_SECRET 不安全：当前长度 ${secret_bytes} bytes (${secret_bits} bits)，JWT HMAC 密钥至少需要 32 bytes (256 bits)。" >&2
+    echo "请改成高强度随机值，例如：openssl rand -base64 32" >&2
+    exit 1
+  fi
+}
+
 is_pid_running() {
   local pid="$1"
   kill -0 "$pid" >/dev/null 2>&1
@@ -62,6 +73,7 @@ require_env YUNKA_BASE_URL
 require_env YUNKA_APP_ID
 require_env YUNKA_APP_SECRET
 require_env YUNKA_CHANNEL_CODE
+validate_jwt_secret
 
 mkdir -p "$RUNTIME_DIR"
 

@@ -28,6 +28,22 @@ class JwtUtilTest {
                 .hasMessageContaining("Invalid jwt token");
     }
 
+    @Test
+    void shouldFailFastWhenJwtSecretIsTooShort() {
+        AuthProperties authProperties = new AuthProperties();
+        AuthProperties.Jwt jwt = new AuthProperties.Jwt();
+        jwt.setIssuer("test-issuer");
+        jwt.setSecret("short!");
+        authProperties.setJwt(jwt);
+
+        assertThatThrownBy(() -> new JwtUtil(authProperties))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("AUTH_JWT_SECRET")
+                .hasMessageContaining("32 bytes")
+                .hasMessageContaining("256 bits")
+                .hasMessageContaining("openssl rand -base64 32");
+    }
+
     private AuthProperties authProperties() {
         AuthProperties authProperties = new AuthProperties();
         AuthProperties.Jwt jwt = new AuthProperties.Jwt();
