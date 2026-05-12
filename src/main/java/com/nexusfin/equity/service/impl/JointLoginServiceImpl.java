@@ -74,21 +74,34 @@ public class JointLoginServiceImpl implements JointLoginService {
         String benefitOrderNo = resolveBenefitOrderNo(normalizedScene, request);
         String requestId = RequestIdUtil.nextId("xa");
         UserTokenResponse tokenResponse = validateJointToken(requestId, benefitOrderNo, request.token());
-        String externalUserId = requiredValue(tokenResponse.cid(), "JOINT_LOGIN_CID_REQUIRED", "Xiaohua cid is required");
-        MemberInfo existingMember = memberInfoRepository.selectByExternalUserId(externalUserId);
-        String memberId = existingMember != null ? existingMember.getMemberId() : RequestIdUtil.nextId("mem");
-        UserQueryResponse userQueryResponse = queryJointUser(requestId, benefitOrderNo, memberId, externalUserId);
+        String cid = requiredValue(tokenResponse.cid(), "JOINT_LOGIN_CID_REQUIRED", "Xiaohua cid is required");
+        MemberInfo existingMember = memberInfoRepository.selectByCid(cid);
+        String absUserId = resolveAbsUserId(existingMember);
+        log.info("traceId={} requestId={} scene={} absUserId={} cid={} joint login local user resolved",
+                TraceIdUtil.getTraceId(),
+                requestId,
+                normalizedScene,
+                absUserId,
+                cid);
+        UserQueryResponse userQueryResponse = queryJointUser(requestId, benefitOrderNo, absUserId, cid);
+        validateJointUserMapping(userQueryResponse.payload(), absUserId, cid);
         JointIdentity identity = mapToIdentity(tokenResponse, userQueryResponse);
-        logIdCardStatus(requestId, normalizedScene, identity);
-        MemberInfo memberInfo = findOrCreateMember(existingMember, memberId, identity);
-        ensureChannelBinding(memberInfo, identity.externalUserId(), resolveChannelCode(identity.channelCode()));
-        String jwtToken = jwtUtil.generateToken(memberInfo.getMemberId(), identity.externalUserId());
+        logIdCardStatus(requestId, normalizedScene, absUserId, identity);
+        MemberInfo memberInfo = findOrCreateMember(existingMember, absUserId, identity);
+        ensureChannelBinding(memberInfo, identity.cid(), resolveChannelCode(identity.channelCode()));
+        log.info("traceId={} requestId={} scene={} absUserId={} cid={} joint login mapping bound",
+                TraceIdUtil.getTraceId(),
+                requestId,
+                normalizedScene,
+                memberInfo.getMemberId(),
+                identity.cid());
+        String jwtToken = jwtUtil.generateToken(memberInfo.getMemberId(), identity.cid());
         return new JointLoginResult(
                 jwtToken,
                 normalizedScene,
                 targetPageResolver.resolve(normalizedScene),
                 benefitOrderNo,
-                identity.externalUserId(),
+                identity.cid(),
                 true
         );
     }
@@ -142,19 +155,39 @@ public class JointLoginServiceImpl implements JointLoginService {
     private UserQueryResponse queryJointUser(
             String requestId,
             String benefitOrderNo,
-            String memberId,
-            String externalUserId
+            String absUserId,
+            String cid
     ) {
         try {
+            log.info("traceId={} requestId={} scene=joint-login outboundField=userId absUserId={} cid={} joint user query begin",
+                    TraceIdUtil.getTraceId(),
+                    requestId,
+                    absUserId,
+                    cid);
             return xiaohuaGatewayService.queryUser(
                     requestId,
                     benefitOrderNo,
-                    new UserQueryRequest(memberId, externalUserId)
+                    new UserQueryRequest(absUserId, cid)
             );
         } catch (UpstreamTimeoutException exception) {
             throw new BizException("JOINT_LOGIN_UPSTREAM_TIMEOUT", "Joint login temporarily unavailable");
         } catch (BizException exception) {
             throw new BizException("JOINT_LOGIN_UPSTREAM_FAILED", "Joint login temporarily unavailable");
+        }
+    }
+
+    private String resolveAbsUserId(MemberInfo existingMember) {
+        return existingMember != null ? existingMember.getMemberId() : RequestIdUtil.nextId("mem");
+    }
+
+    private void validateJointUserMapping(JsonNode payload, String expectedAbsUserId, String expectedCid) {
+        String returnedAbsUserId = firstNonBlank(nullableText(payload, "userId"), nullableText(payload, "uid"));
+        if (returnedAbsUserId != null && !returnedAbsUserId.equals(expectedAbsUserId)) {
+            throw new BizException("JOINT_LOGIN_USER_ID_MISMATCH", "Joint login userId mapping is inconsistent");
+        }
+        String returnedCid = nullableText(payload, "cid");
+        if (returnedCid != null && !returnedCid.equals(expectedCid)) {
+            throw new BizException("JOINT_LOGIN_CID_MISMATCH", "Joint login cid mapping is inconsistent");
         }
     }
 
@@ -180,8 +213,8 @@ public class JointLoginServiceImpl implements JointLoginService {
         String phone = normalizePhone(identity.phone(), newMember);
         String idCard = normalizeIdCard(identity.idCard(), false);
         String realName = normalizeRealName(identity.realName(), newMember);
-        memberInfo.setTechPlatformUserId(identity.externalUserId());
-        memberInfo.setExternalUserId(identity.externalUserId());
+        memberInfo.setTechPlatformUserId(identity.cid());
+        memberInfo.setExternalUserId(identity.cid());
         if (phone != null) {
             memberInfo.setMobileEncrypted(sensitiveDataCipher.encrypt(phone));
             memberInfo.setMobileHash(SensitiveDataUtil.sha256(phone));
@@ -229,19 +262,21 @@ public class JointLoginServiceImpl implements JointLoginService {
         return new ResolvedIdentityField(null, null);
     }
 
-    private void logIdCardStatus(String requestId, String scene, JointIdentity identity) {
+    private void logIdCardStatus(String requestId, String scene, String absUserId, JointIdentity identity) {
         if (identity.idCard() == null || identity.idCard().isBlank()) {
-            log.warn("traceId={} requestId={} externalUserId={} scene={} temporarily allowing joint login without id card",
+            log.warn("traceId={} requestId={} absUserId={} cid={} scene={} temporarily allowing joint login without id card",
                     TraceIdUtil.getTraceId(),
                     requestId,
-                    identity.externalUserId(),
+                    absUserId,
+                    identity.cid(),
                     scene);
             return;
         }
-        log.info("traceId={} requestId={} externalUserId={} scene={} idCardField={} joint login id card resolved",
+        log.info("traceId={} requestId={} absUserId={} cid={} scene={} idCardField={} joint login id card resolved",
                 TraceIdUtil.getTraceId(),
                 requestId,
-                identity.externalUserId(),
+                absUserId,
+                identity.cid(),
                 scene,
                 identity.idCardField());
     }
@@ -336,8 +371,13 @@ public class JointLoginServiceImpl implements JointLoginService {
         return node.path(fieldName).asText("");
     }
 
+    private String nullableText(JsonNode node, String fieldName) {
+        String value = text(node, fieldName);
+        return value == null || value.isBlank() ? null : value;
+    }
+
     private record JointIdentity(
-            String externalUserId,
+            String cid,
             String phone,
             String realName,
             String idCard,

@@ -19,4 +19,8 @@ public interface MemberInfoRepository extends BaseMapper<MemberInfo> {
                 .eq(MemberInfo::getExternalUserId, externalUserId)
                 .last("limit 1"));
     }
+
+    default MemberInfo selectByCid(String cid) {
+        return selectByExternalUserId(cid);
+    }
 }

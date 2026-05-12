@@ -80,7 +80,7 @@ class JointLoginServiceTest {
                           }
                         }
                         """)));
-        when(memberInfoRepository.selectByExternalUserId("xh-cid-001")).thenReturn(null);
+        when(memberInfoRepository.selectByCid("xh-cid-001")).thenReturn(null);
         when(memberChannelRepository.selectByChannelAndExternalUserId("KJ", "xh-cid-001")).thenReturn(null);
 
         JointLoginService.JointLoginResult result = jointLoginService.login(request);
@@ -107,7 +107,8 @@ class JointLoginServiceTest {
         assertThat(output)
                 .contains("scene=push")
                 .contains("requestId=")
-                .contains("externalUserId=xh-cid-001")
+                .contains("absUserId=")
+                .contains("cid=xh-cid-001")
                 .contains("idCardField=idno");
     }
 
@@ -141,7 +142,7 @@ class JointLoginServiceTest {
                           }
                         }
                         """)));
-        when(memberInfoRepository.selectByExternalUserId("xh-cid-002")).thenReturn(null);
+        when(memberInfoRepository.selectByCid("xh-cid-002")).thenReturn(null);
         when(memberChannelRepository.selectByChannelAndExternalUserId("KJ", "xh-cid-002")).thenReturn(null);
 
         JointLoginService.JointLoginResult result = jointLoginService.login(request);
@@ -156,7 +157,8 @@ class JointLoginServiceTest {
         assertThat(output)
                 .contains("scene=push")
                 .contains("requestId=")
-                .contains("externalUserId=xh-cid-002")
+                .contains("absUserId=")
+                .contains("cid=xh-cid-002")
                 .contains("temporarily allowing joint login without id card");
     }
 
@@ -194,7 +196,7 @@ class JointLoginServiceTest {
                           }
                         }
                         """)));
-        when(memberInfoRepository.selectByExternalUserId("xh-cid-001")).thenReturn(existing);
+        when(memberInfoRepository.selectByCid("xh-cid-001")).thenReturn(existing);
         when(memberChannelRepository.selectByChannelAndExternalUserId("KJ", "xh-cid-001")).thenReturn(new MemberChannel());
 
         JointLoginService.JointLoginResult result = jointLoginService.login(request);
@@ -234,6 +236,86 @@ class JointLoginServiceTest {
                 .isInstanceOf(BizException.class)
                 .extracting(ex -> ((BizException) ex).getErrorNo())
                 .isEqualTo("JOINT_LOGIN_BENEFIT_ORDER_REQUIRED");
+    }
+
+    @Test
+    void shouldRejectJointLoginWhenUserQueryReturnsDifferentAbsUserId() throws Exception {
+        AuthProperties authProperties = authProperties();
+        JointLoginServiceImpl jointLoginService = new JointLoginServiceImpl(
+                xiaohuaGatewayService,
+                memberInfoRepository,
+                memberChannelRepository,
+                new JwtUtil(authProperties),
+                authProperties,
+                sensitiveDataCipher,
+                new JointLoginTargetPageResolver()
+        );
+        JointLoginRequest request = new JointLoginRequest(
+                "joint-token-mismatch-user-id",
+                "push",
+                null,
+                null,
+                null
+        );
+
+        when(xiaohuaGatewayService.validateUserToken(any(), any(), any()))
+                .thenReturn(new UserTokenResponse("xh-cid-003", "王五", "13800138002"));
+        when(xiaohuaGatewayService.queryUser(any(), any(), any()))
+                .thenReturn(new UserQueryResponse(objectMapper.readTree("""
+                        {
+                          "userId": "mem-unexpected",
+                          "cid": "xh-cid-003",
+                          "idInfo": {
+                            "idno": "310101199001011113"
+                          }
+                        }
+                        """)));
+        when(memberInfoRepository.selectByCid("xh-cid-003")).thenReturn(null);
+
+        assertThatThrownBy(() -> jointLoginService.login(request))
+                .isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo("JOINT_LOGIN_USER_ID_MISMATCH");
+    }
+
+    @Test
+    void shouldRejectJointLoginWhenUserQueryReturnsDifferentCid() throws Exception {
+        AuthProperties authProperties = authProperties();
+        JointLoginServiceImpl jointLoginService = new JointLoginServiceImpl(
+                xiaohuaGatewayService,
+                memberInfoRepository,
+                memberChannelRepository,
+                new JwtUtil(authProperties),
+                authProperties,
+                sensitiveDataCipher,
+                new JointLoginTargetPageResolver()
+        );
+        JointLoginRequest request = new JointLoginRequest(
+                "joint-token-mismatch-cid",
+                "push",
+                null,
+                null,
+                null
+        );
+
+        when(xiaohuaGatewayService.validateUserToken(any(), any(), any()))
+                .thenReturn(new UserTokenResponse("xh-cid-004", "赵六", "13800138003"));
+        when(xiaohuaGatewayService.queryUser(any(), any(), any()))
+                .thenReturn(new UserQueryResponse(objectMapper.readTree("""
+                        {
+                          "userId": "mem-expected",
+                          "cid": "xh-cid-other",
+                          "idInfo": {
+                            "idno": "310101199001011114"
+                          }
+                        }
+                        """)));
+        when(memberInfoRepository.selectByCid("xh-cid-004")).thenReturn(existingMember("mem-expected", "xh-cid-004"));
+
+        assertThatThrownBy(() -> jointLoginService.login(request))
+                .isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo("JOINT_LOGIN_CID_MISMATCH");
     }
 
     @Test
@@ -387,5 +469,13 @@ class JointLoginServiceTest {
         jwt.setSecret("test-jwt-secret-key-test-jwt-secret-key");
         authProperties.setJwt(jwt);
         return authProperties;
+    }
+
+    private MemberInfo existingMember(String memberId, String externalUserId) {
+        MemberInfo existing = new MemberInfo();
+        existing.setMemberId(memberId);
+        existing.setExternalUserId(externalUserId);
+        existing.setCreatedTs(java.time.LocalDateTime.now().minusDays(1));
+        return existing;
     }
 }
