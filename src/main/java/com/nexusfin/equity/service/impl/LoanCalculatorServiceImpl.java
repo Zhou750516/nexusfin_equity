@@ -6,6 +6,7 @@ import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.dto.request.LoanCalculateRequest;
 import com.nexusfin.equity.dto.response.LoanCalculateResponse;
 import com.nexusfin.equity.dto.response.LoanCalculatorConfigResponse;
+import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.service.H5I18nService;
 import com.nexusfin.equity.service.LoanCalculatorService;
 import com.nexusfin.equity.service.MemberReceivingAccountService;
@@ -13,7 +14,6 @@ import com.nexusfin.equity.service.XiaohuaGatewayService;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.UserCardListRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserCardSummary;
-import com.nexusfin.equity.exception.BizException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -32,6 +32,7 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Shanghai");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final String USER_CARDS_SOURCE = "YUNKA_USER_CARDS";
+    private static final String BIND_CARD_REQUIRED_MESSAGE = "请到科技平台绑卡后重试";
 
     private final H5LoanProperties h5LoanProperties;
     private final YunkaProperties yunkaProperties;
@@ -59,8 +60,27 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
     @Override
     public LoanCalculatorConfigResponse getCalculatorConfig(String memberId) {
         List<UserCardSummary> userCards = queryUserCards(memberId);
+        if (userCards.isEmpty()) {
+            return buildCalculatorConfig(null, true, BIND_CARD_REQUIRED_MESSAGE);
+        }
         UserCardSummary displayCard = userCards.get(0);
         memberReceivingAccountService.cacheReceivingAccounts(memberId, toCacheCommands(userCards));
+        return buildCalculatorConfig(
+                new LoanCalculatorConfigResponse.ReceivingAccount(
+                        displayCard.bankName(),
+                        displayCard.cardLastFour(),
+                        displayCard.cardId()
+                ),
+                false,
+                null
+        );
+    }
+
+    private LoanCalculatorConfigResponse buildCalculatorConfig(
+            LoanCalculatorConfigResponse.ReceivingAccount receivingAccount,
+            boolean bindCardRequired,
+            String bindCardMessage
+    ) {
         return new LoanCalculatorConfigResponse(
                 new LoanCalculatorConfigResponse.AmountRange(
                         h5LoanProperties.amountRange().min(),
@@ -71,11 +91,9 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
                 mapTermOptions(h5LoanProperties.termOptions()),
                 h5LoanProperties.annualRate(),
                 h5I18nService.text("loan.lender", h5LoanProperties.lender()),
-                new LoanCalculatorConfigResponse.ReceivingAccount(
-                        displayCard.bankName(),
-                        displayCard.cardLastFour(),
-                        displayCard.cardId()
-                )
+                receivingAccount,
+                bindCardRequired,
+                bindCardMessage
         );
     }
 
@@ -119,8 +137,8 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
                 "calculator-config",
                 new UserCardListRequest(memberId)
         ).cards();
-        if (cards == null || cards.isEmpty()) {
-            throw new BizException("USER_CARD_LIST_EMPTY", "User card list is empty");
+        if (cards == null) {
+            return List.of();
         }
         for (UserCardSummary card : cards) {
             validateUserCard(card);
@@ -133,7 +151,10 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
                 || !hasText(card.cardId())
                 || !hasText(card.bankName())
                 || !hasText(card.cardLastFour())) {
-            throw new BizException("USER_CARD_LIST_UNAVAILABLE", "User card list contains unavailable card data");
+            throw new BizException(
+                    "USER_CARD_LIST_UNAVAILABLE",
+                    "User card list contains unavailable card data"
+            );
         }
     }
 

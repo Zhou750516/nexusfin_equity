@@ -52,6 +52,11 @@ const calculatorMessages: Record<Locale, Record<string, string>> = {
     "calculator.loanAgreement": "《借款协议》",
     "calculator.privacyPolicy": "《隐私声明》",
     "calculator.agreementSuffix": "等相关条款",
+    "calculator.bindCardTitle": "需要先绑定银行卡",
+    "calculator.bindCardMessage": "请到科技平台绑卡后重试",
+    "calculator.bindCardRequiredShort": "请先绑卡",
+    "calculator.bindCardBack": "返回上一页",
+    "calculator.bindCardAck": "我知道了",
     "calculator.submit": "确认借款"
   },
   "zh-TW": {
@@ -108,6 +113,11 @@ const calculatorMessages: Record<Locale, Record<string, string>> = {
     "calculator.loanAgreement": "《借款協議》",
     "calculator.privacyPolicy": "《隱私聲明》",
     "calculator.agreementSuffix": "等相關條款",
+    "calculator.bindCardTitle": "需要先綁定銀行卡",
+    "calculator.bindCardMessage": "請到科技平台綁卡後重試",
+    "calculator.bindCardRequiredShort": "請先綁卡",
+    "calculator.bindCardBack": "返回上一頁",
+    "calculator.bindCardAck": "我知道了",
     "calculator.submit": "確認借款"
   },
   "en-US": {
@@ -166,6 +176,11 @@ const calculatorMessages: Record<Locale, Record<string, string>> = {
     "calculator.loanAgreement": "Loan Agreement",
     "calculator.privacyPolicy": "Privacy Policy",
     "calculator.agreementSuffix": " and related terms.",
+    "calculator.bindCardTitle": "Bank card required",
+    "calculator.bindCardMessage": "Please bind a card on the tech platform and try again.",
+    "calculator.bindCardRequiredShort": "Bind a card first",
+    "calculator.bindCardBack": "Go back",
+    "calculator.bindCardAck": "Got it",
     "calculator.submit": "Confirm Loan"
   },
   "vi-VN": {
@@ -224,6 +239,11 @@ const calculatorMessages: Record<Locale, Record<string, string>> = {
     "calculator.loanAgreement": "Thỏa thuận khoản vay",
     "calculator.privacyPolicy": "Chính sách quyền riêng tư",
     "calculator.agreementSuffix": " và các điều khoản liên quan.",
+    "calculator.bindCardTitle": "Cần liên kết thẻ ngân hàng",
+    "calculator.bindCardMessage": "Vui lòng liên kết thẻ trên nền tảng công nghệ rồi thử lại.",
+    "calculator.bindCardRequiredShort": "Vui lòng liên kết thẻ trước",
+    "calculator.bindCardBack": "Quay lại",
+    "calculator.bindCardAck": "Đã hiểu",
     "calculator.submit": "Xác nhận vay"
   }
 };

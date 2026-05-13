@@ -1,9 +1,11 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { CalculatorBindCardDialogContent } from "@/components/calculator/CalculatorBindCardDialog";
 import CalculatorHero from "@/components/calculator/CalculatorHero";
-import { buildApplyLoanPayload } from "./calculator.logic";
+import { buildApplyLoanPayload, resolveCalculatorSubmitDisabled } from "./calculator.logic";
 import { useCalculatorPageState } from "./useCalculatorPageState";
+import type { CalculateResult, CalculatorConfig } from "@/types/loan.types";
 
 const navigate = vi.fn();
 
@@ -100,4 +102,71 @@ describe("calculator apply payload", () => {
     expect(markup).toContain("disabled");
     expect(markup).toContain("cursor-not-allowed");
   });
+
+  it("disables submit when calculator config requires card binding", () => {
+    expect(
+      resolveCalculatorSubmitDisabled({
+        config: calculatorConfig({ bindCardRequired: true, receivingAccount: null }),
+        calculateResult: calculateResult(),
+        isSubmitting: false,
+        isCalculating: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps submit available when calculator config has a receiving account and calculation result", () => {
+    expect(
+      resolveCalculatorSubmitDisabled({
+        config: calculatorConfig(),
+        calculateResult: calculateResult(),
+        isSubmitting: false,
+        isCalculating: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("renders bind-card prompt copy without turning the page into a fatal error", () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(CalculatorBindCardDialogContent, {
+        message: "请到科技平台绑卡后重试",
+        onAck: vi.fn(),
+        onBack: vi.fn(),
+        t: (key: string) => key,
+      }),
+    );
+
+    expect(markup).toContain("请到科技平台绑卡后重试");
+    expect(markup).toContain("calculator.bindCardAck");
+    expect(markup).toContain("calculator.bindCardBack");
+  });
 });
+
+function calculatorConfig(overrides: Partial<CalculatorConfig> = {}): CalculatorConfig {
+  return {
+    amountRange: {
+      min: 100,
+      max: 5000,
+      step: 100,
+      default: 3000,
+    },
+    termOptions: [{ label: "3期", value: 3 }],
+    annualRate: 0.18,
+    lender: "XX商业银行",
+    receivingAccount: {
+      bankName: "测试银行",
+      lastFour: "1234",
+      accountId: "acc_001",
+    },
+    bindCardRequired: false,
+    bindCardMessage: null,
+    ...overrides,
+  };
+}
+
+function calculateResult(): CalculateResult {
+  return {
+    totalFee: 120.75,
+    annualRate: "24.0%",
+    repaymentPlan: [],
+  };
+}

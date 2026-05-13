@@ -102,14 +102,19 @@ class LoanCalculatorServiceTest {
     }
 
     @Test
-    void shouldFailWhenUserCardListIsEmpty() {
+    void shouldReturnBindCardRequiredConfigWhenUserCardListIsEmpty() {
         when(xiaohuaGatewayService.queryUserCards(any(), any(), any()))
                 .thenReturn(new UserCardListResponse(List.of()));
 
-        assertThatThrownBy(() -> loanCalculatorService.getCalculatorConfig("mem-test-001"))
-                .isInstanceOf(BizException.class)
-                .extracting(throwable -> ((BizException) throwable).getErrorNo())
-                .isEqualTo("USER_CARD_LIST_EMPTY");
+        LoanCalculatorConfigResponse response = loanCalculatorService.getCalculatorConfig("mem-test-001");
+
+        assertThat(response.amountRange().min()).isEqualTo(100L);
+        assertThat(response.termOptions())
+                .extracting(LoanCalculatorConfigResponse.TermOption::value)
+                .containsExactly(3, 6);
+        assertThat(response.receivingAccount()).isNull();
+        assertThat(response.bindCardRequired()).isTrue();
+        assertThat(response.bindCardMessage()).isEqualTo("请到科技平台绑卡后重试");
     }
 
     @Test

@@ -9,7 +9,7 @@ import { buildPath } from "@/lib/route";
 import type { AmountRange, CalculateResult, CalculatorConfig } from "@/types/loan.types";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { buildApplyLoanPayload } from "./calculator.logic";
+import { buildApplyLoanPayload, resolveCalculatorSubmitDisabled } from "./calculator.logic";
 import { LOAN_PURPOSE_KEYS, PROTOCOL_KEYS, type ProtocolKey } from "@/components/calculator/calculatorOptions";
 
 const AGREED_PROTOCOLS = ["user_agreement", "loan_agreement", "privacy_policy"];
@@ -33,6 +33,7 @@ export function useCalculatorPageState() {
   const [protocolDrawerOpen, setProtocolDrawerOpen] = useState(false);
   const [viewedProtocols, setViewedProtocols] = useState<Set<ProtocolKey>>(() => new Set());
   const [partnersDialogOpen, setPartnersDialogOpen] = useState(false);
+  const [bindCardDialogOpen, setBindCardDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -42,14 +43,23 @@ export function useCalculatorPageState() {
   const firstRepayment = calculateResult?.repaymentPlan[0] ?? null;
   const annualRateValue =
     calculateResult?.annualRate ?? (config ? `${(config.annualRate * 100).toFixed(1)}%` : "--");
-  const receivingAccountLabel = config
+  const bindCardRequired = config?.bindCardRequired === true;
+  const bindCardMessage = config?.bindCardMessage ?? t("calculator.bindCardMessage");
+  const receivingAccountLabel = config?.receivingAccount
     ? formatBankCard(config.receivingAccount.bankName, config.receivingAccount.lastFour, locale)
+    : bindCardRequired
+      ? t("calculator.bindCardRequiredShort")
     : "--";
   const amountRangeLabel = config
     ? `${formatCurrency(config.amountRange.min, locale)} - ${formatCurrency(config.amountRange.max, locale)}`
     : t("calculator.amountRange");
   const drawerStep = config?.amountRange.step ?? 100;
-  const isSubmitDisabled = !calculateResult || isSubmitting || isCalculating;
+  const isSubmitDisabled = resolveCalculatorSubmitDisabled({
+    config,
+    calculateResult,
+    isSubmitting,
+    isCalculating,
+  });
   const isAmountEditDisabled = true;
 
   const drawerQuickActions = useMemo(() => {
@@ -68,7 +78,7 @@ export function useCalculatorPageState() {
   }, [loadedConfigLocale, locale]);
 
   useEffect(() => {
-    if (!config) {
+    if (!config || bindCardRequired) {
       return;
     }
 
@@ -88,7 +98,13 @@ export function useCalculatorPageState() {
       const nextConfig = await getCalculatorConfig();
       setConfig(nextConfig);
       setLoadedConfigLocale(locale);
-      loan.setReceivingAccountId(nextConfig.receivingAccount.accountId ?? null);
+      if (nextConfig.bindCardRequired) {
+        setBindCardDialogOpen(true);
+        setCalculateResult(null);
+        loan.setReceivingAccountId(null);
+        return;
+      }
+      loan.setReceivingAccountId(nextConfig.receivingAccount?.accountId ?? null);
 
       const normalizedAmount = normalizeAmount(loan.amount, nextConfig.amountRange);
       const supportedTerms = nextConfig.termOptions.map((option) => option.value);
@@ -124,7 +140,7 @@ export function useCalculatorPageState() {
   }
 
   async function handleSubmit() {
-    if (!config || !calculateResult) {
+    if (!config || !calculateResult || config.bindCardRequired) {
       return;
     }
 
@@ -134,7 +150,7 @@ export function useCalculatorPageState() {
       const payload = buildApplyLoanPayload({
         amount,
         term: selectedTerm,
-        receivingAccountId: config.receivingAccount.accountId ?? loan.receivingAccountId ?? "",
+        receivingAccountId: config.receivingAccount?.accountId ?? loan.receivingAccountId ?? "",
         agreedProtocols: AGREED_PROTOCOLS,
         purposeKey,
       });
@@ -178,6 +194,7 @@ export function useCalculatorPageState() {
     protocolDrawerOpen,
     viewedProtocols,
     partnersDialogOpen,
+    bindCardDialogOpen,
     isLoading,
     isCalculating,
     isSubmitting,
@@ -190,6 +207,8 @@ export function useCalculatorPageState() {
     drawerStep,
     isAmountEditDisabled,
     isSubmitDisabled,
+    bindCardRequired,
+    bindCardMessage,
     drawerQuickActions,
     setSelectedTerm,
     setDraftAmount,
@@ -198,6 +217,7 @@ export function useCalculatorPageState() {
     setPurposeDrawerOpen,
     setProtocolDrawerOpen,
     setPartnersDialogOpen,
+    setBindCardDialogOpen,
     loadConfig,
     loadCalculation,
     handleSubmit,

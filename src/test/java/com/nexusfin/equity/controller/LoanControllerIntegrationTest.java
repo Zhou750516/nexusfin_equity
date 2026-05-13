@@ -122,7 +122,7 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     }
 
     @Test
-    void shouldReturnControlledErrorWhenUserCardListIsEmpty() throws Exception {
+    void shouldReturnBindCardRequiredConfigWhenUserCardListIsEmpty() throws Exception {
         MemberInfo memberInfo = createMember("mem-loan-config-empty", "user-loan-config-empty");
         when(xiaohuaGatewayService.queryUserCards(any(), eq("calculator-config"), any()))
                 .thenReturn(new UserCardListResponse(List.of()));
@@ -131,9 +131,11 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                         .cookie(authCookie(memberInfo))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(-1))
-                .andExpect(jsonPath("$.message")
-                        .value("USER_CARD_LIST_EMPTY:User card list is empty"));
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.bindCardRequired").value(true))
+                .andExpect(jsonPath("$.data.bindCardMessage").value("请到科技平台绑卡后重试"))
+                .andExpect(jsonPath("$.data.receivingAccount").isEmpty())
+                .andExpect(jsonPath("$.data.amountRange.default").value(3000));
     }
 
     @Test

@@ -9,8 +9,20 @@ public record LoanCalculatorConfigResponse(
         List<TermOption> termOptions,
         BigDecimal annualRate,
         String lender,
-        ReceivingAccount receivingAccount
+        ReceivingAccount receivingAccount,
+        Boolean bindCardRequired,
+        String bindCardMessage
 ) {
+
+    public LoanCalculatorConfigResponse(
+            AmountRange amountRange,
+            List<TermOption> termOptions,
+            BigDecimal annualRate,
+            String lender,
+            ReceivingAccount receivingAccount
+    ) {
+        this(amountRange, termOptions, annualRate, lender, receivingAccount, false, null);
+    }
 
     public record AmountRange(
             Long min,

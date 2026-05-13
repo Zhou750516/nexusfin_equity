@@ -1,6 +1,7 @@
 import MobileLayout from "@/components/MobileLayout";
 import { PageError, PageLoading } from "@/components/PageFeedback";
 import CalculatorAmountDrawer from "@/components/calculator/CalculatorAmountDrawer";
+import CalculatorBindCardDialog from "@/components/calculator/CalculatorBindCardDialog";
 import CalculatorPageContent from "@/components/calculator/CalculatorPageContent";
 import CalculatorProtocolDrawer from "@/components/calculator/CalculatorProtocolDrawer";
 import CalculatorPurposeDrawer from "@/components/calculator/CalculatorPurposeDrawer";
@@ -26,6 +27,7 @@ export default function CalculatorPage() {
     protocolDrawerOpen,
     viewedProtocols,
     partnersDialogOpen,
+    bindCardDialogOpen,
     isLoading,
     isCalculating,
     isSubmitting,
@@ -39,6 +41,7 @@ export default function CalculatorPage() {
     drawerStep,
     isAmountEditDisabled,
     isSubmitDisabled,
+    bindCardMessage,
     drawerQuickActions,
     setSelectedTerm,
     setDraftAmount,
@@ -47,6 +50,7 @@ export default function CalculatorPage() {
     setPurposeDrawerOpen,
     setProtocolDrawerOpen,
     setPartnersDialogOpen,
+    setBindCardDialogOpen,
     loadConfig,
     loadCalculation,
     handleSubmit,
@@ -156,6 +160,14 @@ export default function CalculatorPage() {
         allProtocolsAgreed={allProtocolsAgreed}
         viewedProtocolCount={viewedProtocols.size}
         onViewProtocol={viewProtocol}
+        t={t}
+      />
+
+      <CalculatorBindCardDialog
+        open={bindCardDialogOpen}
+        message={bindCardMessage}
+        onOpenChange={setBindCardDialogOpen}
+        onBack={() => history.back()}
         t={t}
       />
     </MobileLayout>

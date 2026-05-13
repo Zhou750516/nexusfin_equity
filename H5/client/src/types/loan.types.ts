@@ -27,7 +27,9 @@ export interface CalculatorConfig {
   termOptions: TermOption[];
   annualRate: number;
   lender: string;
-  receivingAccount: BankAccount;
+  receivingAccount: BankAccount | null;
+  bindCardRequired?: boolean;
+  bindCardMessage?: string | null;
 }
 
 export interface RepaymentPlanItem {
