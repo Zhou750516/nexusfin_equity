@@ -1,6 +1,6 @@
 import { PageError, PageLoading } from "@/components/PageFeedback";
 import SectionCard from "@/components/shared/SectionCard";
-import { formatCurrency, formatMonthDay } from "@/lib/format";
+import { formatCurrency, formatDateYmd } from "@/lib/format";
 import type { Locale } from "@/i18n/locale";
 import type { CalculateResult, RepaymentPlanItem } from "@/types/loan.types";
 
@@ -48,7 +48,7 @@ export default function CalculatorRepaymentSection({
             <div className="flex items-center gap-4">
               <div className="text-right">
                 <p className="text-[13px] leading-5 text-h5-text-secondary">
-                  {formatMonthDay(firstRepayment.date, locale)}
+                  {formatDateYmd(firstRepayment.date)}
                 </p>
                 <p className="text-[17px] font-bold leading-[25.5px] tracking-tight text-h5-text-primary">
                   {formatCurrency(firstRepayment.total, locale)}
@@ -67,7 +67,7 @@ export default function CalculatorRepaymentSection({
                     {t("calculator.periodLabel", { period: item.period })}
                   </span>
                   <div className="text-right">
-                    <p className="text-[12px] text-h5-text-secondary">{formatMonthDay(item.date, locale)}</p>
+                    <p className="text-[12px] text-h5-text-secondary">{formatDateYmd(item.date)}</p>
                     <p className="text-[14px] font-medium text-h5-text-primary">
                       {formatCurrency(item.total, locale)}
                     </p>

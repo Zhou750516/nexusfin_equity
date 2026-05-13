@@ -29,6 +29,23 @@ export function formatMonthDay(dateValue: string, locale: Locale): string {
   }).format(parsedDate);
 }
 
+export function formatDateYmd(dateValue: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+    return dateValue;
+  }
+
+  const normalizedValue = /^\d+$/.test(dateValue) ? Number(dateValue) : dateValue;
+  const parsedDate = new Date(normalizedValue);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return dateValue;
+  }
+
+  const year = parsedDate.getFullYear();
+  const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+  const day = String(parsedDate.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function formatDateTime(dateValue: string, locale: Locale): string {
   const parsedDate = new Date(dateValue);
   if (Number.isNaN(parsedDate.getTime())) {

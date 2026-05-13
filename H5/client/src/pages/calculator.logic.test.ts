@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CalculatorBindCardDialogContent } from "@/components/calculator/CalculatorBindCardDialog";
 import CalculatorHero from "@/components/calculator/CalculatorHero";
+import CalculatorRepaymentSection from "@/components/calculator/CalculatorRepaymentSection";
 import {
   buildApplyLoanPayload,
   resolveCalculatorSubmitDisabled,
@@ -163,6 +164,37 @@ describe("calculator apply payload", () => {
     expect(markup).toContain("请到科技平台绑卡后重试");
     expect(markup).toContain("calculator.bindCardAck");
     expect(markup).toContain("calculator.bindCardBack");
+  });
+
+  it("renders first and expanded repayment dates as full YYYY-MM-DD values", () => {
+    const result: CalculateResult = {
+      totalFee: 120.75,
+      annualRate: "24.0%",
+      repaymentPlan: [
+        { period: 1, date: "2026-06-13", principal: 992.95, interest: 21.25, total: 1040.25 },
+        { period: 2, date: "2026-07-13", principal: 999.98, interest: 14.22, total: 1040.25 },
+      ],
+    };
+
+    const markup = renderToStaticMarkup(
+      React.createElement(CalculatorRepaymentSection, {
+        isCalculating: false,
+        calculateResult: result,
+        firstRepayment: result.repaymentPlan[0],
+        expanded: true,
+        onToggleExpanded: vi.fn(),
+        onRetry: vi.fn(),
+        locale: "zh-CN",
+        error: null,
+        t: (key: string, params?: Record<string, string | number>) =>
+          key === "calculator.periodLabel" ? `第${params?.period}期` : key,
+      }),
+    );
+
+    expect(markup).toContain("2026-06-13");
+    expect(markup).toContain("2026-07-13");
+    expect(markup).not.toContain("6/13");
+    expect(markup).not.toContain("7/13");
   });
 });
 
