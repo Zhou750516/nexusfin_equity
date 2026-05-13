@@ -71,18 +71,18 @@ public class BenefitsServiceImpl implements BenefitsService {
         }
         H5BenefitsProperties.Detail detail = h5BenefitsProperties.detail();
         var protocolResponse = xiaohuaGatewayService.queryProtocols(
-                "BENEFITS-PROTOCOL-" + uid,
+                "BENEFITS-PROTOCOL-" + memberId,
                 "benefits-card-detail",
                 new ProtocolQueryRequest(
-                        uid,
+                        memberId,
                         h5BenefitsProperties.activate().defaultLoanAmount(),
                         h5LoanProperties.termOptions().isEmpty() ? 0 : h5LoanProperties.termOptions().get(0).value()
                 )
         );
         var cardResponse = xiaohuaGatewayService.queryUserCards(
-                "BENEFITS-CARD-" + uid,
+                "BENEFITS-CARD-" + memberId,
                 "benefits-card-detail",
-                new UserCardListRequest(uid)
+                new UserCardListRequest(memberId)
         );
         List<com.nexusfin.equity.thirdparty.yunka.ProtocolLink> dynamicProtocols = protocolResponse.list() == null
                 ? List.of()
@@ -140,7 +140,7 @@ public class BenefitsServiceImpl implements BenefitsService {
                 "BENEFITS-SYNC-" + request.applicationId(),
                 response.benefitOrderNo(),
                 new BenefitOrderSyncRequest(
-                        uid,
+                        memberId,
                         request.applicationId(),
                         "ACTIVE",
                         activate.defaultLoanAmount(),

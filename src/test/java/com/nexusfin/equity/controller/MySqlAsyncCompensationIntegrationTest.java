@@ -90,6 +90,7 @@ class MySqlAsyncCompensationIntegrationTest {
                         "LA-MYSQL-001",
                         "/loan/apply",
                         bizOrderNo,
+                        "mem-mysql-it-user",
                         "mysql-it-user",
                         "BEN-MYSQL-001",
                         bizOrderNo,

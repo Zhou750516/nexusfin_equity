@@ -42,7 +42,7 @@ public class RepaymentController {
         AuthPrincipal principal = AuthContextUtil.getRequiredPrincipal();
         log.info("traceId={} bizOrderNo={} repayment info requested by memberId={}",
                 TraceIdUtil.getTraceId(), loanId, principal.memberId());
-        return Result.success(repaymentService.getInfo(principal.techPlatformUserId(), loanId));
+        return Result.success(repaymentService.getInfo(principal.memberId(), loanId));
     }
 
     @PostMapping("/sms-send")
@@ -50,7 +50,7 @@ public class RepaymentController {
         AuthPrincipal principal = AuthContextUtil.getRequiredPrincipal();
         log.info("traceId={} bizOrderNo={} repayment sms send requested by memberId={}",
                 TraceIdUtil.getTraceId(), request.loanId(), principal.memberId());
-        return Result.success(repaymentService.sendSms(principal.techPlatformUserId(), request));
+        return Result.success(repaymentService.sendSms(principal.memberId(), request));
     }
 
     @PostMapping("/sms-confirm")
@@ -58,7 +58,7 @@ public class RepaymentController {
         AuthPrincipal principal = AuthContextUtil.getRequiredPrincipal();
         log.info("traceId={} bizOrderNo={} repayment sms confirm requested by memberId={}",
                 TraceIdUtil.getTraceId(), request.loanId(), principal.memberId());
-        return Result.success(repaymentService.confirmSms(principal.techPlatformUserId(), request));
+        return Result.success(repaymentService.confirmSms(principal.memberId(), request));
     }
 
     @PostMapping("/submit")
@@ -66,7 +66,7 @@ public class RepaymentController {
         AuthPrincipal principal = AuthContextUtil.getRequiredPrincipal();
         log.info("traceId={} bizOrderNo={} repayment submit requested by memberId={}",
                 TraceIdUtil.getTraceId(), request.loanId(), principal.memberId());
-        return Result.success(repaymentService.submit(principal.techPlatformUserId(), request));
+        return Result.success(repaymentService.submit(principal.memberId(), request));
     }
 
     @GetMapping("/result/{repaymentId}")
@@ -74,6 +74,6 @@ public class RepaymentController {
         AuthPrincipal principal = AuthContextUtil.getRequiredPrincipal();
         log.info("traceId={} bizOrderNo={} repayment result requested by memberId={}",
                 TraceIdUtil.getTraceId(), repaymentId, principal.memberId());
-        return Result.success(repaymentService.getResult(principal.techPlatformUserId(), repaymentId));
+        return Result.success(repaymentService.getResult(principal.memberId(), repaymentId));
     }
 }

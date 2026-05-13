@@ -49,7 +49,7 @@ public class LoanController {
         AuthPrincipal principal = AuthContextUtil.getRequiredPrincipal();
         log.info("traceId={} bizOrderNo={} loan calculate requested by memberId={}",
                 TraceIdUtil.getTraceId(), "loan-calculate", principal.memberId());
-        return Result.success(loanService.calculate(principal.memberId(), principal.techPlatformUserId(), request));
+        return Result.success(loanService.calculate(principal.memberId(), principal.memberId(), request));
     }
 
 

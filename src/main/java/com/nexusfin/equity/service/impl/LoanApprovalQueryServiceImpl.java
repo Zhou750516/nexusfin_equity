@@ -115,7 +115,7 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
                         requestId,
                         yunkaProperties.paths().loanQuery(),
                         mapping.getApplicationId(),
-                        new LoanQueryForwardData(mapping.getExternalUserId(), mapping.getUpstreamQueryValue())
+                        new LoanQueryForwardData(mapping.getMemberId(), mapping.getUpstreamQueryValue())
                 ).withMemberId(mapping.getMemberId())
         );
         return validateLoanQueryData(data);
@@ -231,7 +231,7 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
             var response = xiaohuaGatewayService.queryLoanRepayPlan(
                     requestId,
                     mapping.getApplicationId(),
-                    new LoanRepayPlanRequest(mapping.getExternalUserId(), mapping.getUpstreamQueryValue())
+                    new LoanRepayPlanRequest(mapping.getMemberId(), mapping.getUpstreamQueryValue())
             );
             if (response == null || response.repayPlan() == null) {
                 return List.of();

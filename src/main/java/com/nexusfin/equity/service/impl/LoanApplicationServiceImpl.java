@@ -65,7 +65,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
 
     @Override
     @Transactional(noRollbackFor = BenefitPurchaseSyncTimeoutCompensationException.class)
-    public LoanApplyResponse apply(String memberId, String uid, LoanApplyRequest request) {
+    public LoanApplyResponse apply(String memberId, String externalUserId, LoanApplyRequest request) {
         validateApplyRequest(request);
         LoanApplicationMapping pendingMapping = loanApplicationGateway.findLatestPendingMapping(memberId);
         if (pendingMapping != null) {
@@ -90,7 +90,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
         String requestId = next("LA");
         String upstreamBankCardNum = resolveBankCardNum(request);
         LoanApplyForwardData forwardData = new LoanApplyForwardData(
-                uid,
+                memberId,
                 benefitOrder.benefitOrderNo(),
                 request.platformBenefitOrderNo(),
                 applicationId,
@@ -129,7 +129,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
         } catch (UpstreamTimeoutException exception) {
             loanApplicationGateway.save(new LoanApplicationGateway.SaveCommand(
                     memberId,
-                    uid,
+                    externalUserId,
                     applicationId,
                     benefitOrder.benefitOrderNo(),
                     loanId,
@@ -148,7 +148,8 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                             requestId,
                             yunkaProperties.paths().loanApply(),
                             applicationId,
-                            uid,
+                            memberId,
+                            externalUserId,
                             benefitOrder.benefitOrderNo(),
                             applicationId,
                             loanId,
@@ -177,7 +178,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
         String upstreamLoanId = readText(response.data(), "loanId", loanId);
         loanApplicationGateway.save(new LoanApplicationGateway.SaveCommand(
                 memberId,
-                uid,
+                externalUserId,
                 applicationId,
                 benefitOrder.benefitOrderNo(),
                 upstreamLoanId,

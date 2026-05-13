@@ -8,6 +8,7 @@ public sealed interface AsyncCompensationEnqueuePayload
             String requestId,
             String path,
             String bizOrderNo,
+            String memberId,
             String uid,
             String benefitOrderNo,
             String applyId,

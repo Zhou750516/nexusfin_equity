@@ -66,7 +66,7 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
                         payload.path(),
                         payload.bizOrderNo(),
                         new YunkaLoanApplyForwardData(
-                                payload.uid(),
+                                resolveOutboundUserId(mapping, payload),
                                 payload.benefitOrderNo(),
                                 payload.applyId(),
                                 payload.loanId(),
@@ -105,14 +105,12 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
             LoanApplicationMapping mapping,
             YunkaLoanApplyPayload payload
     ) {
-        String externalUserId = mapping.getExternalUserId() == null || mapping.getExternalUserId().isBlank()
-                ? payload.uid()
-                : mapping.getExternalUserId();
+        String outboundUserId = resolveOutboundUserId(mapping, payload);
         String upstreamQueryValue = mapping.getUpstreamQueryValue() == null || mapping.getUpstreamQueryValue().isBlank()
                 ? payload.loanId()
                 : mapping.getUpstreamQueryValue();
         ObjectNode queryData = objectMapper.createObjectNode();
-        queryData.put("userId", externalUserId);
+        queryData.put("userId", outboundUserId);
         queryData.put("loanId", upstreamQueryValue);
         try {
             return yunkaCallTemplate.execute(
@@ -130,6 +128,18 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
             }
             throw exception;
         }
+    }
+
+    private String resolveOutboundUserId(LoanApplicationMapping mapping, YunkaLoanApplyPayload payload) {
+        String memberId = mapping != null ? mapping.getMemberId() : null;
+        if (memberId == null || memberId.isBlank()) {
+            memberId = payload.memberId();
+        }
+        if (memberId == null || memberId.isBlank()) {
+            throw new BizException("ASYNC_COMPENSATION_MEMBER_ID_MISSING",
+                    "Yunka loan apply retry requires ABS memberId for outbound userId");
+        }
+        return memberId;
     }
 
     private YunkaLoanApplyPayload readPayload(AsyncCompensationTask task) {
@@ -154,6 +164,7 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
             String requestId,
             String path,
             String bizOrderNo,
+            String memberId,
             String uid,
             String benefitOrderNo,
             String applyId,

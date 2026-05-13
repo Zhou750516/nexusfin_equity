@@ -53,6 +53,7 @@ class YunkaLoanApplyCompensationExecutorTest {
                   "requestId": "LA-001",
                   "path": "/loan/apply",
                   "bizOrderNo": "APP-001",
+                  "memberId": "mem-user-001",
                   "uid": "tech-user-001",
                   "benefitOrderNo": "ord-001",
                   "applyId": "APP-001",
@@ -64,6 +65,7 @@ class YunkaLoanApplyCompensationExecutorTest {
                 """);
         LoanApplicationMapping mapping = new LoanApplicationMapping();
         mapping.setApplicationId("APP-001");
+        mapping.setMemberId("mem-user-001");
         mapping.setMappingStatus("PENDING_REVIEW");
         mapping.setExternalUserId("tech-user-001");
         mapping.setUpstreamQueryValue("LN-001");
@@ -83,7 +85,8 @@ class YunkaLoanApplyCompensationExecutorTest {
         assertThat(requestCaptor.getValue().path()).isEqualTo("/loan/query");
         assertThat(new ObjectMapper().valueToTree(requestCaptor.getValue()).has("bizOrderNo")).isFalse();
         JsonNode requestData = new ObjectMapper().valueToTree(requestCaptor.getValue().data());
-        assertThat(requestData.path("userId").asText()).isEqualTo("tech-user-001");
+        assertThat(requestData.path("userId").asText()).isEqualTo("mem-user-001");
+        assertThat(requestData.path("userId").asText()).isNotEqualTo("tech-user-001");
         assertThat(requestData.has("uid")).isFalse();
         assertThat(result.responsePayload()).contains("SUCCESS");
         assertThat(result.responsePayload()).contains("LN-001");
@@ -111,6 +114,7 @@ class YunkaLoanApplyCompensationExecutorTest {
                   "requestId": "LA-003",
                   "path": "/loan/apply",
                   "bizOrderNo": "APP-003",
+                  "memberId": "mem-user-003",
                   "uid": "tech-user-003",
                   "benefitOrderNo": "ord-003",
                   "applyId": "APP-003",
@@ -122,6 +126,7 @@ class YunkaLoanApplyCompensationExecutorTest {
                 """);
         LoanApplicationMapping mapping = new LoanApplicationMapping();
         mapping.setApplicationId("APP-003");
+        mapping.setMemberId("mem-user-003");
         mapping.setMappingStatus("ACTIVE");
         when(loanApplicationMappingRepository.selectById("APP-003")).thenReturn(mapping);
 
@@ -149,6 +154,7 @@ class YunkaLoanApplyCompensationExecutorTest {
                   "requestId": "LA-004",
                   "path": "/loan/apply",
                   "bizOrderNo": "APP-004",
+                  "memberId": "mem-user-004",
                   "uid": "tech-user-004",
                   "benefitOrderNo": "ord-004",
                   "applyId": "APP-004",
@@ -160,6 +166,7 @@ class YunkaLoanApplyCompensationExecutorTest {
                 """);
         LoanApplicationMapping mapping = new LoanApplicationMapping();
         mapping.setApplicationId("APP-004");
+        mapping.setMemberId("mem-user-004");
         mapping.setExternalUserId("tech-user-004");
         mapping.setUpstreamQueryValue("LN-004");
         mapping.setMappingStatus("PENDING_REVIEW");
@@ -179,7 +186,8 @@ class YunkaLoanApplyCompensationExecutorTest {
         verify(yunkaGatewayClient).proxy(requestCaptor.capture());
         assertThat(requestCaptor.getValue().path()).isEqualTo("/loan/query");
         JsonNode queryData = new ObjectMapper().valueToTree(requestCaptor.getValue().data());
-        assertThat(queryData.path("userId").asText()).isEqualTo("tech-user-004");
+        assertThat(queryData.path("userId").asText()).isEqualTo("mem-user-004");
+        assertThat(queryData.path("userId").asText()).isNotEqualTo("tech-user-004");
         assertThat(queryData.has("uid")).isFalse();
     }
 
@@ -201,6 +209,7 @@ class YunkaLoanApplyCompensationExecutorTest {
                   "requestId": "LA-002",
                   "path": "/loan/apply",
                   "bizOrderNo": "APP-002",
+                  "memberId": "mem-user-002",
                   "uid": "tech-user-002",
                   "benefitOrderNo": "ord-002",
                   "applyId": "APP-002",
@@ -241,6 +250,7 @@ class YunkaLoanApplyCompensationExecutorTest {
                   "requestId": "LA-005",
                   "path": "/loan/apply",
                   "bizOrderNo": "APP-005",
+                  "memberId": "mem-user-005",
                   "uid": "tech-user-005",
                   "benefitOrderNo": "ord-005",
                   "applyId": "APP-005",
@@ -252,6 +262,7 @@ class YunkaLoanApplyCompensationExecutorTest {
                 """);
         LoanApplicationMapping mapping = new LoanApplicationMapping();
         mapping.setApplicationId("APP-005");
+        mapping.setMemberId("mem-user-005");
         mapping.setExternalUserId("tech-user-005");
         mapping.setUpstreamQueryValue("LN-005");
         mapping.setMappingStatus("PENDING_REVIEW");
@@ -274,9 +285,11 @@ class YunkaLoanApplyCompensationExecutorTest {
         assertThat(requestCaptor.getAllValues().get(1).path()).isEqualTo("/loan/apply");
         JsonNode queryPayload = new ObjectMapper().valueToTree(requestCaptor.getAllValues().get(0).data());
         JsonNode applyPayload = new ObjectMapper().valueToTree(requestCaptor.getAllValues().get(1).data());
-        assertThat(queryPayload.path("userId").asText()).isEqualTo("tech-user-005");
+        assertThat(queryPayload.path("userId").asText()).isEqualTo("mem-user-005");
+        assertThat(queryPayload.path("userId").asText()).isNotEqualTo("tech-user-005");
         assertThat(queryPayload.has("uid")).isFalse();
-        assertThat(applyPayload.path("userId").asText()).isEqualTo("tech-user-005");
+        assertThat(applyPayload.path("userId").asText()).isEqualTo("mem-user-005");
+        assertThat(applyPayload.path("userId").asText()).isNotEqualTo("tech-user-005");
         assertThat(applyPayload.has("uid")).isFalse();
         assertThat(applyPayload.path("loanAmount").decimalValue()).isEqualByComparingTo("3000.00");
     }
@@ -299,6 +312,7 @@ class YunkaLoanApplyCompensationExecutorTest {
                   "requestId": "LA-006",
                   "path": "/loan/apply",
                   "bizOrderNo": "APP-006",
+                  "memberId": "mem-user-006",
                   "uid": "tech-user-006",
                   "benefitOrderNo": "ord-006",
                   "applyId": "APP-006",
@@ -310,6 +324,7 @@ class YunkaLoanApplyCompensationExecutorTest {
                 """);
         LoanApplicationMapping mapping = new LoanApplicationMapping();
         mapping.setApplicationId("APP-006");
+        mapping.setMemberId("mem-user-006");
         mapping.setExternalUserId("tech-user-006");
         mapping.setUpstreamQueryValue("LN-006");
         mapping.setMappingStatus("PENDING_REVIEW");
@@ -332,9 +347,11 @@ class YunkaLoanApplyCompensationExecutorTest {
         assertThat(requestCaptor.getAllValues().get(1).path()).isEqualTo("/loan/apply");
         JsonNode queryPayload = new ObjectMapper().valueToTree(requestCaptor.getAllValues().get(0).data());
         JsonNode applyPayload = new ObjectMapper().valueToTree(requestCaptor.getAllValues().get(1).data());
-        assertThat(queryPayload.path("userId").asText()).isEqualTo("tech-user-006");
+        assertThat(queryPayload.path("userId").asText()).isEqualTo("mem-user-006");
+        assertThat(queryPayload.path("userId").asText()).isNotEqualTo("tech-user-006");
         assertThat(queryPayload.has("uid")).isFalse();
-        assertThat(applyPayload.path("userId").asText()).isEqualTo("tech-user-006");
+        assertThat(applyPayload.path("userId").asText()).isEqualTo("mem-user-006");
+        assertThat(applyPayload.path("userId").asText()).isNotEqualTo("tech-user-006");
         assertThat(applyPayload.has("uid")).isFalse();
     }
 
@@ -356,6 +373,7 @@ class YunkaLoanApplyCompensationExecutorTest {
                   "requestId": "LA-007",
                   "path": "/loan/apply",
                   "bizOrderNo": "APP-007",
+                  "memberId": "mem-user-007",
                   "uid": "tech-user-007",
                   "benefitOrderNo": "ord-007",
                   "applyId": "APP-007",

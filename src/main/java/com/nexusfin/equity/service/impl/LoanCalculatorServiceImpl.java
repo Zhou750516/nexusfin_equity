@@ -70,7 +70,7 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
                         requestId,
                         yunkaProperties.paths().loanCalculate(),
                         requestId,
-                        new LoanTrailForwardData(userId, requestedAmount, request.term())
+                        new LoanTrailForwardData(memberId, requestedAmount, request.term())
                 ).withMemberId(memberId)
         );
         BigDecimal receiveAmount = readAmountOrDefault(data, requestedAmount, "receiveAmount");

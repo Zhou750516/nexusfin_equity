@@ -98,8 +98,8 @@ public class RepaymentServiceImpl implements RepaymentService {
     }
 
     @Override
-    public RepaymentInfoResponse getInfo(String uid, String loanId) {
-        validateKnownLoanId(uid, loanId);
+    public RepaymentInfoResponse getInfo(String memberId, String loanId) {
+        validateKnownLoanId(memberId, loanId);
         String requestId = next("RT");
         JsonNode data = yunkaCallTemplate.executeForData(
                 YunkaCallTemplate.YunkaCall.of(
@@ -107,10 +107,10 @@ public class RepaymentServiceImpl implements RepaymentService {
                         requestId,
                         yunkaProperties.paths().repayTrial(),
                         loanId,
-                        new RepayTrialForwardData(uid, loanId, DEFAULT_REPAY_TYPE, List.of())
+                        new RepayTrialForwardData(memberId, loanId, DEFAULT_REPAY_TYPE, List.of())
                 )
         );
-        List<BankAccountResponse> bankCards = queryRepaymentCards(uid, loanId);
+        List<BankAccountResponse> bankCards = queryRepaymentCards(memberId, loanId);
         BankAccountResponse selectedCard = bankCards.stream().findFirst().orElseGet(this::fallbackBankAccount);
         return new RepaymentInfoResponse(
                 loanId,
@@ -127,15 +127,15 @@ public class RepaymentServiceImpl implements RepaymentService {
     }
 
     @Override
-    public RepaymentSmsSendResponse sendSms(String uid, RepaymentSmsSendRequest request) {
-        MemberProfile memberProfile = loadMemberProfile(uid);
-        String bankCardNum = resolveBankCardNumber(uid, request.loanId(), request.bankCardId());
+    public RepaymentSmsSendResponse sendSms(String memberId, RepaymentSmsSendRequest request) {
+        MemberProfile memberProfile = loadMemberProfile(memberId);
+        String bankCardNum = resolveBankCardNumber(memberId, request.loanId(), request.bankCardId());
         String requestId = next("RSS");
         var response = xiaohuaGatewayService.sendCardSms(
                 requestId,
                 request.loanId(),
                 new CardSmsSendRequest(
-                        uid,
+                        memberId,
                         request.loanId(),
                         REPAYMENT_SMS_TYPE,
                         bankCardNum,
@@ -152,14 +152,14 @@ public class RepaymentServiceImpl implements RepaymentService {
     }
 
     @Override
-    public RepaymentSmsConfirmResponse confirmSms(String uid, RepaymentSmsConfirmRequest request) {
-        MemberProfile memberProfile = loadMemberProfile(uid);
+    public RepaymentSmsConfirmResponse confirmSms(String memberId, RepaymentSmsConfirmRequest request) {
+        MemberProfile memberProfile = loadMemberProfile(memberId);
         String requestId = next("RSC");
         var response = xiaohuaGatewayService.confirmCardSms(
                 requestId,
                 request.loanId(),
                 new CardSmsConfirmRequest(
-                        uid,
+                        memberId,
                         memberProfile.mobile(),
                         REPAYMENT_SMS_TYPE,
                         request.loanId(),
@@ -173,15 +173,15 @@ public class RepaymentServiceImpl implements RepaymentService {
     }
 
     @Override
-    public RepaymentSubmitResponse submit(String uid, RepaymentSubmitRequest request) {
+    public RepaymentSubmitResponse submit(String memberId, RepaymentSubmitRequest request) {
         String requestId = next("RS");
-        validateKnownLoanId(uid, request.loanId());
+        validateKnownLoanId(memberId, request.loanId());
         long requestedRepayAmount = yuanToCent(request.amount());
         JsonNode data;
         try {
-            validateRepaymentAmount(uid, request.loanId(), request.repaymentType(), requestedRepayAmount);
-            reserveRepaymentSubmit(uid, request.loanId(), requestedRepayAmount);
-            String bankCardNum = resolveBankCardNumber(uid, request.loanId(), request.bankCardId());
+            validateRepaymentAmount(memberId, request.loanId(), request.repaymentType(), requestedRepayAmount);
+            reserveRepaymentSubmit(memberId, request.loanId(), requestedRepayAmount);
+            String bankCardNum = resolveBankCardNumber(memberId, request.loanId(), request.bankCardId());
             data = yunkaCallTemplate.executeForData(
                     YunkaCallTemplate.YunkaCall.of(
                             "repayment submit",
@@ -189,7 +189,7 @@ public class RepaymentServiceImpl implements RepaymentService {
                             yunkaProperties.paths().repayApply(),
                             request.loanId(),
                             new RepayApplyForwardData(
-                                    uid,
+                                    memberId,
                                     request.loanId(),
                                     mapRepayType(request.repaymentType()),
                                     List.of(),
@@ -209,14 +209,14 @@ public class RepaymentServiceImpl implements RepaymentService {
         );
     }
 
-    private void validateRepaymentAmount(String uid, String loanId, String repaymentType, long requestedRepayAmount) {
+    private void validateRepaymentAmount(String memberId, String loanId, String repaymentType, long requestedRepayAmount) {
         JsonNode trialData = yunkaCallTemplate.executeForData(
                 YunkaCallTemplate.YunkaCall.of(
                         "repayment submit amount validation",
                         next("RTS"),
                         yunkaProperties.paths().repayTrial(),
                         loanId,
-                        new RepayTrialForwardData(uid, loanId, mapRepayType(repaymentType), List.of())
+                        new RepayTrialForwardData(memberId, loanId, mapRepayType(repaymentType), List.of())
                 )
         );
         long repayableAmount = yuanToCent(readDecimal(trialData, "repayAmount", "amount"));
@@ -233,9 +233,9 @@ public class RepaymentServiceImpl implements RepaymentService {
         throw new BizException(REPAYMENT_AMOUNT_EXCEEDED, "Repayment amount exceeds current repayable amount");
     }
 
-    private void reserveRepaymentSubmit(String uid, String loanId, long requestedRepayAmount) {
+    private void reserveRepaymentSubmit(String memberId, String loanId, long requestedRepayAmount) {
         LocalDateTime now = LocalDateTime.now();
-        String bizKey = repaymentSubmitBizKey(uid, loanId, requestedRepayAmount);
+        String bizKey = repaymentSubmitBizKey(memberId, loanId, requestedRepayAmount);
         IdempotencyRecord existing = idempotencyRecordRepository.selectOne(
                 Wrappers.<IdempotencyRecord>lambdaQuery()
                         .eq(IdempotencyRecord::getBizType, REPAYMENT_SUBMIT_BIZ_TYPE)
@@ -272,8 +272,8 @@ public class RepaymentServiceImpl implements RepaymentService {
         }
     }
 
-    private String repaymentSubmitBizKey(String uid, String loanId, long requestedRepayAmount) {
-        return uid + ":" + loanId + ":" + requestedRepayAmount;
+    private String repaymentSubmitBizKey(String memberId, String loanId, long requestedRepayAmount) {
+        return memberId + ":" + loanId + ":" + requestedRepayAmount;
     }
 
     private String repaymentSubmitGuardRequestId(String bizKey, LocalDateTime now) {
@@ -282,8 +282,8 @@ public class RepaymentServiceImpl implements RepaymentService {
     }
 
     @Override
-    public RepaymentResultResponse getResult(String uid, String repaymentId) {
-        String loanId = validateAndResolveLoanId(uid, repaymentId);
+    public RepaymentResultResponse getResult(String memberId, String repaymentId) {
+        String loanId = validateAndResolveLoanId(memberId, repaymentId);
         String requestId = next("RQ");
         JsonNode data = yunkaCallTemplate.executeForData(
                 YunkaCallTemplate.YunkaCall.of(
@@ -291,11 +291,11 @@ public class RepaymentServiceImpl implements RepaymentService {
                         requestId,
                         yunkaProperties.paths().repayQuery(),
                         repaymentId,
-                        new RepayQueryForwardData(uid, loanId, repaymentId)
+                        new RepayQueryForwardData(memberId, loanId, repaymentId)
                 )
         );
         String swiftNumber = readText(data, "swiftNumber", repaymentId);
-        BankAccountResponse bankCard = resolveResultBankCard(uid, swiftNumber, data);
+        BankAccountResponse bankCard = resolveResultBankCard(memberId, swiftNumber, data);
         return new RepaymentResultResponse(
                 repaymentId,
                 swiftNumber,
@@ -308,12 +308,12 @@ public class RepaymentServiceImpl implements RepaymentService {
         );
     }
 
-    private List<BankAccountResponse> queryRepaymentCards(String uid, String bizOrderNo) {
+    private List<BankAccountResponse> queryRepaymentCards(String memberId, String bizOrderNo) {
         try {
             var response = xiaohuaGatewayService.queryUserCards(
                     next("RUC"),
                     bizOrderNo,
-                    new UserCardListRequest(uid)
+                    new UserCardListRequest(memberId)
             );
             if (response == null || response.cards() == null || response.cards().isEmpty()) {
                 return List.of(fallbackBankAccount());
@@ -332,9 +332,9 @@ public class RepaymentServiceImpl implements RepaymentService {
         }
     }
 
-    private BankAccountResponse resolveResultBankCard(String uid, String bizOrderNo, JsonNode data) {
+    private BankAccountResponse resolveResultBankCard(String memberId, String bizOrderNo, JsonNode data) {
         String bankCardNum = readText(data, "bankCardNum", "");
-        List<BankAccountResponse> bankCards = queryRepaymentCards(uid, bizOrderNo);
+        List<BankAccountResponse> bankCards = queryRepaymentCards(memberId, bizOrderNo);
         if (!bankCardNum.isBlank()) {
             return bankCards.stream()
                     .filter(card -> bankCardNum.equals(card.accountId()))
@@ -365,36 +365,36 @@ public class RepaymentServiceImpl implements RepaymentService {
         );
     }
 
-    private String resolveBankCardNumber(String uid, String bizOrderNo, String bankCardId) {
-        return queryRepaymentCards(uid, bizOrderNo).stream()
+    private String resolveBankCardNumber(String memberId, String bizOrderNo, String bankCardId) {
+        return queryRepaymentCards(memberId, bizOrderNo).stream()
                 .filter(card -> bankCardId.equals(card.accountId()))
                 .findFirst()
                 .map(BankAccountResponse::accountId)
                 .orElse(bankCardId);
     }
 
-    private void validateKnownLoanId(String uid, String loanId) {
-        if (findLoanMapping(uid, loanId) == null) {
+    private void validateKnownLoanId(String memberId, String loanId) {
+        if (findLoanMapping(memberId, loanId) == null) {
             throw new BizException(404, "repayment loan reference not found");
         }
     }
 
-    private String validateAndResolveLoanId(String uid, String repaymentId) {
-        LoanApplicationMapping directMapping = findLoanMapping(uid, repaymentId);
+    private String validateAndResolveLoanId(String memberId, String repaymentId) {
+        LoanApplicationMapping directMapping = findLoanMapping(memberId, repaymentId);
         if (directMapping != null) {
             return directMapping.getUpstreamQueryValue();
         }
         String loanId = extractLoanId(repaymentId);
-        if (loanId != null && findLoanMapping(uid, loanId) != null) {
+        if (loanId != null && findLoanMapping(memberId, loanId) != null) {
             return loanId;
         }
         throw new BizException(404, "repayment reference not found");
     }
 
-    private LoanApplicationMapping findLoanMapping(String uid, String loanId) {
+    private LoanApplicationMapping findLoanMapping(String memberId, String loanId) {
         return loanApplicationMappingRepository.selectOne(
                 Wrappers.<LoanApplicationMapping>lambdaQuery()
-                        .eq(LoanApplicationMapping::getExternalUserId, uid)
+                        .eq(LoanApplicationMapping::getMemberId, memberId)
                         .eq(LoanApplicationMapping::getUpstreamQueryType, "loanId")
                         .eq(LoanApplicationMapping::getUpstreamQueryValue, loanId)
                         .last("limit 1")
@@ -411,8 +411,8 @@ public class RepaymentServiceImpl implements RepaymentService {
         return null;
     }
 
-    private MemberProfile loadMemberProfile(String uid) {
-        MemberInfo memberInfo = memberInfoRepository.selectByTechPlatformUserId(uid);
+    private MemberProfile loadMemberProfile(String memberId) {
+        MemberInfo memberInfo = memberInfoRepository.selectById(memberId);
         if (memberInfo == null) {
             throw new BizException(404, "member info not found");
         }

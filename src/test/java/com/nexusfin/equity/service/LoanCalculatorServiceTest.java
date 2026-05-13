@@ -93,8 +93,8 @@ class LoanCalculatorServiceTest {
                         """));
 
         LoanCalculateResponse response = loanCalculatorService.calculate(
-                "mem-001",
-                "user-001",
+                "mem-test-001",
+                "cid-test-001",
                 new LoanCalculateRequest(3000L, 3)
         );
 
@@ -106,12 +106,13 @@ class LoanCalculatorServiceTest {
         ArgumentCaptor<YunkaCallTemplate.YunkaCall> captor = ArgumentCaptor.forClass(YunkaCallTemplate.YunkaCall.class);
         verify(yunkaCallTemplate).executeForData(captor.capture());
         assertThat(captor.getValue().scene()).isEqualTo("loan calculate");
-        assertThat(captor.getValue().memberId()).isEqualTo("mem-001");
+        assertThat(captor.getValue().memberId()).isEqualTo("mem-test-001");
         assertThat(captor.getValue().path()).isEqualTo("/loan/trial");
         var payload = objectMapper.valueToTree(captor.getValue().payload());
         assertThat(payload.path("loanAmount").decimalValue())
                 .isEqualByComparingTo("3000.00");
-        assertThat(payload.path("userId").asText()).isEqualTo("user-001");
+        assertThat(payload.path("userId").asText()).isEqualTo("mem-test-001");
+        assertThat(payload.path("userId").asText()).isNotEqualTo("cid-test-001");
         assertThat(payload.has("uid")).isFalse();
         assertThat(payload.has("applyId")).isFalse();
     }
@@ -126,8 +127,8 @@ class LoanCalculatorServiceTest {
                         """));
 
         LoanCalculateResponse response = loanCalculatorService.calculate(
-                "mem-001",
-                "user-001",
+                "mem-test-001",
+                "cid-test-001",
                 new LoanCalculateRequest(3000L, 3)
         );
 
@@ -139,8 +140,8 @@ class LoanCalculatorServiceTest {
     @Test
     void shouldRejectUnsupportedAmountOrTermBeforeCallingYunka() {
         assertThatThrownBy(() -> loanCalculatorService.calculate(
-                "mem-001",
-                "user-001",
+                "mem-test-001",
+                "cid-test-001",
                 new LoanCalculateRequest(3050L, 3)
         ))
                 .isInstanceOf(BizException.class)
@@ -148,8 +149,8 @@ class LoanCalculatorServiceTest {
                 .isEqualTo("amount step is invalid");
 
         assertThatThrownBy(() -> loanCalculatorService.calculate(
-                "mem-001",
-                "user-001",
+                "mem-test-001",
+                "cid-test-001",
                 new LoanCalculateRequest(3000L, 12)
         ))
                 .isInstanceOf(BizException.class)

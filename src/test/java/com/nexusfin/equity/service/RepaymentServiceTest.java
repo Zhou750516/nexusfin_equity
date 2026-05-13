@@ -96,7 +96,7 @@ class RepaymentServiceTest {
 
     @Test
     void shouldReturnBoundCardsAndDefaultCardInRepaymentInfo() throws Exception {
-        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("user-001", "LN-001"));
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", "LN-001"));
         when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
                 0,
                 "SUCCESS",
@@ -110,7 +110,7 @@ class RepaymentServiceTest {
                         new UserCardSummary("card-002", "建设银行", "1234", 0)
                 )));
 
-        RepaymentInfoResponse response = repaymentService.getInfo("user-001", "LN-001");
+        RepaymentInfoResponse response = repaymentService.getInfo("mem-test-001", "LN-001");
 
         assertThat(response.bankCard().bankName()).isEqualTo("招商银行");
         assertThat(response.bankCard().accountId()).isEqualTo("card-001");
@@ -121,7 +121,8 @@ class RepaymentServiceTest {
         verify(yunkaGatewayClient).proxy(captor.capture());
         JsonNode payload = objectMapper.valueToTree(captor.getValue().data());
         assertThat(captor.getValue().path()).isEqualTo("/repay/trial");
-        assertThat(payload.path("userId").asText()).isEqualTo("user-001");
+        assertThat(payload.path("userId").asText()).isEqualTo("mem-test-001");
+        assertThat(payload.path("userId").asText()).isNotEqualTo("cid-test-001");
         assertThat(payload.has("uid")).isFalse();
     }
 
@@ -129,7 +130,7 @@ class RepaymentServiceTest {
     void shouldRejectUnknownLoanIdBeforeCallingYunka() {
         when(loanApplicationMappingRepository.selectOne(any())).thenReturn(null);
 
-        assertThatThrownBy(() -> repaymentService.getInfo("user-001", "LN-FAKE-001"))
+        assertThatThrownBy(() -> repaymentService.getInfo("mem-test-001", "LN-FAKE-001"))
                 .isInstanceOf(BizException.class)
                 .extracting(throwable -> ((BizException) throwable).getCode(),
                         throwable -> ((BizException) throwable).getErrorMsg())
@@ -145,7 +146,7 @@ class RepaymentServiceTest {
                 .thenReturn(new UserCardListResponse(List.of(
                         new UserCardSummary("card-001", "招商银行", "8648", 1)
                 )));
-        when(memberInfoRepository.selectByTechPlatformUserId("user-001")).thenReturn(memberInfo());
+        when(memberInfoRepository.selectById("mem-test-001")).thenReturn(memberInfo());
         when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
         when(sensitiveDataCipher.decrypt("id-cipher")).thenReturn("110101199003071234");
         when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户");
@@ -153,7 +154,7 @@ class RepaymentServiceTest {
                 .thenReturn(new CardSmsSendResponse("sms-001", "11001", "发送成功"));
 
         RepaymentSmsSendResponse response = repaymentService.sendSms(
-                "user-001",
+                "mem-test-001",
                 new RepaymentSmsSendRequest("LN-002", "card-001")
         );
 
@@ -162,7 +163,7 @@ class RepaymentServiceTest {
         ArgumentCaptor<com.nexusfin.equity.thirdparty.yunka.CardSmsSendRequest> captor =
                 ArgumentCaptor.forClass(com.nexusfin.equity.thirdparty.yunka.CardSmsSendRequest.class);
         verify(xiaohuaGatewayService).sendCardSms(any(), eq("LN-002"), captor.capture());
-        assertThat(captor.getValue().userId()).isEqualTo("user-001");
+        assertThat(captor.getValue().userId()).isEqualTo("mem-test-001");
         assertThat(captor.getValue().bankCardNum()).isEqualTo("card-001");
         assertThat(captor.getValue().type()).isEqualTo(2);
         assertThat(captor.getValue().phone()).isEqualTo("13800138000");
@@ -170,13 +171,13 @@ class RepaymentServiceTest {
 
     @Test
     void shouldConfirmRepaymentSmsUsingLatestGatewayFields() {
-        when(memberInfoRepository.selectByTechPlatformUserId("user-001")).thenReturn(memberInfo());
+        when(memberInfoRepository.selectById("mem-test-001")).thenReturn(memberInfo());
         when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
         when(xiaohuaGatewayService.confirmCardSms(any(), eq("LN-003"), any()))
                 .thenReturn(new CardSmsConfirmResponse("11002", "验证成功"));
 
         RepaymentSmsConfirmResponse response = repaymentService.confirmSms(
-                "user-001",
+                "mem-test-001",
                 new RepaymentSmsConfirmRequest("LN-003", "123456")
         );
 
@@ -185,7 +186,7 @@ class RepaymentServiceTest {
 
     @Test
     void shouldMapLatestRepaymentQueryStatuses() throws Exception {
-        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("user-001", "LN-001"));
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", "LN-001"));
         when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
                 0,
                 "SUCCESS",
@@ -204,7 +205,7 @@ class RepaymentServiceTest {
                         new UserCardSummary("6222020202028648", "招商银行", "8648", 1)
                 )));
 
-        RepaymentResultResponse response = repaymentService.getResult("user-001", "RP-LN-001");
+        RepaymentResultResponse response = repaymentService.getResult("mem-test-001", "RP-LN-001");
 
         assertThat(response.status()).isEqualTo("processing");
         assertThat(response.swiftNumber()).isEqualTo("RP-LN-001");
@@ -216,7 +217,8 @@ class RepaymentServiceTest {
         verify(yunkaGatewayClient).proxy(captor.capture());
         JsonNode data = objectMapper.valueToTree(captor.getValue().data());
         assertThat(captor.getValue().path()).isEqualTo("/repay/query");
-        assertThat(data.get("userId").asText()).isEqualTo("user-001");
+        assertThat(data.get("userId").asText()).isEqualTo("mem-test-001");
+        assertThat(data.get("userId").asText()).isNotEqualTo("cid-test-001");
         assertThat(data.has("uid")).isFalse();
         assertThat(data.get("loanId").asText()).isEqualTo("LN-001");
         assertThat(data.get("swiftNumber").asText()).isEqualTo("RP-LN-001");
@@ -226,7 +228,7 @@ class RepaymentServiceTest {
     void shouldRejectUnknownRepaymentIdBeforeCallingYunka() {
         when(loanApplicationMappingRepository.selectOne(any())).thenReturn(null);
 
-        assertThatThrownBy(() -> repaymentService.getResult("user-001", "RP-LN-FAKE-001"))
+        assertThatThrownBy(() -> repaymentService.getResult("mem-test-001", "RP-LN-FAKE-001"))
                 .isInstanceOf(BizException.class)
                 .extracting(throwable -> ((BizException) throwable).getCode(),
                         throwable -> ((BizException) throwable).getErrorMsg())
@@ -238,7 +240,7 @@ class RepaymentServiceTest {
 
     @Test
     void shouldTranslateRepaymentSubmitTimeoutToBizException() {
-        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("user-001", "LN-REPAY-TIMEOUT-001"));
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", "LN-REPAY-TIMEOUT-001"));
         when(yunkaGatewayClient.proxy(any()))
                 .thenAnswer(invocation -> {
                     YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
@@ -255,7 +257,7 @@ class RepaymentServiceTest {
                 });
 
         assertThatThrownBy(() -> repaymentService.submit(
-                "user-001",
+                "mem-test-001",
                 new RepaymentSubmitRequest("LN-REPAY-TIMEOUT-001", BigDecimal.valueOf(1018.50), "acc_001", "early")
         ))
                 .isInstanceOf(BizException.class)
@@ -271,7 +273,7 @@ class RepaymentServiceTest {
 
     @Test
     void shouldRejectRepaymentSubmitWhenAmountExceedsCurrentRepayableAmount() throws Exception {
-        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("user-001", "LN-REPAY-OVERPAY-001"));
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", "LN-REPAY-OVERPAY-001"));
         when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
                 0,
                 "SUCCESS",
@@ -281,7 +283,7 @@ class RepaymentServiceTest {
         ));
 
         assertThatThrownBy(() -> repaymentService.submit(
-                "user-001",
+                "mem-test-001",
                 new RepaymentSubmitRequest("LN-REPAY-OVERPAY-001", BigDecimal.valueOf(2000.00), "acc_001", "early")
         ))
                 .isInstanceOf(BizException.class)
@@ -301,7 +303,7 @@ class RepaymentServiceTest {
 
     @Test
     void shouldRejectDuplicateRepaymentSubmitBeforeSecondRepayApplyCall() throws Exception {
-        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("user-001", "LN-REPAY-DUP-001"));
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", "LN-REPAY-DUP-001"));
         when(yunkaGatewayClient.proxy(any()))
                 .thenAnswer(invocation -> {
                     YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
@@ -327,12 +329,12 @@ class RepaymentServiceTest {
                 .thenThrow(new DuplicateKeyException("duplicate repayment submit"));
 
         repaymentService.submit(
-                "user-001",
+                "mem-test-001",
                 new RepaymentSubmitRequest("LN-REPAY-DUP-001", BigDecimal.valueOf(1018.50), "acc_001", "early")
         );
 
         assertThatThrownBy(() -> repaymentService.submit(
-                "user-001",
+                "mem-test-001",
                 new RepaymentSubmitRequest("LN-REPAY-DUP-001", BigDecimal.valueOf(1018.50), "acc_001", "early")
         ))
                 .isInstanceOf(BizException.class)
@@ -354,7 +356,7 @@ class RepaymentServiceTest {
 
     @Test
     void shouldSendRepaymentAmountToYunkaInYuanAtBoundary() throws Exception {
-        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("user-001", "LN-REPAY-SUBMIT-001"));
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", "LN-REPAY-SUBMIT-001"));
         when(yunkaGatewayClient.proxy(any()))
                 .thenAnswer(invocation -> {
                     YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
@@ -378,7 +380,7 @@ class RepaymentServiceTest {
         when(idempotencyRecordRepository.insert(any())).thenReturn(1);
 
         repaymentService.submit(
-                "user-001",
+                "mem-test-001",
                 new RepaymentSubmitRequest("LN-REPAY-SUBMIT-001", BigDecimal.valueOf(1018.50), "acc_001", "early")
         );
 
@@ -394,16 +396,19 @@ class RepaymentServiceTest {
                 .findFirst()
                 .orElseThrow();
         JsonNode repayTrialPayload = objectMapper.valueToTree(repayTrialRequest.data());
-        assertThat(repayTrialPayload.path("userId").asText()).isEqualTo("user-001");
+        assertThat(repayTrialPayload.path("userId").asText()).isEqualTo("mem-test-001");
+        assertThat(repayTrialPayload.path("userId").asText()).isNotEqualTo("cid-test-001");
         assertThat(repayTrialPayload.has("uid")).isFalse();
-        assertThat(repayApplyPayload.path("userId").asText()).isEqualTo("user-001");
+        assertThat(repayApplyPayload.path("userId").asText()).isEqualTo("mem-test-001");
+        assertThat(repayApplyPayload.path("userId").asText()).isNotEqualTo("cid-test-001");
         assertThat(repayApplyPayload.has("uid")).isFalse();
         assertThat(repayApplyPayload.path("repayAmount").decimalValue()).isEqualByComparingTo("1018.50");
     }
 
-    private LoanApplicationMapping loanMapping(String externalUserId, String loanId) {
+    private LoanApplicationMapping loanMapping(String memberId, String externalUserId, String loanId) {
         LoanApplicationMapping mapping = new LoanApplicationMapping();
         mapping.setApplicationId("APP-" + loanId);
+        mapping.setMemberId(memberId);
         mapping.setExternalUserId(externalUserId);
         mapping.setUpstreamQueryValue(loanId);
         mapping.setMappingStatus("ACTIVE");
@@ -412,7 +417,9 @@ class RepaymentServiceTest {
 
     private MemberInfo memberInfo() {
         MemberInfo memberInfo = new MemberInfo();
-        memberInfo.setTechPlatformUserId("user-001");
+        memberInfo.setMemberId("mem-test-001");
+        memberInfo.setTechPlatformUserId("cid-test-001");
+        memberInfo.setExternalUserId("cid-test-001");
         memberInfo.setMobileEncrypted("mobile-cipher");
         memberInfo.setIdCardEncrypted("id-cipher");
         memberInfo.setRealNameEncrypted("name-cipher");

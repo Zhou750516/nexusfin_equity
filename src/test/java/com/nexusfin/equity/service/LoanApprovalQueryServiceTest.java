@@ -62,15 +62,15 @@ class LoanApprovalQueryServiceTest {
 
     @Test
     void shouldBuildRejectedApprovalStatusWithBenefitsPreview() {
-        when(loanApplicationGateway.findActiveOrPendingMapping("mem-001", "APP-003"))
-                .thenReturn(mapping("APP-003", "LN-003", "rent"));
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-test-001", "APP-003"))
+                .thenReturn(mapping("mem-test-001", "cid-test-001", "APP-003", "LN-003", "rent"));
         when(yunkaCallTemplate.executeForData(any()))
                 .thenReturn(objectMapper.createObjectNode()
                         .put("loanId", "LN-003")
                         .put("status", "7003")
                         .put("remark", "invalid state"));
 
-        LoanApprovalStatusResponse response = loanApprovalQueryService.getApprovalStatus("mem-001", "APP-003");
+        LoanApprovalStatusResponse response = loanApprovalQueryService.getApprovalStatus("mem-test-001", "APP-003");
 
         assertThat(response.applicationId()).isEqualTo("APP-003");
         assertThat(response.status()).isEqualTo("rejected");
@@ -86,14 +86,15 @@ class LoanApprovalQueryServiceTest {
         org.mockito.Mockito.verify(yunkaCallTemplate).executeForData(captor.capture());
         assertThat(captor.getValue().path()).isEqualTo("/loan/query");
         var payload = objectMapper.valueToTree(captor.getValue().payload());
-        assertThat(payload.path("userId").asText()).isEqualTo("user-001");
+        assertThat(payload.path("userId").asText()).isEqualTo("mem-test-001");
+        assertThat(payload.path("userId").asText()).isNotEqualTo("cid-test-001");
         assertThat(payload.has("uid")).isFalse();
     }
 
     @Test
     void shouldBuildApprovedApprovalResultAndMapRepayPlan() throws Exception {
-        when(loanApplicationGateway.findActiveOrPendingMapping("mem-001", "APP-001"))
-                .thenReturn(mapping("APP-001", "LN-001", "rent"));
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-test-001", "APP-001"))
+                .thenReturn(mapping("mem-test-001", "cid-test-001", "APP-001", "LN-001", "rent"));
         when(yunkaCallTemplate.executeForData(any()))
                 .thenReturn(objectMapper.readTree("""
                         {
@@ -109,7 +110,7 @@ class LoanApprovalQueryServiceTest {
                         new LoanRepayPlanItem(2, "2026-06-07", 100000L, 3000L, 103000L)
                 )));
 
-        LoanApprovalResultResponse response = loanApprovalQueryService.getApprovalResult("mem-001", "APP-001");
+        LoanApprovalResultResponse response = loanApprovalQueryService.getApprovalResult("mem-test-001", "APP-001");
 
         assertThat(response.applicationId()).isEqualTo("APP-001");
         assertThat(response.status()).isEqualTo("approved");
@@ -119,12 +120,18 @@ class LoanApprovalQueryServiceTest {
         assertThat(response.loanId()).isEqualTo("LN-001");
         assertThat(response.repaymentPlan()).hasSize(2);
         assertThat(response.repaymentPlan().get(0).repaymentAmount()).isEqualByComparingTo("1045.00");
+
+        ArgumentCaptor<com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanRequest> repayPlanCaptor =
+                ArgumentCaptor.forClass(com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanRequest.class);
+        org.mockito.Mockito.verify(xiaohuaGatewayService).queryLoanRepayPlan(any(), eq("APP-001"), repayPlanCaptor.capture());
+        assertThat(repayPlanCaptor.getValue().userId()).isEqualTo("mem-test-001");
+        assertThat(repayPlanCaptor.getValue().userId()).isNotEqualTo("cid-test-001");
     }
 
     @Test
     void shouldReturnEmptyRepayPlanWhenRepayPlanQueryThrowsBizException() throws Exception {
-        when(loanApplicationGateway.findActiveOrPendingMapping("mem-001", "APP-002"))
-                .thenReturn(mapping("APP-002", "LN-002", "education"));
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-test-001", "APP-002"))
+                .thenReturn(mapping("mem-test-001", "cid-test-001", "APP-002", "LN-002", "education"));
         when(yunkaCallTemplate.executeForData(any()))
                 .thenReturn(objectMapper.readTree("""
                         {
@@ -137,7 +144,7 @@ class LoanApprovalQueryServiceTest {
         when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("APP-002"), any()))
                 .thenThrow(new BizException("YUNKA_UPSTREAM_REJECTED", "repay plan unavailable"));
 
-        LoanApprovalResultResponse response = loanApprovalQueryService.getApprovalResult("mem-001", "APP-002");
+        LoanApprovalResultResponse response = loanApprovalQueryService.getApprovalResult("mem-test-001", "APP-002");
 
         assertThat(response.status()).isEqualTo("approved");
         assertThat(response.loanId()).isEqualTo("LN-002");
@@ -146,9 +153,9 @@ class LoanApprovalQueryServiceTest {
 
     @Test
     void shouldThrowNotFoundWhenApplicationMappingDoesNotExist() {
-        when(loanApplicationGateway.findActiveOrPendingMapping("mem-001", "APP-404")).thenReturn(null);
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-test-001", "APP-404")).thenReturn(null);
 
-        assertThatThrownBy(() -> loanApprovalQueryService.getApprovalStatus("mem-001", "APP-404"))
+        assertThatThrownBy(() -> loanApprovalQueryService.getApprovalStatus("mem-test-001", "APP-404"))
                 .isInstanceOf(BizException.class)
                 .extracting(
                         throwable -> ((BizException) throwable).getCode(),
@@ -159,12 +166,12 @@ class LoanApprovalQueryServiceTest {
 
     @Test
     void shouldRejectLoanApprovalStatusWhenLoanQueryDataIsEmpty() {
-        when(loanApplicationGateway.findActiveOrPendingMapping("mem-001", "APP-EMPTY"))
-                .thenReturn(mapping("APP-EMPTY", "LN-EMPTY", "rent"));
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-test-001", "APP-EMPTY"))
+                .thenReturn(mapping("mem-test-001", "cid-test-001", "APP-EMPTY", "LN-EMPTY", "rent"));
         when(yunkaCallTemplate.executeForData(any()))
                 .thenReturn(objectMapper.createObjectNode());
 
-        assertThatThrownBy(() -> loanApprovalQueryService.getApprovalStatus("mem-001", "APP-EMPTY"))
+        assertThatThrownBy(() -> loanApprovalQueryService.getApprovalStatus("mem-test-001", "APP-EMPTY"))
                 .isInstanceOf(BizException.class)
                 .extracting(
                         throwable -> ((BizException) throwable).getErrorNo(),
@@ -175,14 +182,14 @@ class LoanApprovalQueryServiceTest {
 
     @Test
     void shouldRejectLoanApprovalStatusWhenLoanQueryStatusIsMissing() {
-        when(loanApplicationGateway.findActiveOrPendingMapping("mem-001", "APP-MISSING-STATUS"))
-                .thenReturn(mapping("APP-MISSING-STATUS", "LN-MISSING-STATUS", "rent"));
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-test-001", "APP-MISSING-STATUS"))
+                .thenReturn(mapping("mem-test-001", "cid-test-001", "APP-MISSING-STATUS", "LN-MISSING-STATUS", "rent"));
         when(yunkaCallTemplate.executeForData(any()))
                 .thenReturn(objectMapper.createObjectNode()
                         .put("loanId", "LN-MISSING-STATUS")
                         .put("remark", "missing status"));
 
-        assertThatThrownBy(() -> loanApprovalQueryService.getApprovalStatus("mem-001", "APP-MISSING-STATUS"))
+        assertThatThrownBy(() -> loanApprovalQueryService.getApprovalStatus("mem-test-001", "APP-MISSING-STATUS"))
                 .isInstanceOf(BizException.class)
                 .extracting(
                         throwable -> ((BizException) throwable).getErrorNo(),
@@ -193,15 +200,15 @@ class LoanApprovalQueryServiceTest {
 
     @Test
     void shouldRejectLoanApprovalResultWhenApprovedLoanQueryLoanIdIsMissing() {
-        when(loanApplicationGateway.findActiveOrPendingMapping("mem-001", "APP-MISSING-LOANID"))
-                .thenReturn(mapping("APP-MISSING-LOANID", "LN-MISSING-LOANID", "rent"));
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-test-001", "APP-MISSING-LOANID"))
+                .thenReturn(mapping("mem-test-001", "cid-test-001", "APP-MISSING-LOANID", "LN-MISSING-LOANID", "rent"));
         when(yunkaCallTemplate.executeForData(any()))
                 .thenReturn(objectMapper.createObjectNode()
                         .put("status", "7001")
                         .put("loanAmount", 3000.00)
                         .put("remark", "放款成功"));
 
-        assertThatThrownBy(() -> loanApprovalQueryService.getApprovalResult("mem-001", "APP-MISSING-LOANID"))
+        assertThatThrownBy(() -> loanApprovalQueryService.getApprovalResult("mem-test-001", "APP-MISSING-LOANID"))
                 .isInstanceOf(BizException.class)
                 .extracting(
                         throwable -> ((BizException) throwable).getErrorNo(),
@@ -210,13 +217,13 @@ class LoanApprovalQueryServiceTest {
                 .containsExactly("YUNKA_RESPONSE_INVALID", "Yunka loan query response is invalid");
     }
 
-    private LoanApplicationMapping mapping(String applicationId, String loanId, String purpose) {
+    private LoanApplicationMapping mapping(String memberId, String externalUserId, String applicationId, String loanId, String purpose) {
         LoanApplicationMapping mapping = new LoanApplicationMapping();
         mapping.setApplicationId(applicationId);
-        mapping.setMemberId("mem-001");
+        mapping.setMemberId(memberId);
         mapping.setBenefitOrderNo("BEN-001");
         mapping.setChannelCode("KJ");
-        mapping.setExternalUserId("user-001");
+        mapping.setExternalUserId(externalUserId);
         mapping.setUpstreamQueryType("loanId");
         mapping.setUpstreamQueryValue(loanId);
         mapping.setPurpose(purpose);

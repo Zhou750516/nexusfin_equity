@@ -16,8 +16,10 @@ import com.nexusfin.equity.service.impl.BenefitsServiceImpl;
 import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncRequest;
 import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncResponse;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolLink;
+import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryRequest;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryResponse;
 import com.nexusfin.equity.thirdparty.yunka.UserCardListResponse;
+import com.nexusfin.equity.thirdparty.yunka.UserCardListRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserCardSummary;
 import java.math.BigDecimal;
 import java.util.List;
@@ -87,13 +89,23 @@ class BenefitsServiceTest {
                 )));
         when(memberPaymentProtocolRepository.selectOne(any())).thenReturn(activeProtocol());
 
-        BenefitsCardDetailResponse response = benefitsService.getCardDetail("mem-001", "user-001");
+        BenefitsCardDetailResponse response = benefitsService.getCardDetail("mem-test-001", "cid-test-001");
 
         assertThat(response.protocols()).extracting(BenefitsCardDetailResponse.ProtocolLink::url)
                 .contains("https://agreements/loan");
         assertThat(response.userCards()).hasSize(1);
         assertThat(response.userCards().get(0).bankName()).isEqualTo("招商银行");
         assertThat(response.protocolReady()).isTrue();
+
+        ArgumentCaptor<ProtocolQueryRequest> protocolCaptor = ArgumentCaptor.forClass(ProtocolQueryRequest.class);
+        verify(xiaohuaGatewayService).queryProtocols(any(), eq("benefits-card-detail"), protocolCaptor.capture());
+        assertThat(protocolCaptor.getValue().userId()).isEqualTo("mem-test-001");
+        assertThat(protocolCaptor.getValue().userId()).isNotEqualTo("cid-test-001");
+
+        ArgumentCaptor<UserCardListRequest> cardCaptor = ArgumentCaptor.forClass(UserCardListRequest.class);
+        verify(xiaohuaGatewayService).queryUserCards(any(), eq("benefits-card-detail"), cardCaptor.capture());
+        assertThat(cardCaptor.getValue().userId()).isEqualTo("mem-test-001");
+        assertThat(cardCaptor.getValue().userId()).isNotEqualTo("cid-test-001");
     }
 
     @Test
@@ -105,8 +117,8 @@ class BenefitsServiceTest {
                 .thenReturn(new UserCardListResponse(List.of()));
 
         assertThatThrownBy(() -> benefitsService.activate(
-                "mem-001",
-                "user-001",
+                "mem-test-001",
+                "cid-test-001",
                 new BenefitsActivateRequest("APP-001", "huixuan_card", "joint-token-benefits-block")
         )).isInstanceOf(BizException.class)
                 .extracting(ex -> ((BizException) ex).getErrorNo())
@@ -125,7 +137,7 @@ class BenefitsServiceTest {
                         new UserCardSummary("card-001", "招商银行", "8648", 1)
                 )));
         when(memberPaymentProtocolRepository.selectOne(any())).thenReturn(activeProtocol());
-        when(benefitOrderService.createOrder(eq("mem-001"), any(CreateBenefitOrderRequest.class)))
+        when(benefitOrderService.createOrder(eq("mem-test-001"), any(CreateBenefitOrderRequest.class)))
                 .thenReturn(new CreateBenefitOrderResponse("ord-001", "FIRST_DEDUCT_PENDING", "/h5/equity/orders/ord-001"));
         when(benefitRedirectUrlService.generate(any()))
                 .thenReturn(new BenefitRedirectUrlService.BenefitRedirectUrlResult("https://redirect.test/exercise"));
@@ -133,17 +145,19 @@ class BenefitsServiceTest {
                 .thenReturn(new BenefitOrderSyncResponse("SUCCESS", "ok"));
 
         BenefitsActivateResponse response = benefitsService.activate(
-                "mem-001",
-                "user-001",
+                "mem-test-001",
+                "cid-test-001",
                 new BenefitsActivateRequest("APP-001", "huixuan_card", "joint-token-benefits-001")
         );
 
         assertThat(response.activationId()).isEqualTo("ord-001");
         ArgumentCaptor<CreateBenefitOrderRequest> orderCaptor = ArgumentCaptor.forClass(CreateBenefitOrderRequest.class);
-        verify(benefitOrderService).createOrder(eq("mem-001"), orderCaptor.capture());
+        verify(benefitOrderService).createOrder(eq("mem-test-001"), orderCaptor.capture());
         assertThat(orderCaptor.getValue().requestId()).isEqualTo("activate-APP-001");
         ArgumentCaptor<BenefitOrderSyncRequest> syncCaptor = ArgumentCaptor.forClass(BenefitOrderSyncRequest.class);
         verify(xiaohuaGatewayService).syncBenefitOrder(any(), eq("ord-001"), syncCaptor.capture());
+        assertThat(syncCaptor.getValue().userId()).isEqualTo("mem-test-001");
+        assertThat(syncCaptor.getValue().userId()).isNotEqualTo("cid-test-001");
         assertThat(syncCaptor.getValue().benefitUrl()).isEqualTo("https://redirect.test/exercise");
     }
 
@@ -159,14 +173,14 @@ class BenefitsServiceTest {
                         new UserCardSummary("card-001", "招商银行", "8648", 1)
                 )));
         when(memberPaymentProtocolRepository.selectOne(any())).thenReturn(activeProtocol());
-        when(benefitOrderService.createOrder(eq("mem-001"), any(CreateBenefitOrderRequest.class)))
+        when(benefitOrderService.createOrder(eq("mem-test-001"), any(CreateBenefitOrderRequest.class)))
                 .thenReturn(new CreateBenefitOrderResponse("ord-001", "FIRST_DEDUCT_PENDING", "/h5/equity/orders/ord-001"));
         when(benefitRedirectUrlService.generate(any()))
                 .thenThrow(new BizException("REDRECT_BENEFIT_URL_UPSTREAM_FAILED", "Benefit redirect url is unavailable"));
 
         assertThatThrownBy(() -> benefitsService.activate(
-                "mem-001",
-                "user-001",
+                "mem-test-001",
+                "cid-test-001",
                 new BenefitsActivateRequest("APP-001", "huixuan_card", "joint-token-benefits-002")
         )).isInstanceOf(BizException.class)
                 .extracting(ex -> ((BizException) ex).getErrorNo())

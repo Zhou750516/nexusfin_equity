@@ -74,8 +74,8 @@ class LoanApplicationServiceTest {
 
     @Test
     void shouldForwardRichApplyFieldsAndCreateActiveMappingOnSuccessfulLoanApply() throws Exception {
-        when(loanApplicationGateway.findLatestPendingMapping("mem-001")).thenReturn(null);
-        when(benefitOrderService.createOrder(eq("mem-001"), any()))
+        when(loanApplicationGateway.findLatestPendingMapping("mem-test-001")).thenReturn(null);
+        when(benefitOrderService.createOrder(eq("mem-test-001"), any()))
                 .thenReturn(new CreateBenefitOrderResponse("BEN-001", "FIRST_DEDUCT_PENDING", "/redirect"));
         when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
                 0,
@@ -89,7 +89,7 @@ class LoanApplicationServiceTest {
                         """)
         ));
 
-        LoanApplyResponse response = loanApplicationService.apply("mem-001", "user-001", buildApplyRequest());
+        LoanApplyResponse response = loanApplicationService.apply("mem-test-001", "cid-test-001", buildApplyRequest());
 
         assertThat(response.applicationId()).startsWith("APP-");
         assertThat(response.status()).isEqualTo("pending");
@@ -98,14 +98,15 @@ class LoanApplicationServiceTest {
 
         ArgumentCaptor<com.nexusfin.equity.dto.request.CreateBenefitOrderRequest> benefitOrderCaptor =
                 ArgumentCaptor.forClass(com.nexusfin.equity.dto.request.CreateBenefitOrderRequest.class);
-        verify(benefitOrderService).createOrder(eq("mem-001"), benefitOrderCaptor.capture());
+        verify(benefitOrderService).createOrder(eq("mem-test-001"), benefitOrderCaptor.capture());
         assertThat(benefitOrderCaptor.getValue().loanAmount()).isEqualTo(29900L);
 
         ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> yunkaCaptor =
                 ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
         verify(yunkaGatewayClient).proxy(yunkaCaptor.capture());
         JsonNode forwardData = objectMapper.valueToTree(yunkaCaptor.getValue().data());
-        assertThat(forwardData.path("userId").asText()).isEqualTo("user-001");
+        assertThat(forwardData.path("userId").asText()).isEqualTo("mem-test-001");
+        assertThat(forwardData.path("userId").asText()).isNotEqualTo("cid-test-001");
         assertThat(forwardData.has("uid")).isFalse();
         assertThat(forwardData.path("purpose").asText()).isEqualTo("rent");
         assertThat(forwardData.path("loanReason").asText()).isEqualTo("DAILY_CONSUMPTION");
@@ -119,6 +120,8 @@ class LoanApplicationServiceTest {
         ArgumentCaptor<LoanApplicationGateway.SaveCommand> saveCaptor =
                 ArgumentCaptor.forClass(LoanApplicationGateway.SaveCommand.class);
         verify(loanApplicationGateway).save(saveCaptor.capture());
+        assertThat(saveCaptor.getValue().memberId()).isEqualTo("mem-test-001");
+        assertThat(saveCaptor.getValue().externalUserId()).isEqualTo("cid-test-001");
         assertThat(saveCaptor.getValue().applicationId()).isEqualTo(response.applicationId());
         assertThat(saveCaptor.getValue().benefitOrderNo()).isEqualTo("BEN-001");
         assertThat(saveCaptor.getValue().upstreamLoanId()).isEqualTo("LN-UPSTREAM-001");
@@ -128,8 +131,8 @@ class LoanApplicationServiceTest {
 
     @Test
     void shouldReturnFailedResponseWhenLoanApplyIsRejected(CapturedOutput output) throws Exception {
-        when(loanApplicationGateway.findLatestPendingMapping("mem-001")).thenReturn(null);
-        when(benefitOrderService.createOrder(eq("mem-001"), any()))
+        when(loanApplicationGateway.findLatestPendingMapping("mem-test-001")).thenReturn(null);
+        when(benefitOrderService.createOrder(eq("mem-test-001"), any()))
                 .thenReturn(new CreateBenefitOrderResponse("BEN-REJECT", "FIRST_DEDUCT_PENDING", "/redirect"));
         when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
                 10003,
@@ -137,7 +140,7 @@ class LoanApplicationServiceTest {
                 objectMapper.readTree("{}")
         ));
 
-        LoanApplyResponse response = loanApplicationService.apply("mem-001", "user-001", buildApplyRequest());
+        LoanApplyResponse response = loanApplicationService.apply("mem-test-001", "cid-test-001", buildApplyRequest());
 
         assertThat(response.applicationId()).isNull();
         assertThat(response.status()).isEqualTo("loan_failed");
@@ -153,13 +156,13 @@ class LoanApplicationServiceTest {
     @Test
     void shouldEnqueueCompensationAndSavePendingReviewMappingWhenLoanApplyTimesOut(CapturedOutput output)
             throws Exception {
-        when(loanApplicationGateway.findLatestPendingMapping("mem-001")).thenReturn(null);
-        when(benefitOrderService.createOrder(eq("mem-001"), any()))
+        when(loanApplicationGateway.findLatestPendingMapping("mem-test-001")).thenReturn(null);
+        when(benefitOrderService.createOrder(eq("mem-test-001"), any()))
                 .thenReturn(new CreateBenefitOrderResponse("BEN-TIMEOUT", "FIRST_DEDUCT_PENDING", "/redirect"));
         when(yunkaGatewayClient.proxy(any()))
                 .thenThrow(new UpstreamTimeoutException("Yunka gateway timeout"));
 
-        LoanApplyResponse response = loanApplicationService.apply("mem-001", "user-001", buildApplyRequest());
+        LoanApplyResponse response = loanApplicationService.apply("mem-test-001", "cid-test-001", buildApplyRequest());
 
         assertThat(response.applicationId()).startsWith("APP-");
         assertThat(response.status()).isEqualTo("pending");
@@ -168,6 +171,8 @@ class LoanApplicationServiceTest {
         ArgumentCaptor<LoanApplicationGateway.SaveCommand> saveCaptor =
                 ArgumentCaptor.forClass(LoanApplicationGateway.SaveCommand.class);
         verify(loanApplicationGateway).save(saveCaptor.capture());
+        assertThat(saveCaptor.getValue().memberId()).isEqualTo("mem-test-001");
+        assertThat(saveCaptor.getValue().externalUserId()).isEqualTo("cid-test-001");
         assertThat(saveCaptor.getValue().applicationId()).isEqualTo(response.applicationId());
         assertThat(saveCaptor.getValue().benefitOrderNo()).isEqualTo("BEN-TIMEOUT");
         assertThat(saveCaptor.getValue().mappingStatus()).isEqualTo("PENDING_REVIEW");
@@ -185,8 +190,9 @@ class LoanApplicationServiceTest {
         AsyncCompensationEnqueuePayload.YunkaLoanApplyRetry payload =
                 (AsyncCompensationEnqueuePayload.YunkaLoanApplyRetry) enqueueCaptor.getValue().requestPayload();
         assertThat(payload.path()).isEqualTo("/loan/apply");
+        assertThat(payload.memberId()).isEqualTo("mem-test-001");
         assertThat(payload.benefitOrderNo()).isEqualTo("BEN-TIMEOUT");
-        assertThat(payload.uid()).isEqualTo("user-001");
+        assertThat(payload.uid()).isEqualTo("cid-test-001");
         assertThat(payload.applyId()).isEqualTo(response.applicationId());
         assertThat(output)
                 .contains("scene=loan apply")
@@ -200,10 +206,10 @@ class LoanApplicationServiceTest {
         pendingMapping.setApplicationId("APP-PENDING-001");
         pendingMapping.setBenefitOrderNo("BEN-PENDING-001");
         pendingMapping.setMappingStatus("PENDING_REVIEW");
-        when(loanApplicationGateway.findLatestPendingMapping("mem-001")).thenReturn(pendingMapping);
+        when(loanApplicationGateway.findLatestPendingMapping("mem-test-001")).thenReturn(pendingMapping);
 
-        LoanApplyResponse firstRetry = loanApplicationService.apply("mem-001", "user-001", buildApplyRequest());
-        LoanApplyResponse secondRetry = loanApplicationService.apply("mem-001", "user-001", buildApplyRequest());
+        LoanApplyResponse firstRetry = loanApplicationService.apply("mem-test-001", "cid-test-001", buildApplyRequest());
+        LoanApplyResponse secondRetry = loanApplicationService.apply("mem-test-001", "cid-test-001", buildApplyRequest());
 
         assertThat(firstRetry.applicationId()).isEqualTo("APP-PENDING-001");
         assertThat(firstRetry.benefitOrderNo()).isEqualTo("BEN-PENDING-001");
@@ -211,7 +217,7 @@ class LoanApplicationServiceTest {
         assertThat(secondRetry.applicationId()).isEqualTo("APP-PENDING-001");
         assertThat(secondRetry.benefitOrderNo()).isEqualTo("BEN-PENDING-001");
         verifyNoInteractions(benefitOrderService, yunkaGatewayClient, asyncCompensationEnqueueService);
-        verify(loanApplicationGateway, org.mockito.Mockito.times(2)).findLatestPendingMapping("mem-001");
+        verify(loanApplicationGateway, org.mockito.Mockito.times(2)).findLatestPendingMapping("mem-test-001");
         verifyNoMoreInteractions(loanApplicationGateway);
     }
 
@@ -235,7 +241,7 @@ class LoanApplicationServiceTest {
                 "PBEN-001"
         );
 
-        assertThatThrownBy(() -> loanApplicationService.apply("mem-001", "user-001", invalidRequest))
+        assertThatThrownBy(() -> loanApplicationService.apply("mem-test-001", "cid-test-001", invalidRequest))
                 .isInstanceOf(BizException.class)
                 .extracting(throwable -> ((BizException) throwable).getErrorMsg())
                 .isEqualTo("receiving account is unsupported");
