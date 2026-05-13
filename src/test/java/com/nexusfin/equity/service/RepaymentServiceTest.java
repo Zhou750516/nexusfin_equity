@@ -76,15 +76,15 @@ class RepaymentServiceTest {
     private SensitiveDataCipher sensitiveDataCipher;
 
     @Mock
-    private LoanReceivingAccountService loanReceivingAccountService;
+    private MemberReceivingAccountService memberReceivingAccountService;
 
     private RepaymentService repaymentService;
 
     @BeforeEach
     void setUp() {
         lenient().when(h5I18nService.text(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
-        lenient().when(loanReceivingAccountService.getDefaultReceivingAccount())
-                .thenReturn(new LoanReceivingAccountService.ReceivingAccountDetails("acc_001", "招商银行", "8648"));
+        lenient().when(memberReceivingAccountService.getDefaultReceivingAccount("mem-test-001"))
+                .thenReturn(new MemberReceivingAccountService.ReceivingAccountDetails("acc_001", "招商银行", "8648"));
         repaymentService = new RepaymentServiceImpl(
                 h5LoanProperties(),
                 yunkaProperties(),
@@ -95,7 +95,7 @@ class RepaymentServiceTest {
                 loanApplicationMappingRepository,
                 idempotencyRecordRepository,
                 sensitiveDataCipher,
-                loanReceivingAccountService,
+                memberReceivingAccountService,
                 new YunkaCallTemplate(yunkaGatewayClient)
         );
     }

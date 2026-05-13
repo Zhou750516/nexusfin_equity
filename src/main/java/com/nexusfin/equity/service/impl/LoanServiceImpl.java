@@ -31,8 +31,8 @@ public class LoanServiceImpl implements LoanService {
     }
 
     @Override
-    public LoanCalculatorConfigResponse getCalculatorConfig() {
-        return loanCalculatorService.getCalculatorConfig();
+    public LoanCalculatorConfigResponse getCalculatorConfig(String memberId) {
+        return loanCalculatorService.getCalculatorConfig(memberId);
     }
 
     @Override

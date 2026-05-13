@@ -52,12 +52,12 @@ class LoanServiceTest {
                 "XX商业银行",
                 new LoanCalculatorConfigResponse.ReceivingAccount("招商银行", "8648", "acc_001")
         );
-        when(loanCalculatorService.getCalculatorConfig()).thenReturn(delegated);
+        when(loanCalculatorService.getCalculatorConfig("mem-001")).thenReturn(delegated);
 
-        LoanCalculatorConfigResponse response = loanService.getCalculatorConfig();
+        LoanCalculatorConfigResponse response = loanService.getCalculatorConfig("mem-001");
 
         assertThat(response).isSameAs(delegated);
-        verify(loanCalculatorService).getCalculatorConfig();
+        verify(loanCalculatorService).getCalculatorConfig("mem-001");
     }
 
     @Test

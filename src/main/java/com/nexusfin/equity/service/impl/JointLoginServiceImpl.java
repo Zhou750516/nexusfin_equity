@@ -11,6 +11,7 @@ import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.JointLoginService;
+import com.nexusfin.equity.service.MemberReceivingAccountService;
 import com.nexusfin.equity.service.XiaohuaGatewayService;
 import com.nexusfin.equity.thirdparty.yunka.UserQueryRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserQueryResponse;
@@ -41,6 +42,7 @@ public class JointLoginServiceImpl implements JointLoginService {
     private final XiaohuaGatewayService xiaohuaGatewayService;
     private final MemberInfoRepository memberInfoRepository;
     private final MemberChannelRepository memberChannelRepository;
+    private final MemberReceivingAccountService memberReceivingAccountService;
     private final JwtUtil jwtUtil;
     private final AuthProperties authProperties;
     private final SensitiveDataCipher sensitiveDataCipher;
@@ -50,6 +52,7 @@ public class JointLoginServiceImpl implements JointLoginService {
             XiaohuaGatewayService xiaohuaGatewayService,
             MemberInfoRepository memberInfoRepository,
             MemberChannelRepository memberChannelRepository,
+            MemberReceivingAccountService memberReceivingAccountService,
             JwtUtil jwtUtil,
             AuthProperties authProperties,
             SensitiveDataCipher sensitiveDataCipher,
@@ -58,6 +61,7 @@ public class JointLoginServiceImpl implements JointLoginService {
         this.xiaohuaGatewayService = xiaohuaGatewayService;
         this.memberInfoRepository = memberInfoRepository;
         this.memberChannelRepository = memberChannelRepository;
+        this.memberReceivingAccountService = memberReceivingAccountService;
         this.jwtUtil = jwtUtil;
         this.authProperties = authProperties;
         this.sensitiveDataCipher = sensitiveDataCipher;
@@ -88,6 +92,7 @@ public class JointLoginServiceImpl implements JointLoginService {
         JointIdentity identity = mapToIdentity(tokenResponse, userQueryResponse);
         logIdCardStatus(requestId, normalizedScene, absUserId, identity);
         MemberInfo memberInfo = findOrCreateMember(existingMember, absUserId, identity);
+        syncReceivingAccountIfPresent(requestId, normalizedScene, memberInfo.getMemberId(), identity.cid(), userQueryResponse.payload());
         ensureChannelBinding(memberInfo, identity.cid(), resolveChannelCode(identity.channelCode()));
         log.info("traceId={} requestId={} scene={} absUserId={} cid={} joint login mapping bound",
                 TraceIdUtil.getTraceId(),
@@ -300,6 +305,69 @@ public class JointLoginServiceImpl implements JointLoginService {
         return firstNonBlank(channelCode, authProperties.getDefaultChannelCode());
     }
 
+    private void syncReceivingAccountIfPresent(
+            String requestId,
+            String scene,
+            String memberId,
+            String cid,
+            JsonNode payload
+    ) {
+        ResolvedReceivingAccount receivingAccount = resolveReceivingAccount(payload);
+        if (receivingAccount == null) {
+            log.info("traceId={} requestId={} absUserId={} cid={} scene={} joint login receiving account absent, skip initialization",
+                    TraceIdUtil.getTraceId(),
+                    requestId,
+                    memberId,
+                    cid,
+                    scene);
+            return;
+        }
+        memberReceivingAccountService.upsertDefaultReceivingAccount(
+                memberId,
+                new MemberReceivingAccountService.UpsertCommand(
+                        receivingAccount.accountId(),
+                        receivingAccount.bankName(),
+                        receivingAccount.lastFour(),
+                        "JOINT_LOGIN"
+                )
+        );
+        log.info("traceId={} requestId={} absUserId={} cid={} scene={} accountId={} joint login receiving account initialized",
+                TraceIdUtil.getTraceId(),
+                requestId,
+                memberId,
+                cid,
+                scene,
+                receivingAccount.accountId());
+    }
+
+    private ResolvedReceivingAccount resolveReceivingAccount(JsonNode payload) {
+        JsonNode accountNode = firstObject(payload.path("receivingAccount"), payload.path("bankCard"), payload);
+        String accountId = firstNonBlank(
+                nullableText(accountNode, "accountId"),
+                nullableText(accountNode, "bankCardNo"),
+                nullableText(accountNode, "bankCardNum"),
+                nullableText(accountNode, "cardId"),
+                nullableText(accountNode, "cardNo")
+        );
+        String bankName = firstNonBlank(
+                nullableText(accountNode, "bankName"),
+                nullableText(accountNode, "bank")
+        );
+        String lastFour = firstNonBlank(
+                nullableText(accountNode, "lastFour"),
+                nullableText(accountNode, "cardLastFour"),
+                nullableText(accountNode, "cardNoTail"),
+                nullableText(accountNode, "cardTail")
+        );
+        if (lastFour == null && accountId != null && accountId.length() >= 4) {
+            lastFour = accountId.substring(accountId.length() - 4);
+        }
+        if (accountId == null || bankName == null || lastFour == null) {
+            return null;
+        }
+        return new ResolvedReceivingAccount(accountId, bankName, lastFour);
+    }
+
     private String normalizeScene(String scene) {
         String normalized = firstNonBlank(scene, "unknown");
         return normalized.toLowerCase(Locale.ROOT);
@@ -376,6 +444,15 @@ public class JointLoginServiceImpl implements JointLoginService {
         return value == null || value.isBlank() ? null : value;
     }
 
+    private JsonNode firstObject(JsonNode... candidates) {
+        for (JsonNode candidate : candidates) {
+            if (candidate != null && !candidate.isMissingNode() && !candidate.isNull()) {
+                return candidate;
+            }
+        }
+        return com.fasterxml.jackson.databind.node.MissingNode.getInstance();
+    }
+
     private record JointIdentity(
             String cid,
             String phone,
@@ -389,6 +466,13 @@ public class JointLoginServiceImpl implements JointLoginService {
     private record ResolvedIdentityField(
             String value,
             String fieldName
+    ) {
+    }
+
+    private record ResolvedReceivingAccount(
+            String accountId,
+            String bankName,
+            String lastFour
     ) {
     }
 }

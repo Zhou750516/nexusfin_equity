@@ -34,7 +34,7 @@ class LoanCalculatorServiceTest {
     private H5I18nService h5I18nService;
 
     @Mock
-    private LoanReceivingAccountService loanReceivingAccountService;
+    private MemberReceivingAccountService memberReceivingAccountService;
 
     @Mock
     private YunkaCallTemplate yunkaCallTemplate;
@@ -48,17 +48,17 @@ class LoanCalculatorServiceTest {
                 h5LoanProperties(),
                 yunkaProperties(),
                 h5I18nService,
-                loanReceivingAccountService,
+                memberReceivingAccountService,
                 yunkaCallTemplate
         );
     }
 
     @Test
     void shouldBuildCalculatorConfigFromDatabaseReceivingAccount() {
-        when(loanReceivingAccountService.getDefaultReceivingAccount())
-                .thenReturn(new LoanReceivingAccountService.ReceivingAccountDetails("acc-db-001", "测试银行", "1234"));
+        when(memberReceivingAccountService.getDefaultReceivingAccount("mem-test-001"))
+                .thenReturn(new MemberReceivingAccountService.ReceivingAccountDetails("acc-db-001", "测试银行", "1234"));
 
-        LoanCalculatorConfigResponse response = loanCalculatorService.getCalculatorConfig();
+        LoanCalculatorConfigResponse response = loanCalculatorService.getCalculatorConfig("mem-test-001");
 
         assertThat(response.amountRange().min()).isEqualTo(100L);
         assertThat(response.amountRange().defaultAmount()).isEqualTo(3000L);
@@ -74,14 +74,14 @@ class LoanCalculatorServiceTest {
 
     @Test
     void shouldFailWhenDatabaseReceivingAccountIsMissing() {
-        when(loanReceivingAccountService.getDefaultReceivingAccount())
-                .thenThrow(new BizException("LOAN_RECEIVING_ACCOUNT_NOT_CONFIGURED",
-                        "Default loan receiving account is not configured"));
+        when(memberReceivingAccountService.getDefaultReceivingAccount("mem-test-001"))
+                .thenThrow(new BizException("MEMBER_RECEIVING_ACCOUNT_NOT_CONFIGURED",
+                        "Member receiving account is not configured"));
 
-        assertThatThrownBy(() -> loanCalculatorService.getCalculatorConfig())
+        assertThatThrownBy(() -> loanCalculatorService.getCalculatorConfig("mem-test-001"))
                 .isInstanceOf(BizException.class)
                 .extracting(throwable -> ((BizException) throwable).getErrorNo())
-                .isEqualTo("LOAN_RECEIVING_ACCOUNT_NOT_CONFIGURED");
+                .isEqualTo("MEMBER_RECEIVING_ACCOUNT_NOT_CONFIGURED");
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.entity.MemberInfo;
+import com.nexusfin.equity.entity.MemberReceivingAccount;
 import com.nexusfin.equity.enums.MemberStatusEnum;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
@@ -13,6 +14,7 @@ import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
+import com.nexusfin.equity.repository.MemberReceivingAccountRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
 import com.nexusfin.equity.support.AbstractYunkaXiaohuaIT;
 import com.nexusfin.equity.thirdparty.yunka.CardSmsConfirmResponse;
@@ -76,6 +78,9 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     private LoanApplicationMappingRepository loanApplicationMappingRepository;
 
     @Autowired
+    private MemberReceivingAccountRepository memberReceivingAccountRepository;
+
+    @Autowired
     private JwtUtil jwtUtil;
 
     @Autowired
@@ -90,6 +95,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
         memberPaymentProtocolRepository.delete(null);
         memberChannelRepository.delete(null);
         loanApplicationMappingRepository.delete(null);
+        memberReceivingAccountRepository.delete(null);
         memberInfoRepository.delete(null);
     }
 
@@ -175,9 +181,9 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "status": "8004",
-                  "amount": 101850,
+                  "amount": 1018.50,
                   "swiftNumber": "RP-LN-REPAY-003",
-                  "discount": 2650
+                  "discount": 26.50
                 }
                 """);
         when(yunkaGatewayClient.proxy(any()))
@@ -210,6 +216,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     @Test
     void shouldReturnControlledErrorWhenRepaymentSubmitTimesOut() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-timeout", "user-repay-timeout");
+        insertReceivingAccount(memberInfo.getMemberId(), "acc-mem-repay-timeout", "招商银行", "8648");
         createApplicationMapping(memberInfo, "APP-REPAY-TIMEOUT-001", "LN-REPAY-TIMEOUT-001");
         when(yunkaGatewayClient.proxy(any()))
                 .thenAnswer(invocation -> {
@@ -219,7 +226,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                                 0,
                                 "SUCCESS",
                                 objectMapper.readTree("""
-                                        {"repayAmount":101850}
+                                        {"repayAmount":1018.50}
                                         """)
                         );
                     }
@@ -233,7 +240,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                                 {
                                   "loanId": "LN-REPAY-TIMEOUT-001",
                                   "amount": 1018.50,
-                                  "bankCardId": "acc_001",
+                                  "bankCardId": "acc-mem-repay-timeout",
                                   "repaymentType": "early"
                                 }
                                 """))
@@ -245,13 +252,14 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     @Test
     void shouldReturnControlledErrorWhenRepaymentAmountExceedsCurrentRepayableAmount() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-overpay", "user-repay-overpay");
+        insertReceivingAccount(memberInfo.getMemberId(), "acc-mem-repay-overpay", "招商银行", "8648");
         createApplicationMapping(memberInfo, "APP-REPAY-OVERPAY-001", "LN-REPAY-OVERPAY-001");
         when(yunkaGatewayClient.proxy(any()))
                 .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
                         0,
                         "SUCCESS",
                         objectMapper.readTree("""
-                                {"repayAmount":101850}
+                                {"repayAmount":1018.50}
                                 """)
                 ));
 
@@ -262,7 +270,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                                 {
                                   "loanId": "LN-REPAY-OVERPAY-001",
                                   "amount": 2000.00,
-                                  "bankCardId": "acc_001",
+                                  "bankCardId": "acc-mem-repay-overpay",
                                   "repaymentType": "early"
                                 }
                                 """))
@@ -276,6 +284,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     @Test
     void shouldReturnControlledErrorForDuplicateRepaymentSubmitWithoutSecondRepayApplyCall() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-duplicate", "user-repay-duplicate");
+        insertReceivingAccount(memberInfo.getMemberId(), "acc-mem-repay-duplicate", "招商银行", "8648");
         createApplicationMapping(memberInfo, "APP-REPAY-DUP-001", "LN-REPAY-DUP-001");
         when(yunkaGatewayClient.proxy(any()))
                 .thenAnswer(invocation -> {
@@ -285,7 +294,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                                 0,
                                 "SUCCESS",
                                 objectMapper.readTree("""
-                                        {"repayAmount":101850}
+                                        {"repayAmount":1018.50}
                                         """)
                         );
                     }
@@ -302,7 +311,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                 {
                   "loanId": "LN-REPAY-DUP-001",
                   "amount": 1018.50,
-                  "bankCardId": "acc_001",
+                  "bankCardId": "acc-mem-repay-duplicate",
                   "repaymentType": "early"
                 }
                 """;
@@ -367,5 +376,19 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     private Cookie authCookie(MemberInfo memberInfo) {
         return new Cookie("NEXUSFIN_AUTH",
                 jwtUtil.generateToken(memberInfo.getMemberId(), memberInfo.getExternalUserId()));
+    }
+
+    private void insertReceivingAccount(String memberId, String accountId, String bankName, String lastFour) {
+        MemberReceivingAccount account = new MemberReceivingAccount();
+        account.setMemberId(memberId);
+        account.setAccountId(accountId);
+        account.setBankName(bankName);
+        account.setLastFour(lastFour);
+        account.setAccountStatus("ACTIVE");
+        account.setIsDefault(1);
+        account.setSource("TEST");
+        account.setCreatedTs(LocalDateTime.now());
+        account.setUpdatedTs(LocalDateTime.now());
+        memberReceivingAccountRepository.insert(account);
     }
 }

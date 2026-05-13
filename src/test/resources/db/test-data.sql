@@ -4,6 +4,7 @@ DELETE FROM contract_archive;
 DELETE FROM sign_task;
 DELETE FROM member_payment_protocol;
 DELETE FROM benefit_order;
+DELETE FROM member_receiving_account;
 DELETE FROM member_channel;
 DELETE FROM member_info;
 DELETE FROM idempotency_record;

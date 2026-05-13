@@ -41,7 +41,7 @@ public class LoanController {
         AuthPrincipal principal = AuthContextUtil.getRequiredPrincipal();
         log.info("traceId={} bizOrderNo={} loan calculator config requested by memberId={}",
                 TraceIdUtil.getTraceId(), "loan-calculator-config", principal.memberId());
-        return Result.success(loanService.getCalculatorConfig());
+        return Result.success(loanService.getCalculatorConfig(principal.memberId()));
     }
 
     @PostMapping("/calculate")

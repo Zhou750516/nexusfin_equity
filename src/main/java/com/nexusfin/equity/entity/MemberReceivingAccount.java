@@ -1,20 +1,40 @@
 package com.nexusfin.equity.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
 
-@TableName("loan_receiving_account")
-public class LoanReceivingAccount {
+@TableName("member_receiving_account")
+public class MemberReceivingAccount {
 
-    @TableId
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private String memberId;
     private String accountId;
     private String bankName;
     private String lastFour;
     private String accountStatus;
     private Integer isDefault;
+    private String source;
     private LocalDateTime createdTs;
     private LocalDateTime updatedTs;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getMemberId() {
+        return memberId;
+    }
+
+    public void setMemberId(String memberId) {
+        this.memberId = memberId;
+    }
 
     public String getAccountId() {
         return accountId;
@@ -54,6 +74,14 @@ public class LoanReceivingAccount {
 
     public void setIsDefault(Integer isDefault) {
         this.isDefault = isDefault;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
     }
 
     public LocalDateTime getCreatedTs() {

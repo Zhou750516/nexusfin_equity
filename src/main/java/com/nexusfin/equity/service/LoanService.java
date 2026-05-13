@@ -10,7 +10,7 @@ import com.nexusfin.equity.dto.response.LoanCalculatorConfigResponse;
 
 public interface LoanService {
 
-    LoanCalculatorConfigResponse getCalculatorConfig();
+    LoanCalculatorConfigResponse getCalculatorConfig(String memberId);
 
     LoanCalculateResponse calculate(String memberId, String uid, LoanCalculateRequest request);
 

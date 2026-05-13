@@ -3,17 +3,17 @@ package com.nexusfin.equity.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.entity.LoanApplicationMapping;
-import com.nexusfin.equity.entity.LoanReceivingAccount;
+import com.nexusfin.equity.entity.MemberReceivingAccount;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.enums.MemberStatusEnum;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.repository.ContractArchiveRepository;
 import com.nexusfin.equity.repository.IdempotencyRecordRepository;
 import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
-import com.nexusfin.equity.repository.LoanReceivingAccountRepository;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
+import com.nexusfin.equity.repository.MemberReceivingAccountRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
 import com.nexusfin.equity.support.AbstractYunkaXiaohuaIT;
 import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanItem;
@@ -71,7 +71,7 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     private LoanApplicationMappingRepository loanApplicationMappingRepository;
 
     @Autowired
-    private LoanReceivingAccountRepository loanReceivingAccountRepository;
+    private MemberReceivingAccountRepository memberReceivingAccountRepository;
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -88,16 +88,14 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
         memberPaymentProtocolRepository.delete(null);
         memberChannelRepository.delete(null);
         loanApplicationMappingRepository.delete(null);
+        memberReceivingAccountRepository.delete(null);
         memberInfoRepository.delete(null);
-        loanReceivingAccountRepository.delete(null);
-        insertReceivingAccount("acc_001", "招商银行", "8648");
     }
 
     @Test
     void shouldReturnCalculatorConfigReceivingAccountFromDatabase() throws Exception {
-        loanReceivingAccountRepository.delete(null);
-        insertReceivingAccount("acc-db-002", "测试银行", "4321");
         MemberInfo memberInfo = createMember("mem-loan-config-db", "user-loan-config-db");
+        insertReceivingAccount(memberInfo.getMemberId(), "acc-db-002", "测试银行", "4321");
 
         mockMvc.perform(get("/api/loan/calculator-config")
                         .cookie(authCookie(memberInfo))
@@ -111,7 +109,6 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
 
     @Test
     void shouldReturnControlledErrorWhenReceivingAccountIsMissing() throws Exception {
-        loanReceivingAccountRepository.delete(null);
         MemberInfo memberInfo = createMember("mem-loan-config-empty", "user-loan-config-empty");
 
         mockMvc.perform(get("/api/loan/calculator-config")
@@ -120,7 +117,7 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(-1))
                 .andExpect(jsonPath("$.message")
-                        .value("LOAN_RECEIVING_ACCOUNT_NOT_CONFIGURED:Default loan receiving account is not configured"));
+                        .value("MEMBER_RECEIVING_ACCOUNT_NOT_CONFIGURED:Member receiving account is not configured"));
     }
 
     @Test
@@ -270,15 +267,17 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                 jwtUtil.generateToken(memberInfo.getMemberId(), memberInfo.getExternalUserId()));
     }
 
-    private void insertReceivingAccount(String accountId, String bankName, String lastFour) {
-        LoanReceivingAccount account = new LoanReceivingAccount();
+    private void insertReceivingAccount(String memberId, String accountId, String bankName, String lastFour) {
+        MemberReceivingAccount account = new MemberReceivingAccount();
+        account.setMemberId(memberId);
         account.setAccountId(accountId);
         account.setBankName(bankName);
         account.setLastFour(lastFour);
         account.setAccountStatus("ACTIVE");
         account.setIsDefault(1);
+        account.setSource("TEST");
         account.setCreatedTs(LocalDateTime.now());
         account.setUpdatedTs(LocalDateTime.now());
-        loanReceivingAccountRepository.insert(account);
+        memberReceivingAccountRepository.insert(account);
     }
 }

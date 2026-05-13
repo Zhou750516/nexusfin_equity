@@ -23,7 +23,7 @@ import com.nexusfin.equity.repository.IdempotencyRecordRepository;
 import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.H5I18nService;
-import com.nexusfin.equity.service.LoanReceivingAccountService;
+import com.nexusfin.equity.service.MemberReceivingAccountService;
 import com.nexusfin.equity.service.RepaymentService;
 import com.nexusfin.equity.service.XiaohuaGatewayService;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
@@ -72,7 +72,7 @@ public class RepaymentServiceImpl implements RepaymentService {
     private final LoanApplicationMappingRepository loanApplicationMappingRepository;
     private final IdempotencyRecordRepository idempotencyRecordRepository;
     private final SensitiveDataCipher sensitiveDataCipher;
-    private final LoanReceivingAccountService loanReceivingAccountService;
+    private final MemberReceivingAccountService memberReceivingAccountService;
     private final YunkaCallTemplate yunkaCallTemplate;
 
     public RepaymentServiceImpl(
@@ -85,7 +85,7 @@ public class RepaymentServiceImpl implements RepaymentService {
             LoanApplicationMappingRepository loanApplicationMappingRepository,
             IdempotencyRecordRepository idempotencyRecordRepository,
             SensitiveDataCipher sensitiveDataCipher,
-            LoanReceivingAccountService loanReceivingAccountService,
+            MemberReceivingAccountService memberReceivingAccountService,
             YunkaCallTemplate yunkaCallTemplate
     ) {
         this.h5LoanProperties = h5LoanProperties;
@@ -97,7 +97,7 @@ public class RepaymentServiceImpl implements RepaymentService {
         this.loanApplicationMappingRepository = loanApplicationMappingRepository;
         this.idempotencyRecordRepository = idempotencyRecordRepository;
         this.sensitiveDataCipher = sensitiveDataCipher;
-        this.loanReceivingAccountService = loanReceivingAccountService;
+        this.memberReceivingAccountService = memberReceivingAccountService;
         this.yunkaCallTemplate = yunkaCallTemplate;
     }
 
@@ -115,7 +115,7 @@ public class RepaymentServiceImpl implements RepaymentService {
                 )
         );
         List<BankAccountResponse> bankCards = queryRepaymentCards(memberId, loanId);
-        BankAccountResponse selectedCard = bankCards.stream().findFirst().orElseGet(this::fallbackBankAccount);
+        BankAccountResponse selectedCard = bankCards.stream().findFirst().orElseGet(() -> fallbackBankAccount(memberId));
         return new RepaymentInfoResponse(
                 loanId,
                 readDecimal(data, "repayAmount", "amount"),
@@ -320,7 +320,7 @@ public class RepaymentServiceImpl implements RepaymentService {
                     new UserCardListRequest(memberId)
             );
             if (response == null || response.cards() == null || response.cards().isEmpty()) {
-                return List.of(fallbackBankAccount());
+                return List.of(fallbackBankAccount(memberId));
             }
             return response.cards().stream()
                     .sorted((left, right) -> Integer.compare(defaultInt(right.isDefault()), defaultInt(left.isDefault())))
@@ -332,7 +332,7 @@ public class RepaymentServiceImpl implements RepaymentService {
                     bizOrderNo,
                     exception.getErrorNo(),
                     exception.getErrorMsg());
-            return List.of(fallbackBankAccount());
+            return List.of(fallbackBankAccount(memberId));
         }
     }
 
@@ -349,7 +349,7 @@ public class RepaymentServiceImpl implements RepaymentService {
                             bankCardNum
                     ));
         }
-        return bankCards.stream().findFirst().orElseGet(this::fallbackBankAccount);
+        return bankCards.stream().findFirst().orElseGet(() -> fallbackBankAccount(memberId));
     }
 
     private BankAccountResponse toBankAccount(UserCardSummary card) {
@@ -360,9 +360,9 @@ public class RepaymentServiceImpl implements RepaymentService {
         );
     }
 
-    private BankAccountResponse fallbackBankAccount() {
-        LoanReceivingAccountService.ReceivingAccountDetails account =
-                loanReceivingAccountService.getDefaultReceivingAccount();
+    private BankAccountResponse fallbackBankAccount(String memberId) {
+        MemberReceivingAccountService.ReceivingAccountDetails account =
+                memberReceivingAccountService.getDefaultReceivingAccount(memberId);
         return new BankAccountResponse(
                 account.bankName(),
                 account.lastFour(),

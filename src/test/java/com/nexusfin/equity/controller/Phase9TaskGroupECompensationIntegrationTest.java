@@ -10,6 +10,7 @@ import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.entity.MemberChannel;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.entity.MemberPaymentProtocol;
+import com.nexusfin.equity.entity.MemberReceivingAccount;
 import com.nexusfin.equity.enums.MemberStatusEnum;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.repository.AsyncCompensationTaskRepository;
@@ -21,6 +22,7 @@ import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
+import com.nexusfin.equity.repository.MemberReceivingAccountRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
 import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
 import com.nexusfin.equity.util.JwtUtil;
@@ -89,6 +91,9 @@ class Phase9TaskGroupECompensationIntegrationTest {
     private AsyncCompensationPartitionRuntimeRepository asyncCompensationPartitionRuntimeRepository;
 
     @Autowired
+    private MemberReceivingAccountRepository memberReceivingAccountRepository;
+
+    @Autowired
     private JwtUtil jwtUtil;
 
     @Autowired
@@ -109,6 +114,7 @@ class Phase9TaskGroupECompensationIntegrationTest {
         memberPaymentProtocolRepository.delete(null);
         memberChannelRepository.delete(null);
         loanApplicationMappingRepository.delete(null);
+        memberReceivingAccountRepository.delete(null);
         memberInfoRepository.delete(null);
         benefitProductRepository.delete(null);
     }
@@ -128,7 +134,7 @@ class Phase9TaskGroupECompensationIntegrationTest {
                                   "amount": 3000,
                                   "orderAmount": 299,
                                   "term": 3,
-                                  "receivingAccountId": "acc_001",
+                                  "receivingAccountId": "acc-mem-benefit-timeout",
                                   "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
                                   "purpose": "shopping",
                                   "platformBenefitOrderNo": "PBO-QW-TIMEOUT-001"
@@ -178,6 +184,7 @@ class Phase9TaskGroupECompensationIntegrationTest {
         MemberInfo memberInfo = createMember(memberId, externalUserId);
         createChannel(memberId, externalUserId);
         createActiveProtocol(memberId, externalUserId);
+        insertReceivingAccount(memberId, "acc-" + memberId, "招商银行", "8648");
         return memberInfo;
     }
 
@@ -230,5 +237,19 @@ class Phase9TaskGroupECompensationIntegrationTest {
                 "NEXUSFIN_AUTH",
                 jwtUtil.generateToken(memberInfo.getMemberId(), memberInfo.getExternalUserId())
         );
+    }
+
+    private void insertReceivingAccount(String memberId, String accountId, String bankName, String lastFour) {
+        MemberReceivingAccount account = new MemberReceivingAccount();
+        account.setMemberId(memberId);
+        account.setAccountId(accountId);
+        account.setBankName(bankName);
+        account.setLastFour(lastFour);
+        account.setAccountStatus("ACTIVE");
+        account.setIsDefault(1);
+        account.setSource("TEST");
+        account.setCreatedTs(LocalDateTime.now());
+        account.setUpdatedTs(LocalDateTime.now());
+        memberReceivingAccountRepository.insert(account);
     }
 }

@@ -53,7 +53,7 @@ class LoanApplicationServiceTest {
     private H5I18nService h5I18nService;
 
     @Mock
-    private LoanReceivingAccountService loanReceivingAccountService;
+    private MemberReceivingAccountService memberReceivingAccountService;
 
     @Mock
     private AsyncCompensationEnqueueService asyncCompensationEnqueueService;
@@ -63,8 +63,8 @@ class LoanApplicationServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(h5I18nService.text(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
-        lenient().when(loanReceivingAccountService.getDefaultReceivingAccount())
-                .thenReturn(new LoanReceivingAccountService.ReceivingAccountDetails("acc_001", "招商银行", "8648"));
+        lenient().when(memberReceivingAccountService.getReceivingAccount("mem-test-001", "acc_001"))
+                .thenReturn(new MemberReceivingAccountService.ReceivingAccountDetails("acc_001", "招商银行", "8648"));
         loanApplicationService = new LoanApplicationServiceImpl(
                 h5LoanProperties(),
                 h5BenefitsProperties(),
@@ -72,7 +72,7 @@ class LoanApplicationServiceTest {
                 loanApplicationGateway,
                 benefitOrderService,
                 h5I18nService,
-                loanReceivingAccountService,
+                memberReceivingAccountService,
                 asyncCompensationEnqueueService,
                 new YunkaCallTemplate(yunkaGatewayClient)
         );
@@ -229,6 +229,9 @@ class LoanApplicationServiceTest {
 
     @Test
     void shouldRejectUnsupportedReceivingAccountBeforeCreatingBenefitOrder() throws Exception {
+        when(memberReceivingAccountService.getReceivingAccount("mem-test-001", "acc_invalid"))
+                .thenThrow(new BizException("MEMBER_RECEIVING_ACCOUNT_NOT_FOUND",
+                        "Receiving account does not belong to current member"));
         LoanApplyRequest invalidRequest = new LoanApplyRequest(
                 3000L,
                 299L,
@@ -250,7 +253,7 @@ class LoanApplicationServiceTest {
         assertThatThrownBy(() -> loanApplicationService.apply("mem-test-001", "cid-test-001", invalidRequest))
                 .isInstanceOf(BizException.class)
                 .extracting(throwable -> ((BizException) throwable).getErrorMsg())
-                .isEqualTo("receiving account is unsupported");
+                .isEqualTo("Receiving account does not belong to current member");
 
         verifyNoInteractions(benefitOrderService, asyncCompensationEnqueueService, yunkaGatewayClient);
     }

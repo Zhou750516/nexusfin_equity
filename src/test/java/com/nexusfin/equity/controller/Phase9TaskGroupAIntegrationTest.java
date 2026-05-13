@@ -6,6 +6,7 @@ import com.nexusfin.equity.entity.BenefitProduct;
 import com.nexusfin.equity.entity.MemberChannel;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.entity.MemberPaymentProtocol;
+import com.nexusfin.equity.entity.MemberReceivingAccount;
 import com.nexusfin.equity.enums.MemberStatusEnum;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.repository.BenefitProductRepository;
@@ -14,6 +15,7 @@ import com.nexusfin.equity.repository.IdempotencyRecordRepository;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
+import com.nexusfin.equity.repository.MemberReceivingAccountRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
 import com.nexusfin.equity.service.BenefitRedirectUrlService;
 import com.nexusfin.equity.service.XiaohuaGatewayService;
@@ -78,6 +80,9 @@ class Phase9TaskGroupAIntegrationTest {
     private IdempotencyRecordRepository idempotencyRecordRepository;
 
     @Autowired
+    private MemberReceivingAccountRepository memberReceivingAccountRepository;
+
+    @Autowired
     private JwtUtil jwtUtil;
 
     @Autowired
@@ -97,6 +102,7 @@ class Phase9TaskGroupAIntegrationTest {
         idempotencyRecordRepository.delete(null);
         memberPaymentProtocolRepository.delete(null);
         memberChannelRepository.delete(null);
+        memberReceivingAccountRepository.delete(null);
         memberInfoRepository.delete(null);
         benefitProductRepository.delete(null);
 
@@ -134,6 +140,7 @@ class Phase9TaskGroupAIntegrationTest {
     @Test
     void shouldReturnCalculatorConfigForAuthenticatedUser() throws Exception {
         MemberInfo memberInfo = createMember("mem-loan-config", "user-loan-config");
+        insertReceivingAccount(memberInfo.getMemberId(), "acc-calculator-001", "招商银行", "8648");
 
         mockMvc.perform(get("/api/loan/calculator-config")
                         .cookie(authCookie(memberInfo)))
@@ -148,7 +155,7 @@ class Phase9TaskGroupAIntegrationTest {
                 .andExpect(jsonPath("$.data.lender").value("XX商业银行"))
                 .andExpect(jsonPath("$.data.receivingAccount.bankName").value("招商银行"))
                 .andExpect(jsonPath("$.data.receivingAccount.lastFour").value("8648"))
-                .andExpect(jsonPath("$.data.receivingAccount.accountId").value("acc_001"));
+                .andExpect(jsonPath("$.data.receivingAccount.accountId").value("acc-calculator-001"));
     }
 
     @Test
@@ -264,6 +271,20 @@ class Phase9TaskGroupAIntegrationTest {
         memberChannel.setCreatedTs(LocalDateTime.now());
         memberChannel.setUpdatedTs(LocalDateTime.now());
         memberChannelRepository.insert(memberChannel);
+    }
+
+    private void insertReceivingAccount(String memberId, String accountId, String bankName, String lastFour) {
+        MemberReceivingAccount account = new MemberReceivingAccount();
+        account.setMemberId(memberId);
+        account.setAccountId(accountId);
+        account.setBankName(bankName);
+        account.setLastFour(lastFour);
+        account.setAccountStatus("ACTIVE");
+        account.setIsDefault(1);
+        account.setSource("TEST");
+        account.setCreatedTs(LocalDateTime.now());
+        account.setUpdatedTs(LocalDateTime.now());
+        memberReceivingAccountRepository.insert(account);
     }
 
     private void createActiveProtocol(String memberId, String externalUserId) {

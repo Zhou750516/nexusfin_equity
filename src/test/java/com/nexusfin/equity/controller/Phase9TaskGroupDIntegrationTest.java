@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.entity.MemberInfo;
+import com.nexusfin.equity.entity.MemberReceivingAccount;
 import com.nexusfin.equity.enums.MemberStatusEnum;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.repository.IdempotencyRecordRepository;
@@ -11,6 +12,7 @@ import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
+import com.nexusfin.equity.repository.MemberReceivingAccountRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
 import com.nexusfin.equity.support.AbstractYunkaXiaohuaIT;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
@@ -72,6 +74,9 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
     private LoanApplicationMappingRepository loanApplicationMappingRepository;
 
     @Autowired
+    private MemberReceivingAccountRepository memberReceivingAccountRepository;
+
+    @Autowired
     private JwtUtil jwtUtil;
 
     @Autowired
@@ -86,20 +91,22 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         memberPaymentProtocolRepository.delete(null);
         memberChannelRepository.delete(null);
         loanApplicationMappingRepository.delete(null);
+        memberReceivingAccountRepository.delete(null);
         memberInfoRepository.delete(null);
     }
 
     @Test
     void shouldForwardRepaymentInfoToYunkaRepayTrial(CapturedOutput output) throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-info", "user-repay-info");
+        insertReceivingAccount(memberInfo.getMemberId(), "acc-repay-info-001", "招商银行", "8648");
         createApplicationMapping(memberInfo, "APP-REPAY-INFO-001", "LOAN202604130001");
         JsonNode yunkaData = objectMapper.readTree("""
                 {
-                  "repayAmount": 101850,
-                  "repayPrincipal": 100000,
-                  "repayInterest": 1850,
+                  "repayAmount": 1018.50,
+                  "repayPrincipal": 1000.00,
+                  "repayInterest": 18.50,
                   "repayPenaltyInt": 0,
-                  "discount": 2650
+                  "discount": 26.50
                 }
                 """);
         when(yunkaGatewayClient.proxy(any()))
@@ -120,7 +127,7 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         org.mockito.Mockito.verify(yunkaGatewayClient).proxy(requestCaptor.capture());
         JsonNode data = objectMapper.valueToTree(requestCaptor.getValue().data());
         assertThat(requestCaptor.getValue().path()).isEqualTo("/repay/trial");
-        assertThat(data.get("userId").asText()).isEqualTo("user-repay-info");
+        assertThat(data.get("userId").asText()).isEqualTo("mem-repay-info");
         assertThat(data.has("uid")).isFalse();
         assertThat(data.get("loanId").asText()).isEqualTo("LOAN202604130001");
         assertThat(data.get("repayType").asText()).isEqualTo("EARLY");
@@ -134,6 +141,8 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
     @Test
     void shouldForwardRepaymentSubmitToYunkaRepayApply() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-submit", "user-repay-submit");
+        insertReceivingAccount(memberInfo.getMemberId(), "acc-repay-submit-001", "招商银行", "8648");
+        createApplicationMapping(memberInfo, "APP-REPAY-SUBMIT-001", "LOAN202604130002");
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "status": "PROCESSING",
@@ -142,7 +151,19 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
                 }
                 """);
         when(yunkaGatewayClient.proxy(any()))
-                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", yunkaData));
+                .thenAnswer(invocation -> {
+                    YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
+                    if ("/repay/trial".equals(gatewayRequest.path())) {
+                        return new YunkaGatewayClient.YunkaGatewayResponse(
+                                0,
+                                "SUCCESS",
+                                objectMapper.readTree("""
+                                        {"repayAmount":1018.50}
+                                        """)
+                        );
+                    }
+                    return new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", yunkaData);
+                });
 
         mockMvc.perform(post("/api/repayment/submit")
                         .cookie(authCookie(memberInfo))
@@ -151,7 +172,7 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
                                 {
                                   "loanId": "LOAN202604130002",
                                   "amount": 1018.50,
-                                  "bankCardId": "acc_001",
+                                  "bankCardId": "acc-repay-submit-001",
                                   "repaymentType": "early"
                                 }
                                 """))
@@ -163,24 +184,29 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
 
         ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> requestCaptor =
                 ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
-        org.mockito.Mockito.verify(yunkaGatewayClient).proxy(requestCaptor.capture());
-        JsonNode data = objectMapper.valueToTree(requestCaptor.getValue().data());
-        assertThat(requestCaptor.getValue().path()).isEqualTo("/repay/apply");
-        assertThat(data.get("userId").asText()).isEqualTo("user-repay-submit");
+        org.mockito.Mockito.verify(yunkaGatewayClient, org.mockito.Mockito.times(2)).proxy(requestCaptor.capture());
+        YunkaGatewayClient.YunkaGatewayRequest repayApplyRequest = requestCaptor.getAllValues().stream()
+                .filter(request -> "/repay/apply".equals(request.path()))
+                .findFirst()
+                .orElseThrow();
+        JsonNode data = objectMapper.valueToTree(repayApplyRequest.data());
+        assertThat(repayApplyRequest.path()).isEqualTo("/repay/apply");
+        assertThat(data.get("userId").asText()).isEqualTo("mem-repay-submit");
         assertThat(data.has("uid")).isFalse();
         assertThat(data.get("loanId").asText()).isEqualTo("LOAN202604130002");
-        assertThat(data.get("bankCardNo").asText()).isEqualTo("acc_001");
-        assertThat(data.get("repayAmount").asLong()).isEqualTo(101850L);
+        assertThat(data.get("bankCardNo").asText()).isEqualTo("acc-repay-submit-001");
+        assertThat(data.get("repayAmount").decimalValue()).isEqualByComparingTo("1018.50");
     }
 
     @Test
     void shouldForwardRepaymentResultToYunkaRepayQuery() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-result", "user-repay-result");
+        insertReceivingAccount(memberInfo.getMemberId(), "acc-repay-result-001", "招商银行", "8648");
         createApplicationMapping(memberInfo, "APP-REPAY-RESULT-001", "LOAN202604130002");
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "status": "SUCCESS",
-                  "amount": 101850,
+                  "amount": 1018.50,
                   "successTime": "2026-04-13T14:32:00+08:00",
                   "remark": "还款成功",
                   "swiftNumber": "RP-LOAN202604130002"
@@ -204,7 +230,7 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         org.mockito.Mockito.verify(yunkaGatewayClient).proxy(requestCaptor.capture());
         JsonNode data = objectMapper.valueToTree(requestCaptor.getValue().data());
         assertThat(requestCaptor.getValue().path()).isEqualTo("/repay/query");
-        assertThat(data.get("userId").asText()).isEqualTo("user-repay-result");
+        assertThat(data.get("userId").asText()).isEqualTo("mem-repay-result");
         assertThat(data.has("uid")).isFalse();
         assertThat(data.get("loanId").asText()).isEqualTo("LOAN202604130002");
         assertThat(data.get("swiftNumber").asText()).isEqualTo("RP-LOAN202604130002");
@@ -213,14 +239,15 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
     @Test
     void shouldReturnRepaymentInfoInEnglishWhenAcceptLanguageProvided() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-info-en", "user-repay-info-en");
+        insertReceivingAccount(memberInfo.getMemberId(), "acc-repay-info-en-001", "招商银行", "8648");
         createApplicationMapping(memberInfo, "APP-REPAY-INFO-EN-001", "LOAN202604130009");
         JsonNode yunkaData = objectMapper.readTree("""
                 {
-                  "repayAmount": 101850,
-                  "repayPrincipal": 100000,
-                  "repayInterest": 1850,
+                  "repayAmount": 1018.50,
+                  "repayPrincipal": 1000.00,
+                  "repayInterest": 18.50,
                   "repayPenaltyInt": 0,
-                  "discount": 2650
+                  "discount": 26.50
                 }
                 """);
         when(yunkaGatewayClient.proxy(any()))
@@ -274,5 +301,19 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
                 "NEXUSFIN_AUTH",
                 jwtUtil.generateToken(memberInfo.getMemberId(), memberInfo.getExternalUserId())
         );
+    }
+
+    private void insertReceivingAccount(String memberId, String accountId, String bankName, String lastFour) {
+        MemberReceivingAccount account = new MemberReceivingAccount();
+        account.setMemberId(memberId);
+        account.setAccountId(accountId);
+        account.setBankName(bankName);
+        account.setLastFour(lastFour);
+        account.setAccountStatus("ACTIVE");
+        account.setIsDefault(1);
+        account.setSource("TEST");
+        account.setCreatedTs(LocalDateTime.now());
+        account.setUpdatedTs(LocalDateTime.now());
+        memberReceivingAccountRepository.insert(account);
     }
 }

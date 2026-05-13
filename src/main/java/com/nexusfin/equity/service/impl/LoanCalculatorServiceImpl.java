@@ -8,7 +8,7 @@ import com.nexusfin.equity.dto.response.LoanCalculateResponse;
 import com.nexusfin.equity.dto.response.LoanCalculatorConfigResponse;
 import com.nexusfin.equity.service.H5I18nService;
 import com.nexusfin.equity.service.LoanCalculatorService;
-import com.nexusfin.equity.service.LoanReceivingAccountService;
+import com.nexusfin.equity.service.MemberReceivingAccountService;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -25,27 +25,27 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
     private final H5LoanProperties h5LoanProperties;
     private final YunkaProperties yunkaProperties;
     private final H5I18nService h5I18nService;
-    private final LoanReceivingAccountService loanReceivingAccountService;
+    private final MemberReceivingAccountService memberReceivingAccountService;
     private final YunkaCallTemplate yunkaCallTemplate;
 
     public LoanCalculatorServiceImpl(
             H5LoanProperties h5LoanProperties,
             YunkaProperties yunkaProperties,
             H5I18nService h5I18nService,
-            LoanReceivingAccountService loanReceivingAccountService,
+            MemberReceivingAccountService memberReceivingAccountService,
             YunkaCallTemplate yunkaCallTemplate
     ) {
         this.h5LoanProperties = h5LoanProperties;
         this.yunkaProperties = yunkaProperties;
         this.h5I18nService = h5I18nService;
-        this.loanReceivingAccountService = loanReceivingAccountService;
+        this.memberReceivingAccountService = memberReceivingAccountService;
         this.yunkaCallTemplate = yunkaCallTemplate;
     }
 
     @Override
-    public LoanCalculatorConfigResponse getCalculatorConfig() {
-        LoanReceivingAccountService.ReceivingAccountDetails receivingAccount =
-                loanReceivingAccountService.getDefaultReceivingAccount();
+    public LoanCalculatorConfigResponse getCalculatorConfig(String memberId) {
+        MemberReceivingAccountService.ReceivingAccountDetails receivingAccount =
+                memberReceivingAccountService.getDefaultReceivingAccount(memberId);
         return new LoanCalculatorConfigResponse(
                 new LoanCalculatorConfigResponse.AmountRange(
                         h5LoanProperties.amountRange().min(),

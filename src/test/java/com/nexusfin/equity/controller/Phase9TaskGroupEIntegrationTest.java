@@ -9,6 +9,7 @@ import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.entity.MemberChannel;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.entity.MemberPaymentProtocol;
+import com.nexusfin.equity.entity.MemberReceivingAccount;
 import com.nexusfin.equity.enums.MemberStatusEnum;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
@@ -19,6 +20,7 @@ import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
+import com.nexusfin.equity.repository.MemberReceivingAccountRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
 import com.nexusfin.equity.service.AsyncCompensationEnqueueService;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
@@ -92,6 +94,9 @@ class Phase9TaskGroupEIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
+    private MemberReceivingAccountRepository memberReceivingAccountRepository;
+
+    @Autowired
     private JwtUtil jwtUtil;
 
     @Autowired
@@ -112,6 +117,7 @@ class Phase9TaskGroupEIntegrationTest {
         memberPaymentProtocolRepository.delete(null);
         memberChannelRepository.delete(null);
         loanApplicationMappingRepository.delete(null);
+        memberReceivingAccountRepository.delete(null);
         memberInfoRepository.delete(null);
         benefitProductRepository.delete(null);
     }
@@ -138,7 +144,7 @@ class Phase9TaskGroupEIntegrationTest {
                                   "amount": 3000,
                                   "orderAmount": 299,
                                   "term": 3,
-                                  "receivingAccountId": "acc_001",
+                                  "receivingAccountId": "acc-mem-loan-apply",
                                   "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
                                   "purpose": "shopping",
                                   "platformBenefitOrderNo": "PBO-INT-001"
@@ -171,15 +177,15 @@ class Phase9TaskGroupEIntegrationTest {
         org.mockito.Mockito.verify(yunkaGatewayClient).proxy(requestCaptor.capture());
         JsonNode data = objectMapper.valueToTree(requestCaptor.getValue().data());
         assertThat(requestCaptor.getValue().path()).isEqualTo("/loan/apply");
-        assertThat(data.get("userId").asText()).isEqualTo("user-loan-apply");
+        assertThat(data.get("userId").asText()).isEqualTo("mem-loan-apply");
         assertThat(data.has("uid")).isFalse();
         assertThat(data.get("benefitOrderNo").asText()).isEqualTo(benefitOrder.getBenefitOrderNo());
         assertThat(data.get("platformBenefitOrderNo").asText()).isEqualTo("PBO-INT-001");
         assertThat(data.get("applyId").asText()).isEqualTo(mapping.getApplicationId());
         assertThat(data.get("loanId").asText()).startsWith("LN-");
-        assertThat(data.get("loanAmount").asLong()).isEqualTo(300000L);
+        assertThat(data.get("loanAmount").decimalValue()).isEqualByComparingTo("3000.00");
         assertThat(data.get("loanPeriod").asInt()).isEqualTo(3);
-        assertThat(data.get("bankCardNo").asText()).isEqualTo("acc_001");
+        assertThat(data.get("bankCardNo").asText()).isEqualTo("acc-mem-loan-apply");
         assertThat(benefitOrder.getLoanAmount()).isEqualTo(29900L);
         assertThat(output).contains("loan apply yunka request begin");
         assertThat(output).contains("scene=loan apply").contains("yunka request success");
@@ -209,7 +215,7 @@ class Phase9TaskGroupEIntegrationTest {
                                   "amount": 3000,
                                   "orderAmount": 299,
                                   "term": 3,
-                                  "receivingAccountId": "acc_001",
+                                  "receivingAccountId": "acc-mem-loan-purpose",
                                   "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
                                   "purpose": "rent",
                                   "platformBenefitOrderNo": "PBO-PURPOSE-001"
@@ -239,7 +245,7 @@ class Phase9TaskGroupEIntegrationTest {
                                   "amount": 3000,
                                   "orderAmount": 299,
                                   "term": 3,
-                                  "receivingAccountId": "acc_001",
+                                  "receivingAccountId": "acc-mem-loan-purpose-missing",
                                   "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
                                   "platformBenefitOrderNo": "PBO-MISSING-PURPOSE-001"
                                 }
@@ -262,7 +268,7 @@ class Phase9TaskGroupEIntegrationTest {
                                   "amount": 3000,
                                   "orderAmount": 299,
                                   "term": 3,
-                                  "receivingAccountId": "acc_001",
+                                  "receivingAccountId": "acc-mem-loan-pbo-missing",
                                   "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
                                   "purpose": "shopping"
                                 }
@@ -284,7 +290,7 @@ class Phase9TaskGroupEIntegrationTest {
                                 {
                                   "amount": 3000,
                                   "term": 3,
-                                  "receivingAccountId": "acc_001",
+                                  "receivingAccountId": "acc-mem-loan-order-amount-missing",
                                   "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
                                   "purpose": "shopping",
                                   "platformBenefitOrderNo": "PBO-MISSING-ORDER-AMOUNT-001"
@@ -310,7 +316,7 @@ class Phase9TaskGroupEIntegrationTest {
                                   "amount": 3000,
                                   "orderAmount": 299,
                                   "term": 3,
-                                  "receivingAccountId": "acc_001",
+                                  "receivingAccountId": "acc-mem-loan-apply-partial",
                                   "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
                                   "purpose": "shopping",
                                   "platformBenefitOrderNo": "PBO-FAIL-001"
@@ -345,7 +351,7 @@ class Phase9TaskGroupEIntegrationTest {
                                   "amount": 3000,
                                   "orderAmount": 299,
                                   "term": 3,
-                                  "receivingAccountId": "acc_001",
+                                  "receivingAccountId": "acc-mem-loan-timeout",
                                   "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
                                   "purpose": "shopping",
                                   "platformBenefitOrderNo": "PBO-TIMEOUT-001"
@@ -381,7 +387,7 @@ class Phase9TaskGroupEIntegrationTest {
                                   "amount": 3000,
                                   "orderAmount": 299,
                                   "term": 3,
-                                  "receivingAccountId": "acc_001",
+                                  "receivingAccountId": "acc-mem-loan-timeout-retry",
                                   "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
                                   "purpose": "shopping",
                                   "platformBenefitOrderNo": "PBO-RETRY-001"
@@ -403,7 +409,7 @@ class Phase9TaskGroupEIntegrationTest {
                                   "amount": 3000,
                                   "orderAmount": 299,
                                   "term": 3,
-                                  "receivingAccountId": "acc_001",
+                                  "receivingAccountId": "acc-mem-loan-timeout-retry",
                                   "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
                                   "purpose": "shopping",
                                   "platformBenefitOrderNo": "PBO-RETRY-001"
@@ -448,6 +454,7 @@ class Phase9TaskGroupEIntegrationTest {
         MemberInfo memberInfo = createMember(memberId, externalUserId);
         createChannel(memberId, externalUserId);
         createActiveProtocol(memberId, externalUserId);
+        insertReceivingAccount(memberId, "acc-" + memberId, "招商银行", "8648");
         return memberInfo;
     }
 
@@ -500,5 +507,19 @@ class Phase9TaskGroupEIntegrationTest {
                 "NEXUSFIN_AUTH",
                 jwtUtil.generateToken(memberInfo.getMemberId(), memberInfo.getExternalUserId())
         );
+    }
+
+    private void insertReceivingAccount(String memberId, String accountId, String bankName, String lastFour) {
+        MemberReceivingAccount account = new MemberReceivingAccount();
+        account.setMemberId(memberId);
+        account.setAccountId(accountId);
+        account.setBankName(bankName);
+        account.setLastFour(lastFour);
+        account.setAccountStatus("ACTIVE");
+        account.setIsDefault(1);
+        account.setSource("TEST");
+        account.setCreatedTs(LocalDateTime.now());
+        account.setUpdatedTs(LocalDateTime.now());
+        memberReceivingAccountRepository.insert(account);
     }
 }
