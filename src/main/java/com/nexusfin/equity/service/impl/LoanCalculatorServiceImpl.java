@@ -1,6 +1,7 @@
 package com.nexusfin.equity.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.nexusfin.equity.config.H5BenefitsProperties;
 import com.nexusfin.equity.config.H5LoanProperties;
 import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.dto.request.LoanCalculateRequest;
@@ -35,6 +36,7 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
     private static final String BIND_CARD_REQUIRED_MESSAGE = "请到科技平台绑卡后重试";
 
     private final H5LoanProperties h5LoanProperties;
+    private final H5BenefitsProperties h5BenefitsProperties;
     private final YunkaProperties yunkaProperties;
     private final H5I18nService h5I18nService;
     private final MemberReceivingAccountService memberReceivingAccountService;
@@ -43,6 +45,7 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
 
     public LoanCalculatorServiceImpl(
             H5LoanProperties h5LoanProperties,
+            H5BenefitsProperties h5BenefitsProperties,
             YunkaProperties yunkaProperties,
             H5I18nService h5I18nService,
             MemberReceivingAccountService memberReceivingAccountService,
@@ -50,6 +53,7 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
             YunkaCallTemplate yunkaCallTemplate
     ) {
         this.h5LoanProperties = h5LoanProperties;
+        this.h5BenefitsProperties = h5BenefitsProperties;
         this.yunkaProperties = yunkaProperties;
         this.h5I18nService = h5I18nService;
         this.memberReceivingAccountService = memberReceivingAccountService;
@@ -91,6 +95,7 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
                 mapTermOptions(h5LoanProperties.termOptions()),
                 h5LoanProperties.annualRate(),
                 h5I18nService.text("loan.lender", h5LoanProperties.lender()),
+                h5BenefitsProperties.detail().price(),
                 receivingAccount,
                 bindCardRequired,
                 bindCardMessage

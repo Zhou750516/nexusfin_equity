@@ -27,6 +27,7 @@ export interface CalculatorConfig {
   termOptions: TermOption[];
   annualRate: number;
   lender: string;
+  orderAmount: number;
   receivingAccount: BankAccount | null;
   bindCardRequired?: boolean;
   bindCardMessage?: string | null;
@@ -55,10 +56,12 @@ export type LoanPurpose = "shopping" | "rent" | "education" | "travel";
 
 export interface ApplyParams {
   amount: number;
+  orderAmount: number;
   term: number;
   receivingAccountId: string;
   agreedProtocols: string[];
   purpose: LoanPurpose;
+  platformBenefitOrderNo: string;
 }
 
 export interface ApplyResult {

@@ -2,6 +2,7 @@ import { useLoan } from "@/contexts/LoanContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { Locale } from "@/i18n/locale";
 import { formatBankCard, formatCurrency } from "@/lib/format";
+import { readJointLoginParams } from "@/lib/joint-session";
 import { calculateLoan, getCalculatorConfig, applyLoan } from "@/lib/loan-api";
 import { toLoanPurposeKey } from "@/lib/loan-purpose";
 import { shouldRequestLocalizedData } from "@/lib/localized-request";
@@ -9,7 +10,11 @@ import { buildPath } from "@/lib/route";
 import type { AmountRange, CalculateResult, CalculatorConfig } from "@/types/loan.types";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { buildApplyLoanPayload, resolveCalculatorSubmitDisabled } from "./calculator.logic";
+import {
+  buildApplyLoanPayload,
+  resolveCalculatorSubmitDisabled,
+  resolvePlatformBenefitOrderNo,
+} from "./calculator.logic";
 import { LOAN_PURPOSE_KEYS, PROTOCOL_KEYS, type ProtocolKey } from "@/components/calculator/calculatorOptions";
 
 const AGREED_PROTOCOLS = ["user_agreement", "loan_agreement", "privacy_policy"];
@@ -38,6 +43,7 @@ export function useCalculatorPageState() {
   const [isCalculating, setIsCalculating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const platformBenefitOrderNo = resolvePlatformBenefitOrderNo(readJointLoginParams());
 
   const allProtocolsAgreed = viewedProtocols.size === PROTOCOL_KEYS.length;
   const firstRepayment = calculateResult?.repaymentPlan[0] ?? null;
@@ -143,16 +149,22 @@ export function useCalculatorPageState() {
     if (!config || !calculateResult || config.bindCardRequired) {
       return;
     }
+    if (!platformBenefitOrderNo) {
+      setError(t("calculator.platformBenefitOrderMissing"));
+      return;
+    }
 
     setIsSubmitting(true);
     setError(null);
     try {
       const payload = buildApplyLoanPayload({
         amount,
+        orderAmount: config.orderAmount,
         term: selectedTerm,
         receivingAccountId: config.receivingAccount?.accountId ?? loan.receivingAccountId ?? "",
         agreedProtocols: AGREED_PROTOCOLS,
         purposeKey,
+        platformBenefitOrderNo,
       });
       loan.setPurpose(payload.purpose);
 

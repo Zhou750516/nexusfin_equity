@@ -3,7 +3,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CalculatorBindCardDialogContent } from "@/components/calculator/CalculatorBindCardDialog";
 import CalculatorHero from "@/components/calculator/CalculatorHero";
-import { buildApplyLoanPayload, resolveCalculatorSubmitDisabled } from "./calculator.logic";
+import {
+  buildApplyLoanPayload,
+  resolveCalculatorSubmitDisabled,
+  resolvePlatformBenefitOrderNo,
+} from "./calculator.logic";
 import { useCalculatorPageState } from "./useCalculatorPageState";
 import type { CalculateResult, CalculatorConfig } from "@/types/loan.types";
 
@@ -68,22 +72,43 @@ describe("calculator apply payload", () => {
     expect(hookState!.drawerOpen).toBe(false);
   });
 
-  it("maps selected purpose key into apply payload purpose", () => {
+  it("maps selected purpose key and required backend fields into apply payload", () => {
     expect(
       buildApplyLoanPayload({
         amount: 3000,
+        orderAmount: 300,
         term: 3,
         receivingAccountId: "acc_001",
         agreedProtocols: ["user_agreement", "loan_agreement"],
         purposeKey: "calculator.loanPurpose.rent",
+        platformBenefitOrderNo: "PBO-001",
       }),
     ).toEqual({
       amount: 3000,
+      orderAmount: 300,
       term: 3,
       receivingAccountId: "acc_001",
       agreedProtocols: ["user_agreement", "loan_agreement"],
       purpose: "rent",
+      platformBenefitOrderNo: "PBO-001",
     });
+  });
+
+  it("resolves platform benefit order number from joint-login params", () => {
+    expect(resolvePlatformBenefitOrderNo({
+      token: "joint-token-001",
+      scene: "push",
+      orderNo: "PBO-ORDER-001",
+      benefitOrderNo: "BEN-LOCAL-001",
+    })).toBe("PBO-ORDER-001");
+
+    expect(resolvePlatformBenefitOrderNo({
+      token: "joint-token-002",
+      scene: "exercise",
+      benefitOrderNo: "BEN-FALLBACK-001",
+    })).toBe("BEN-FALLBACK-001");
+
+    expect(resolvePlatformBenefitOrderNo(null)).toBeNull();
   });
 
   it("renders edit amount entry as disabled while keeping it visible", () => {
@@ -152,6 +177,7 @@ function calculatorConfig(overrides: Partial<CalculatorConfig> = {}): Calculator
     termOptions: [{ label: "3期", value: 3 }],
     annualRate: 0.18,
     lender: "XX商业银行",
+    orderAmount: 300,
     receivingAccount: {
       bankName: "测试银行",
       lastFour: "1234",

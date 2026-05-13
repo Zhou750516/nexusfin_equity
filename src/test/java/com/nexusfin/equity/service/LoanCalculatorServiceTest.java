@@ -1,6 +1,7 @@
 package com.nexusfin.equity.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexusfin.equity.config.H5BenefitsProperties;
 import com.nexusfin.equity.config.H5LoanProperties;
 import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.dto.request.LoanCalculateRequest;
@@ -53,6 +54,7 @@ class LoanCalculatorServiceTest {
         lenient().when(h5I18nService.text(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
         loanCalculatorService = new LoanCalculatorServiceImpl(
                 h5LoanProperties(),
+                h5BenefitsProperties(),
                 yunkaProperties(),
                 h5I18nService,
                 memberReceivingAccountService,
@@ -78,6 +80,7 @@ class LoanCalculatorServiceTest {
                 .containsExactly(3, 6);
         assertThat(response.annualRate()).isEqualByComparingTo("0.18");
         assertThat(response.lender()).isEqualTo("XX商业银行");
+        assertThat(response.orderAmount()).isEqualTo(300L);
         assertThat(response.receivingAccount().bankName()).isEqualTo("第一银行");
         assertThat(response.receivingAccount().lastFour()).isEqualTo("1111");
         assertThat(response.receivingAccount().accountId()).isEqualTo("card-first-001");
@@ -112,6 +115,7 @@ class LoanCalculatorServiceTest {
         assertThat(response.termOptions())
                 .extracting(LoanCalculatorConfigResponse.TermOption::value)
                 .containsExactly(3, 6);
+        assertThat(response.orderAmount()).isEqualTo(300L);
         assertThat(response.receivingAccount()).isNull();
         assertThat(response.bindCardRequired()).isTrue();
         assertThat(response.bindCardMessage()).isEqualTo("请到科技平台绑卡后重试");
@@ -265,6 +269,22 @@ class LoanCalculatorServiceTest {
                 ),
                 BigDecimal.valueOf(0.18),
                 "XX商业银行"
+        );
+    }
+
+    private H5BenefitsProperties h5BenefitsProperties() {
+        return new H5BenefitsProperties(
+                "HUXUAN_CARD",
+                new H5BenefitsProperties.Activate(300000L, "huixuan_card", "惠选卡开通成功"),
+                new H5BenefitsProperties.Detail(
+                        "惠选卡",
+                        300L,
+                        448L,
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        List.of()
+                )
         );
     }
 
