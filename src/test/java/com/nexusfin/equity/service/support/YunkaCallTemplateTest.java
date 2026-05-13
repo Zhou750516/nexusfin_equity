@@ -42,7 +42,7 @@ class YunkaCallTemplateTest {
                         "LQ-001",
                         "/loan/query",
                         "APP-001",
-                        JsonNodeFactory.instance.objectNode().put("uid", "user-001")
+                        JsonNodeFactory.instance.objectNode().put("userId", "user-001")
                 ).withMemberId("mem-001")
         );
 

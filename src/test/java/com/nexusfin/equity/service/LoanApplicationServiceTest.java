@@ -105,6 +105,8 @@ class LoanApplicationServiceTest {
                 ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
         verify(yunkaGatewayClient).proxy(yunkaCaptor.capture());
         JsonNode forwardData = objectMapper.valueToTree(yunkaCaptor.getValue().data());
+        assertThat(forwardData.path("userId").asText()).isEqualTo("user-001");
+        assertThat(forwardData.has("uid")).isFalse();
         assertThat(forwardData.path("purpose").asText()).isEqualTo("rent");
         assertThat(forwardData.path("loanReason").asText()).isEqualTo("DAILY_CONSUMPTION");
         assertThat(forwardData.path("bankCardNum").asText()).isEqualTo("6222020202028648");

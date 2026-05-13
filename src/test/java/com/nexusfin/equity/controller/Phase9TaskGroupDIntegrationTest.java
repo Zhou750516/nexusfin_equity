@@ -120,7 +120,8 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         org.mockito.Mockito.verify(yunkaGatewayClient).proxy(requestCaptor.capture());
         JsonNode data = objectMapper.valueToTree(requestCaptor.getValue().data());
         assertThat(requestCaptor.getValue().path()).isEqualTo("/repay/trial");
-        assertThat(data.get("uid").asText()).isEqualTo("user-repay-info");
+        assertThat(data.get("userId").asText()).isEqualTo("user-repay-info");
+        assertThat(data.has("uid")).isFalse();
         assertThat(data.get("loanId").asText()).isEqualTo("LOAN202604130001");
         assertThat(data.get("repayType").asText()).isEqualTo("EARLY");
         assertThat(output).contains("repayment info yunka request begin");
@@ -165,7 +166,8 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         org.mockito.Mockito.verify(yunkaGatewayClient).proxy(requestCaptor.capture());
         JsonNode data = objectMapper.valueToTree(requestCaptor.getValue().data());
         assertThat(requestCaptor.getValue().path()).isEqualTo("/repay/apply");
-        assertThat(data.get("uid").asText()).isEqualTo("user-repay-submit");
+        assertThat(data.get("userId").asText()).isEqualTo("user-repay-submit");
+        assertThat(data.has("uid")).isFalse();
         assertThat(data.get("loanId").asText()).isEqualTo("LOAN202604130002");
         assertThat(data.get("bankCardNo").asText()).isEqualTo("acc_001");
         assertThat(data.get("repayAmount").asLong()).isEqualTo(101850L);
@@ -202,7 +204,8 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         org.mockito.Mockito.verify(yunkaGatewayClient).proxy(requestCaptor.capture());
         JsonNode data = objectMapper.valueToTree(requestCaptor.getValue().data());
         assertThat(requestCaptor.getValue().path()).isEqualTo("/repay/query");
-        assertThat(data.get("uid").asText()).isEqualTo("user-repay-result");
+        assertThat(data.get("userId").asText()).isEqualTo("user-repay-result");
+        assertThat(data.has("uid")).isFalse();
         assertThat(data.get("loanId").asText()).isEqualTo("LOAN202604130002");
         assertThat(data.get("swiftNumber").asText()).isEqualTo("RP-LOAN202604130002");
     }

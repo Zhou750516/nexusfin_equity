@@ -9,6 +9,7 @@ import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.service.impl.LoanApprovalQueryServiceImpl;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
+import com.nexusfin.equity.service.support.YunkaCallTemplate.YunkaCall;
 import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanItem;
 import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanResponse;
 import java.time.LocalDateTime;
@@ -16,6 +17,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -79,6 +81,13 @@ class LoanApprovalQueryServiceTest {
         assertThat(response.steps())
                 .extracting(LoanApprovalStatusResponse.ApprovalStep::status)
                 .containsExactly("completed", "completed", "pending");
+
+        ArgumentCaptor<YunkaCall> captor = ArgumentCaptor.forClass(YunkaCall.class);
+        org.mockito.Mockito.verify(yunkaCallTemplate).executeForData(captor.capture());
+        assertThat(captor.getValue().path()).isEqualTo("/loan/query");
+        var payload = objectMapper.valueToTree(captor.getValue().payload());
+        assertThat(payload.path("userId").asText()).isEqualTo("user-001");
+        assertThat(payload.has("uid")).isFalse();
     }
 
     @Test

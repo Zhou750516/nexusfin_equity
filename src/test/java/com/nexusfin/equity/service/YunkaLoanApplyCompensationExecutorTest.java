@@ -82,6 +82,9 @@ class YunkaLoanApplyCompensationExecutorTest {
         assertThat(requestCaptor.getValue().requestId()).isEqualTo("LA-001");
         assertThat(requestCaptor.getValue().path()).isEqualTo("/loan/query");
         assertThat(new ObjectMapper().valueToTree(requestCaptor.getValue()).has("bizOrderNo")).isFalse();
+        JsonNode requestData = new ObjectMapper().valueToTree(requestCaptor.getValue().data());
+        assertThat(requestData.path("userId").asText()).isEqualTo("tech-user-001");
+        assertThat(requestData.has("uid")).isFalse();
         assertThat(result.responsePayload()).contains("SUCCESS");
         assertThat(result.responsePayload()).contains("LN-001");
         ArgumentCaptor<LoanApplicationMapping> mappingCaptor = ArgumentCaptor.forClass(LoanApplicationMapping.class);
@@ -175,6 +178,9 @@ class YunkaLoanApplyCompensationExecutorTest {
                 ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
         verify(yunkaGatewayClient).proxy(requestCaptor.capture());
         assertThat(requestCaptor.getValue().path()).isEqualTo("/loan/query");
+        JsonNode queryData = new ObjectMapper().valueToTree(requestCaptor.getValue().data());
+        assertThat(queryData.path("userId").asText()).isEqualTo("tech-user-004");
+        assertThat(queryData.has("uid")).isFalse();
     }
 
     @Test
@@ -266,7 +272,12 @@ class YunkaLoanApplyCompensationExecutorTest {
         verify(yunkaGatewayClient, org.mockito.Mockito.times(2)).proxy(requestCaptor.capture());
         assertThat(requestCaptor.getAllValues().get(0).path()).isEqualTo("/loan/query");
         assertThat(requestCaptor.getAllValues().get(1).path()).isEqualTo("/loan/apply");
+        JsonNode queryPayload = new ObjectMapper().valueToTree(requestCaptor.getAllValues().get(0).data());
         JsonNode applyPayload = new ObjectMapper().valueToTree(requestCaptor.getAllValues().get(1).data());
+        assertThat(queryPayload.path("userId").asText()).isEqualTo("tech-user-005");
+        assertThat(queryPayload.has("uid")).isFalse();
+        assertThat(applyPayload.path("userId").asText()).isEqualTo("tech-user-005");
+        assertThat(applyPayload.has("uid")).isFalse();
         assertThat(applyPayload.path("loanAmount").decimalValue()).isEqualByComparingTo("3000.00");
     }
 
@@ -319,6 +330,12 @@ class YunkaLoanApplyCompensationExecutorTest {
         verify(yunkaGatewayClient, org.mockito.Mockito.times(2)).proxy(requestCaptor.capture());
         assertThat(requestCaptor.getAllValues().get(0).path()).isEqualTo("/loan/query");
         assertThat(requestCaptor.getAllValues().get(1).path()).isEqualTo("/loan/apply");
+        JsonNode queryPayload = new ObjectMapper().valueToTree(requestCaptor.getAllValues().get(0).data());
+        JsonNode applyPayload = new ObjectMapper().valueToTree(requestCaptor.getAllValues().get(1).data());
+        assertThat(queryPayload.path("userId").asText()).isEqualTo("tech-user-006");
+        assertThat(queryPayload.has("uid")).isFalse();
+        assertThat(applyPayload.path("userId").asText()).isEqualTo("tech-user-006");
+        assertThat(applyPayload.has("uid")).isFalse();
     }
 
     @Test

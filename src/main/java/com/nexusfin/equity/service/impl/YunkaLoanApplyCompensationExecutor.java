@@ -112,7 +112,7 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
                 ? payload.loanId()
                 : mapping.getUpstreamQueryValue();
         ObjectNode queryData = objectMapper.createObjectNode();
-        queryData.put("uid", externalUserId);
+        queryData.put("userId", externalUserId);
         queryData.put("loanId", upstreamQueryValue);
         try {
             return yunkaCallTemplate.execute(
@@ -165,7 +165,7 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
     }
 
     private record YunkaLoanApplyForwardData(
-            String uid,
+            String userId,
             String benefitOrderNo,
             String applyId,
             String loanId,

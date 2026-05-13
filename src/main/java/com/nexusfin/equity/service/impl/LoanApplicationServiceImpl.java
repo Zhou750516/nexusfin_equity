@@ -234,7 +234,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
     }
 
     private record LoanApplyForwardData(
-            String uid,
+            String userId,
             String benefitOrderNo,
             String platformBenefitOrderNo,
             String applyId,

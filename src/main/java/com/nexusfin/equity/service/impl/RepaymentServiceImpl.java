@@ -493,7 +493,7 @@ public class RepaymentServiceImpl implements RepaymentService {
     }
 
     private record RepayTrialForwardData(
-            String uid,
+            String userId,
             String loanId,
             String repayType,
             List<Integer> periods
@@ -501,7 +501,7 @@ public class RepaymentServiceImpl implements RepaymentService {
     }
 
     private record RepayApplyForwardData(
-            String uid,
+            String userId,
             String loanId,
             String repayType,
             List<Integer> periods,
@@ -511,7 +511,7 @@ public class RepaymentServiceImpl implements RepaymentService {
     }
 
     private record RepayQueryForwardData(
-            String uid,
+            String userId,
             String loanId,
             String swiftNumber
     ) {

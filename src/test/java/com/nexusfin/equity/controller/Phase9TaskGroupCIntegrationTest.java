@@ -135,7 +135,8 @@ class Phase9TaskGroupCIntegrationTest extends AbstractYunkaXiaohuaIT {
         JsonNode data = objectMapper.valueToTree(request.data());
         assertThat(request.path()).isEqualTo("/loan/trial");
         assertThat(request.requestId()).startsWith("LC-");
-        assertThat(data.get("uid").asText()).isEqualTo("user-loan-calculate");
+        assertThat(data.get("userId").asText()).isEqualTo("user-loan-calculate");
+        assertThat(data.has("uid")).isFalse();
         assertThat(data.get("applyId").asText()).startsWith("LC-");
         assertThat(data.get("loanAmount").asLong()).isEqualTo(300000L);
         assertThat(data.get("loanPeriod").asInt()).isEqualTo(3);
@@ -177,7 +178,8 @@ class Phase9TaskGroupCIntegrationTest extends AbstractYunkaXiaohuaIT {
         org.mockito.Mockito.verify(yunkaGatewayClient).proxy(requestCaptor.capture());
         JsonNode data = objectMapper.valueToTree(requestCaptor.getValue().data());
         assertThat(requestCaptor.getValue().path()).isEqualTo("/loan/query");
-        assertThat(data.get("uid").asText()).isEqualTo("user-approval-status");
+        assertThat(data.get("userId").asText()).isEqualTo("user-approval-status");
+        assertThat(data.has("uid")).isFalse();
         assertThat(data.get("loanId").asText()).isEqualTo("LOAN202604130001");
     }
 

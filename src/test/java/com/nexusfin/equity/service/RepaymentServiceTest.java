@@ -116,6 +116,13 @@ class RepaymentServiceTest {
         assertThat(response.bankCard().accountId()).isEqualTo("card-001");
         assertThat(response.bankCards()).hasSize(2);
         assertThat(response.smsRequired()).isTrue();
+
+        ArgumentCaptor<YunkaGatewayRequest> captor = ArgumentCaptor.forClass(YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(captor.capture());
+        JsonNode payload = objectMapper.valueToTree(captor.getValue().data());
+        assertThat(captor.getValue().path()).isEqualTo("/repay/trial");
+        assertThat(payload.path("userId").asText()).isEqualTo("user-001");
+        assertThat(payload.has("uid")).isFalse();
     }
 
     @Test
@@ -209,7 +216,8 @@ class RepaymentServiceTest {
         verify(yunkaGatewayClient).proxy(captor.capture());
         JsonNode data = objectMapper.valueToTree(captor.getValue().data());
         assertThat(captor.getValue().path()).isEqualTo("/repay/query");
-        assertThat(data.get("uid").asText()).isEqualTo("user-001");
+        assertThat(data.get("userId").asText()).isEqualTo("user-001");
+        assertThat(data.has("uid")).isFalse();
         assertThat(data.get("loanId").asText()).isEqualTo("LN-001");
         assertThat(data.get("swiftNumber").asText()).isEqualTo("RP-LN-001");
     }
@@ -381,6 +389,15 @@ class RepaymentServiceTest {
                 .findFirst()
                 .orElseThrow();
         JsonNode repayApplyPayload = objectMapper.valueToTree(repayApplyRequest.data());
+        YunkaGatewayRequest repayTrialRequest = captor.getAllValues().stream()
+                .filter(request -> "/repay/trial".equals(request.path()))
+                .findFirst()
+                .orElseThrow();
+        JsonNode repayTrialPayload = objectMapper.valueToTree(repayTrialRequest.data());
+        assertThat(repayTrialPayload.path("userId").asText()).isEqualTo("user-001");
+        assertThat(repayTrialPayload.has("uid")).isFalse();
+        assertThat(repayApplyPayload.path("userId").asText()).isEqualTo("user-001");
+        assertThat(repayApplyPayload.has("uid")).isFalse();
         assertThat(repayApplyPayload.path("repayAmount").decimalValue()).isEqualByComparingTo("1018.50");
     }
 

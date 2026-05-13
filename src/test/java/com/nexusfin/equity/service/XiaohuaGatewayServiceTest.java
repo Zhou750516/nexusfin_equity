@@ -7,6 +7,8 @@ import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.ErrorCodes;
 import com.nexusfin.equity.service.impl.XiaohuaGatewayServiceImpl;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
+import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanRequest;
+import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanResponse;
 import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncRequest;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryRequest;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryResponse;
@@ -141,6 +143,34 @@ class XiaohuaGatewayServiceTest {
         assertThat(envelope.has("bizOrderNo")).isFalse();
         assertThat(forwarded.has("userId")).isFalse();
         assertThat(forwarded.path("token").asText()).isEqualTo("joint-token-001");
+    }
+
+    @Test
+    void shouldForwardUserIdWhenQueryingLoanRepayPlan() throws Exception {
+        JsonNode data = objectMapper.readTree("""
+                {
+                  "repayPlan": []
+                }
+                """);
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", data));
+
+        LoanRepayPlanResponse response = gatewayService.queryLoanRepayPlan(
+                "REQ-REPAY-PLAN-001",
+                "BIZ-REPAY-PLAN-001",
+                new LoanRepayPlanRequest("user-001", "loan-001")
+        );
+
+        assertThat(response.repayPlan()).isEmpty();
+
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> captor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(captor.capture());
+        assertThat(captor.getValue().path()).isEqualTo("/loan/repayPlan");
+        JsonNode forwarded = objectMapper.valueToTree(captor.getValue().data());
+        assertThat(forwarded.path("userId").asText()).isEqualTo("user-001");
+        assertThat(forwarded.has("uid")).isFalse();
+        assertThat(forwarded.path("loanId").asText()).isEqualTo("loan-001");
     }
 
     @Test

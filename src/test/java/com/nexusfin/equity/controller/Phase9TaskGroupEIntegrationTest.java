@@ -171,7 +171,8 @@ class Phase9TaskGroupEIntegrationTest {
         org.mockito.Mockito.verify(yunkaGatewayClient).proxy(requestCaptor.capture());
         JsonNode data = objectMapper.valueToTree(requestCaptor.getValue().data());
         assertThat(requestCaptor.getValue().path()).isEqualTo("/loan/apply");
-        assertThat(data.get("uid").asText()).isEqualTo("user-loan-apply");
+        assertThat(data.get("userId").asText()).isEqualTo("user-loan-apply");
+        assertThat(data.has("uid")).isFalse();
         assertThat(data.get("benefitOrderNo").asText()).isEqualTo(benefitOrder.getBenefitOrderNo());
         assertThat(data.get("platformBenefitOrderNo").asText()).isEqualTo("PBO-INT-001");
         assertThat(data.get("applyId").asText()).isEqualTo(mapping.getApplicationId());

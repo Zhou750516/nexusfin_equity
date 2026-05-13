@@ -303,7 +303,7 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
     }
 
     private record LoanQueryForwardData(
-            String uid,
+            String userId,
             String loanId
     ) {
     }
