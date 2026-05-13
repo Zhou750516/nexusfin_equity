@@ -12,6 +12,9 @@ import com.nexusfin.equity.service.MemberReceivingAccountService;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +24,9 @@ import static com.nexusfin.equity.util.LoanInputValidator.validateAmountAndTerm;
 
 @Service
 public class LoanCalculatorServiceImpl implements LoanCalculatorService {
+
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Shanghai");
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
     private final H5LoanProperties h5LoanProperties;
     private final YunkaProperties yunkaProperties;
@@ -80,8 +86,9 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
         );
         BigDecimal receiveAmount = readAmountOrDefault(data, requestedAmount, "receiveAmount");
         BigDecimal repayAmount = readAmountOrDefault(data, receiveAmount, "repayAmount");
+        BigDecimal feeBaseAmount = readAmountOrDefault(data, receiveAmount, "originalRefund");
         return new LoanCalculateResponse(
-                repayAmount.subtract(receiveAmount).setScale(2, RoundingMode.HALF_UP),
+                repayAmount.subtract(feeBaseAmount).setScale(2, RoundingMode.HALF_UP),
                 readAnnualRate(data),
                 mapRepaymentPlan(data.path("repayPlan"))
         );
@@ -106,13 +113,53 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
         }
         return java.util.stream.StreamSupport.stream(repaymentPlan.spliterator(), false)
                 .map(item -> new LoanCalculateResponse.RepaymentPlanItem(
-                        item.path("period").asInt(),
-                        item.path("date").asText(),
-                        readDecimal(item, "principal", "repayPrincipal"),
-                        readDecimal(item, "interest", "repayInterest"),
-                        readDecimal(item, "total", "repayAmount")
+                        readInt(item, "periodNo", "period"),
+                        readRepaymentDate(item),
+                        readDecimal(item, "repayPrincipal", "principal"),
+                        readDecimal(item, "repayInterest", "interest"),
+                        readDecimal(item, "repayAmount", "total")
                 ))
                 .toList();
+    }
+
+    private int readInt(JsonNode data, String... fields) {
+        for (String field : fields) {
+            JsonNode value = data.path(field);
+            if (!value.isMissingNode() && !value.isNull()) {
+                if (value.isInt() || value.isLong()) {
+                    return value.asInt();
+                }
+                String text = value.asText();
+                if (!text.isBlank()) {
+                    try {
+                        return Integer.parseInt(text);
+                    } catch (NumberFormatException ignored) {
+                        return 0;
+                    }
+                }
+            }
+        }
+        return 0;
+    }
+
+    private String readRepaymentDate(JsonNode data) {
+        JsonNode date = data.path("date");
+        if (!date.isMissingNode() && !date.isNull() && !date.asText().isBlank()) {
+            return date.asText();
+        }
+        JsonNode dueTime = data.path("dueTime");
+        if (dueTime.isMissingNode() || dueTime.isNull()) {
+            return "";
+        }
+        try {
+            long epochMillis = dueTime.isNumber() ? dueTime.asLong() : Long.parseLong(dueTime.asText());
+            return Instant.ofEpochMilli(epochMillis)
+                    .atZone(BUSINESS_ZONE)
+                    .toLocalDate()
+                    .format(DATE_FORMATTER);
+        } catch (NumberFormatException ex) {
+            return "";
+        }
     }
 
     private BigDecimal readAmountOrDefault(JsonNode data, BigDecimal fallback, String... fields) {

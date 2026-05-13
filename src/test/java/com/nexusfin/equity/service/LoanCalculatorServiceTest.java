@@ -137,6 +137,52 @@ class LoanCalculatorServiceTest {
     }
 
     @Test
+    void shouldMapCurrentYunkaTrialResponseFieldsForCalculatorDisplay() throws Exception {
+        when(yunkaCallTemplate.executeForData(any()))
+                .thenReturn(objectMapper.readTree("""
+                        {
+                          "status": "SUCCESS",
+                          "providerCode": "0",
+                          "providerMessage": "success",
+                          "retryable": false,
+                          "originalRefund": 3000.0,
+                          "receiveAmount": 3120.75,
+                          "repayAmount": 3120.75,
+                          "yearRate": 24.0,
+                          "repayPlan": [
+                            {
+                              "dueTime": 1781280000000,
+                              "originalRepay": 1040.25,
+                              "periodNo": 1,
+                              "repayAmount": 1040.25,
+                              "repayGuaranteeFee": 0.0,
+                              "repayInterest": 21.25,
+                              "repayOtherCharge": 0.0,
+                              "repayPrincipal": 992.95,
+                              "repaySvcFee": 26.05
+                            }
+                          ]
+                        }
+                        """));
+
+        LoanCalculateResponse response = loanCalculatorService.calculate(
+                "mem-test-001",
+                "cid-test-001",
+                new LoanCalculateRequest(3000L, 3)
+        );
+
+        assertThat(response.totalFee()).isEqualByComparingTo("120.75");
+        assertThat(response.annualRate()).isEqualTo("24.0%");
+        assertThat(response.repaymentPlan()).hasSize(1);
+        LoanCalculateResponse.RepaymentPlanItem firstPeriod = response.repaymentPlan().get(0);
+        assertThat(firstPeriod.period()).isEqualTo(1);
+        assertThat(firstPeriod.date()).isEqualTo("2026-06-13");
+        assertThat(firstPeriod.principal()).isEqualByComparingTo("992.95");
+        assertThat(firstPeriod.interest()).isEqualByComparingTo("21.25");
+        assertThat(firstPeriod.total()).isEqualByComparingTo("1040.25");
+    }
+
+    @Test
     void shouldFallbackToConfigAnnualRateAndRequestedAmountWhenYunkaFieldsAreMissing() throws Exception {
         when(yunkaCallTemplate.executeForData(any()))
                 .thenReturn(objectMapper.readTree("""
