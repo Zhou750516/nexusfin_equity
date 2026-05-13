@@ -8,6 +8,7 @@ import com.nexusfin.equity.dto.response.LoanCalculateResponse;
 import com.nexusfin.equity.dto.response.LoanCalculatorConfigResponse;
 import com.nexusfin.equity.service.H5I18nService;
 import com.nexusfin.equity.service.LoanCalculatorService;
+import com.nexusfin.equity.service.LoanReceivingAccountService;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -24,23 +25,27 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
     private final H5LoanProperties h5LoanProperties;
     private final YunkaProperties yunkaProperties;
     private final H5I18nService h5I18nService;
+    private final LoanReceivingAccountService loanReceivingAccountService;
     private final YunkaCallTemplate yunkaCallTemplate;
 
     public LoanCalculatorServiceImpl(
             H5LoanProperties h5LoanProperties,
             YunkaProperties yunkaProperties,
             H5I18nService h5I18nService,
+            LoanReceivingAccountService loanReceivingAccountService,
             YunkaCallTemplate yunkaCallTemplate
     ) {
         this.h5LoanProperties = h5LoanProperties;
         this.yunkaProperties = yunkaProperties;
         this.h5I18nService = h5I18nService;
+        this.loanReceivingAccountService = loanReceivingAccountService;
         this.yunkaCallTemplate = yunkaCallTemplate;
     }
 
     @Override
     public LoanCalculatorConfigResponse getCalculatorConfig() {
-        H5LoanProperties.ReceivingAccount receivingAccount = h5LoanProperties.receivingAccount();
+        LoanReceivingAccountService.ReceivingAccountDetails receivingAccount =
+                loanReceivingAccountService.getDefaultReceivingAccount();
         return new LoanCalculatorConfigResponse(
                 new LoanCalculatorConfigResponse.AmountRange(
                         h5LoanProperties.amountRange().min(),
@@ -52,7 +57,7 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
                 h5LoanProperties.annualRate(),
                 h5I18nService.text("loan.lender", h5LoanProperties.lender()),
                 new LoanCalculatorConfigResponse.ReceivingAccount(
-                        h5I18nService.text("loan.receivingAccount.bankName", receivingAccount.bankName()),
+                        receivingAccount.bankName(),
                         receivingAccount.lastFour(),
                         receivingAccount.accountId()
                 )

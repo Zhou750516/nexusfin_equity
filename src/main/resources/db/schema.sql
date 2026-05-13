@@ -141,6 +141,37 @@ create table if not exists loan_application_mapping (
     updated_ts timestamp not null
 );
 
+create table if not exists loan_receiving_account (
+    account_id varchar(64) primary key,
+    bank_name varchar(128) not null,
+    last_four varchar(8) not null,
+    account_status varchar(32) not null,
+    is_default tinyint not null,
+    created_ts timestamp not null,
+    updated_ts timestamp not null
+);
+
+insert into loan_receiving_account (
+    account_id,
+    bank_name,
+    last_four,
+    account_status,
+    is_default,
+    created_ts,
+    updated_ts
+)
+select
+    'acc_001',
+    '招商银行',
+    '8648',
+    'ACTIVE',
+    1,
+    current_timestamp,
+    current_timestamp
+where not exists (
+    select 1 from loan_receiving_account where account_id = 'acc_001'
+);
+
 create table if not exists benefit_status_push_log (
     event_id varchar(64) primary key,
     benefit_order_no varchar(64) not null,

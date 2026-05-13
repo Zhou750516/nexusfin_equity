@@ -3,12 +3,14 @@ package com.nexusfin.equity.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.entity.LoanApplicationMapping;
+import com.nexusfin.equity.entity.LoanReceivingAccount;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.enums.MemberStatusEnum;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.repository.ContractArchiveRepository;
 import com.nexusfin.equity.repository.IdempotencyRecordRepository;
 import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
+import com.nexusfin.equity.repository.LoanReceivingAccountRepository;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
@@ -69,6 +71,9 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     private LoanApplicationMappingRepository loanApplicationMappingRepository;
 
     @Autowired
+    private LoanReceivingAccountRepository loanReceivingAccountRepository;
+
+    @Autowired
     private JwtUtil jwtUtil;
 
     @Autowired
@@ -84,6 +89,38 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
         memberChannelRepository.delete(null);
         loanApplicationMappingRepository.delete(null);
         memberInfoRepository.delete(null);
+        loanReceivingAccountRepository.delete(null);
+        insertReceivingAccount("acc_001", "招商银行", "8648");
+    }
+
+    @Test
+    void shouldReturnCalculatorConfigReceivingAccountFromDatabase() throws Exception {
+        loanReceivingAccountRepository.delete(null);
+        insertReceivingAccount("acc-db-002", "测试银行", "4321");
+        MemberInfo memberInfo = createMember("mem-loan-config-db", "user-loan-config-db");
+
+        mockMvc.perform(get("/api/loan/calculator-config")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.receivingAccount.bankName").value("测试银行"))
+                .andExpect(jsonPath("$.data.receivingAccount.lastFour").value("4321"))
+                .andExpect(jsonPath("$.data.receivingAccount.accountId").value("acc-db-002"));
+    }
+
+    @Test
+    void shouldReturnControlledErrorWhenReceivingAccountIsMissing() throws Exception {
+        loanReceivingAccountRepository.delete(null);
+        MemberInfo memberInfo = createMember("mem-loan-config-empty", "user-loan-config-empty");
+
+        mockMvc.perform(get("/api/loan/calculator-config")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(-1))
+                .andExpect(jsonPath("$.message")
+                        .value("LOAN_RECEIVING_ACCOUNT_NOT_CONFIGURED:Default loan receiving account is not configured"));
     }
 
     @Test
@@ -231,5 +268,17 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     private Cookie authCookie(MemberInfo memberInfo) {
         return new Cookie("NEXUSFIN_AUTH",
                 jwtUtil.generateToken(memberInfo.getMemberId(), memberInfo.getExternalUserId()));
+    }
+
+    private void insertReceivingAccount(String accountId, String bankName, String lastFour) {
+        LoanReceivingAccount account = new LoanReceivingAccount();
+        account.setAccountId(accountId);
+        account.setBankName(bankName);
+        account.setLastFour(lastFour);
+        account.setAccountStatus("ACTIVE");
+        account.setIsDefault(1);
+        account.setCreatedTs(LocalDateTime.now());
+        account.setUpdatedTs(LocalDateTime.now());
+        loanReceivingAccountRepository.insert(account);
     }
 }

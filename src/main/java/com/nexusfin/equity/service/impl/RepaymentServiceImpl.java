@@ -23,6 +23,7 @@ import com.nexusfin.equity.repository.IdempotencyRecordRepository;
 import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.H5I18nService;
+import com.nexusfin.equity.service.LoanReceivingAccountService;
 import com.nexusfin.equity.service.RepaymentService;
 import com.nexusfin.equity.service.XiaohuaGatewayService;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
@@ -71,6 +72,7 @@ public class RepaymentServiceImpl implements RepaymentService {
     private final LoanApplicationMappingRepository loanApplicationMappingRepository;
     private final IdempotencyRecordRepository idempotencyRecordRepository;
     private final SensitiveDataCipher sensitiveDataCipher;
+    private final LoanReceivingAccountService loanReceivingAccountService;
     private final YunkaCallTemplate yunkaCallTemplate;
 
     public RepaymentServiceImpl(
@@ -83,6 +85,7 @@ public class RepaymentServiceImpl implements RepaymentService {
             LoanApplicationMappingRepository loanApplicationMappingRepository,
             IdempotencyRecordRepository idempotencyRecordRepository,
             SensitiveDataCipher sensitiveDataCipher,
+            LoanReceivingAccountService loanReceivingAccountService,
             YunkaCallTemplate yunkaCallTemplate
     ) {
         this.h5LoanProperties = h5LoanProperties;
@@ -94,6 +97,7 @@ public class RepaymentServiceImpl implements RepaymentService {
         this.loanApplicationMappingRepository = loanApplicationMappingRepository;
         this.idempotencyRecordRepository = idempotencyRecordRepository;
         this.sensitiveDataCipher = sensitiveDataCipher;
+        this.loanReceivingAccountService = loanReceivingAccountService;
         this.yunkaCallTemplate = yunkaCallTemplate;
     }
 
@@ -357,9 +361,10 @@ public class RepaymentServiceImpl implements RepaymentService {
     }
 
     private BankAccountResponse fallbackBankAccount() {
-        H5LoanProperties.ReceivingAccount account = h5LoanProperties.receivingAccount();
+        LoanReceivingAccountService.ReceivingAccountDetails account =
+                loanReceivingAccountService.getDefaultReceivingAccount();
         return new BankAccountResponse(
-                h5I18nService.text("loan.receivingAccount.bankName", account.bankName()),
+                account.bankName(),
                 account.lastFour(),
                 account.accountId()
         );

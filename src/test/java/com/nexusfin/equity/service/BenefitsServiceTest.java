@@ -229,8 +229,7 @@ class BenefitsServiceTest {
                 new H5LoanProperties.AmountRange(100L, 5000L, 100L, 3000L),
                 List.of(new H5LoanProperties.TermOption("3期", 3)),
                 BigDecimal.valueOf(0.18),
-                "XX商业银行",
-                new H5LoanProperties.ReceivingAccount("招商银行", "8648", "acc_001")
+                "XX商业银行"
         );
     }
 }

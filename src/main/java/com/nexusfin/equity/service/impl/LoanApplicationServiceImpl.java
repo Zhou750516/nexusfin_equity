@@ -19,6 +19,7 @@ import com.nexusfin.equity.service.BenefitOrderService;
 import com.nexusfin.equity.service.H5I18nService;
 import com.nexusfin.equity.service.LoanApplicationGateway;
 import com.nexusfin.equity.service.LoanApplicationService;
+import com.nexusfin.equity.service.LoanReceivingAccountService;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import java.math.BigDecimal;
@@ -40,6 +41,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
     private final LoanApplicationGateway loanApplicationGateway;
     private final BenefitOrderService benefitOrderService;
     private final H5I18nService h5I18nService;
+    private final LoanReceivingAccountService loanReceivingAccountService;
     private final AsyncCompensationEnqueueService asyncCompensationEnqueueService;
     private final YunkaCallTemplate yunkaCallTemplate;
 
@@ -50,6 +52,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
             LoanApplicationGateway loanApplicationGateway,
             BenefitOrderService benefitOrderService,
             H5I18nService h5I18nService,
+            LoanReceivingAccountService loanReceivingAccountService,
             AsyncCompensationEnqueueService asyncCompensationEnqueueService,
             YunkaCallTemplate yunkaCallTemplate
     ) {
@@ -59,6 +62,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
         this.loanApplicationGateway = loanApplicationGateway;
         this.benefitOrderService = benefitOrderService;
         this.h5I18nService = h5I18nService;
+        this.loanReceivingAccountService = loanReceivingAccountService;
         this.asyncCompensationEnqueueService = asyncCompensationEnqueueService;
         this.yunkaCallTemplate = yunkaCallTemplate;
     }
@@ -194,7 +198,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
 
     private void validateApplyRequest(LoanApplyRequest request) {
         validateAmountAndTerm(h5LoanProperties, request.amount(), request.term());
-        String accountId = h5LoanProperties.receivingAccount().accountId();
+        String accountId = loanReceivingAccountService.getDefaultReceivingAccount().accountId();
         if (!accountId.equals(request.receivingAccountId())) {
             throw new BizException(400, "receiving account is unsupported");
         }

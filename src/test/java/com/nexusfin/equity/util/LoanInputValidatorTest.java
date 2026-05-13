@@ -41,8 +41,7 @@ class LoanInputValidatorTest {
                         new H5LoanProperties.TermOption("6期", 6)
                 ),
                 BigDecimal.valueOf(0.18),
-                "XX商业银行",
-                new H5LoanProperties.ReceivingAccount("招商银行", "8648", "acc_001")
+                "XX商业银行"
         );
     }
 }

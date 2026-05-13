@@ -34,6 +34,9 @@ class LoanCalculatorServiceTest {
     private H5I18nService h5I18nService;
 
     @Mock
+    private LoanReceivingAccountService loanReceivingAccountService;
+
+    @Mock
     private YunkaCallTemplate yunkaCallTemplate;
 
     private LoanCalculatorService loanCalculatorService;
@@ -45,12 +48,16 @@ class LoanCalculatorServiceTest {
                 h5LoanProperties(),
                 yunkaProperties(),
                 h5I18nService,
+                loanReceivingAccountService,
                 yunkaCallTemplate
         );
     }
 
     @Test
-    void shouldBuildCalculatorConfigFromPropertiesAndI18nDefaults() {
+    void shouldBuildCalculatorConfigFromDatabaseReceivingAccount() {
+        when(loanReceivingAccountService.getDefaultReceivingAccount())
+                .thenReturn(new LoanReceivingAccountService.ReceivingAccountDetails("acc-db-001", "测试银行", "1234"));
+
         LoanCalculatorConfigResponse response = loanCalculatorService.getCalculatorConfig();
 
         assertThat(response.amountRange().min()).isEqualTo(100L);
@@ -60,9 +67,21 @@ class LoanCalculatorServiceTest {
                 .containsExactly(3, 6);
         assertThat(response.annualRate()).isEqualByComparingTo("0.18");
         assertThat(response.lender()).isEqualTo("XX商业银行");
-        assertThat(response.receivingAccount().bankName()).isEqualTo("招商银行");
-        assertThat(response.receivingAccount().lastFour()).isEqualTo("8648");
-        assertThat(response.receivingAccount().accountId()).isEqualTo("acc_001");
+        assertThat(response.receivingAccount().bankName()).isEqualTo("测试银行");
+        assertThat(response.receivingAccount().lastFour()).isEqualTo("1234");
+        assertThat(response.receivingAccount().accountId()).isEqualTo("acc-db-001");
+    }
+
+    @Test
+    void shouldFailWhenDatabaseReceivingAccountIsMissing() {
+        when(loanReceivingAccountService.getDefaultReceivingAccount())
+                .thenThrow(new BizException("LOAN_RECEIVING_ACCOUNT_NOT_CONFIGURED",
+                        "Default loan receiving account is not configured"));
+
+        assertThatThrownBy(() -> loanCalculatorService.getCalculatorConfig())
+                .isInstanceOf(BizException.class)
+                .extracting(throwable -> ((BizException) throwable).getErrorNo())
+                .isEqualTo("LOAN_RECEIVING_ACCOUNT_NOT_CONFIGURED");
     }
 
     @Test
@@ -166,8 +185,7 @@ class LoanCalculatorServiceTest {
                         new H5LoanProperties.TermOption("6期", 6)
                 ),
                 BigDecimal.valueOf(0.18),
-                "XX商业银行",
-                new H5LoanProperties.ReceivingAccount("招商银行", "8648", "acc_001")
+                "XX商业银行"
         );
     }
 

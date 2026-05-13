@@ -9,8 +9,7 @@ public record H5LoanProperties(
         AmountRange amountRange,
         List<TermOption> termOptions,
         BigDecimal annualRate,
-        String lender,
-        ReceivingAccount receivingAccount
+        String lender
 ) {
 
     public record AmountRange(
@@ -27,10 +26,4 @@ public record H5LoanProperties(
     ) {
     }
 
-    public record ReceivingAccount(
-            String bankName,
-            String lastFour,
-            String accountId
-    ) {
-    }
 }

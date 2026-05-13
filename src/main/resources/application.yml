@@ -66,10 +66,6 @@ nexusfin:
           value: 3
       annual-rate: 0.18
       lender: XX商业银行
-      receiving-account:
-        bank-name: 招商银行
-        last-four: "8648"
-        account-id: acc_001
     benefits:
       product-code: HUXUAN_CARD
       activate:

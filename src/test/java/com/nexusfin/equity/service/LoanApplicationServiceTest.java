@@ -53,6 +53,9 @@ class LoanApplicationServiceTest {
     private H5I18nService h5I18nService;
 
     @Mock
+    private LoanReceivingAccountService loanReceivingAccountService;
+
+    @Mock
     private AsyncCompensationEnqueueService asyncCompensationEnqueueService;
 
     private LoanApplicationService loanApplicationService;
@@ -60,6 +63,8 @@ class LoanApplicationServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(h5I18nService.text(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
+        lenient().when(loanReceivingAccountService.getDefaultReceivingAccount())
+                .thenReturn(new LoanReceivingAccountService.ReceivingAccountDetails("acc_001", "招商银行", "8648"));
         loanApplicationService = new LoanApplicationServiceImpl(
                 h5LoanProperties(),
                 h5BenefitsProperties(),
@@ -67,6 +72,7 @@ class LoanApplicationServiceTest {
                 loanApplicationGateway,
                 benefitOrderService,
                 h5I18nService,
+                loanReceivingAccountService,
                 asyncCompensationEnqueueService,
                 new YunkaCallTemplate(yunkaGatewayClient)
         );
@@ -286,8 +292,7 @@ class LoanApplicationServiceTest {
                 new H5LoanProperties.AmountRange(100L, 5000L, 100L, 3000L),
                 List.of(new H5LoanProperties.TermOption("3期", 3)),
                 BigDecimal.valueOf(0.18),
-                "XX商业银行",
-                new H5LoanProperties.ReceivingAccount("招商银行", "8648", "acc_001")
+                "XX商业银行"
         );
     }
 
