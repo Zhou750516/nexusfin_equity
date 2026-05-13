@@ -50,9 +50,6 @@ class JointLoginServiceTest {
     @Mock
     private MemberChannelRepository memberChannelRepository;
 
-    @Mock
-    private MemberReceivingAccountService memberReceivingAccountService;
-
     @Test
     void shouldCreateJwtAndResolveLandingPageForPushSceneWithoutBenefitOrder(CapturedOutput output) throws Exception {
         AuthProperties authProperties = authProperties();
@@ -60,7 +57,6 @@ class JointLoginServiceTest {
                 xiaohuaGatewayService,
                 memberInfoRepository,
                 memberChannelRepository,
-                memberReceivingAccountService,
                 new JwtUtil(authProperties),
                 authProperties,
                 sensitiveDataCipher,
@@ -95,13 +91,6 @@ class JointLoginServiceTest {
         ArgumentCaptor<MemberInfo> memberCaptor = ArgumentCaptor.forClass(MemberInfo.class);
         verify(memberInfoRepository).insert(memberCaptor.capture());
         verify(memberChannelRepository).insert(any(MemberChannel.class));
-        verify(memberReceivingAccountService).upsertDefaultReceivingAccount(
-                any(),
-                argThat(command -> "6222020202028648".equals(command.accountId())
-                        && "招商银行".equals(command.bankName())
-                        && "8648".equals(command.lastFour())
-                        && "JOINT_LOGIN".equals(command.source()))
-        );
         verify(xiaohuaGatewayService).validateUserToken(any(), any(), argThat((UserTokenRequest tokenRequest) ->
                 "joint-token-001".equals(tokenRequest.token())));
         verify(xiaohuaGatewayService).queryUser(any(), any(), argThat((UserQueryRequest userQueryRequest) ->
@@ -133,7 +122,6 @@ class JointLoginServiceTest {
                 xiaohuaGatewayService,
                 memberInfoRepository,
                 memberChannelRepository,
-                memberReceivingAccountService,
                 new JwtUtil(authProperties),
                 authProperties,
                 sensitiveDataCipher,
@@ -164,7 +152,6 @@ class JointLoginServiceTest {
 
         ArgumentCaptor<MemberInfo> memberCaptor = ArgumentCaptor.forClass(MemberInfo.class);
         verify(memberInfoRepository).insert(memberCaptor.capture());
-        verify(memberReceivingAccountService, never()).upsertDefaultReceivingAccount(any(), any());
         assertThat(memberCaptor.getValue().getIdCardEncrypted()).isNull();
         assertThat(memberCaptor.getValue().getIdCardHash()).isNull();
         assertThat(result.scene()).isEqualTo("push");
@@ -185,7 +172,6 @@ class JointLoginServiceTest {
                 xiaohuaGatewayService,
                 memberInfoRepository,
                 memberChannelRepository,
-                memberReceivingAccountService,
                 new JwtUtil(authProperties),
                 authProperties,
                 sensitiveDataCipher,
@@ -235,7 +221,6 @@ class JointLoginServiceTest {
                 xiaohuaGatewayService,
                 memberInfoRepository,
                 memberChannelRepository,
-                memberReceivingAccountService,
                 new JwtUtil(authProperties),
                 authProperties,
                 sensitiveDataCipher,
@@ -263,7 +248,6 @@ class JointLoginServiceTest {
                 xiaohuaGatewayService,
                 memberInfoRepository,
                 memberChannelRepository,
-                memberReceivingAccountService,
                 new JwtUtil(authProperties),
                 authProperties,
                 sensitiveDataCipher,
@@ -304,7 +288,6 @@ class JointLoginServiceTest {
                 xiaohuaGatewayService,
                 memberInfoRepository,
                 memberChannelRepository,
-                memberReceivingAccountService,
                 new JwtUtil(authProperties),
                 authProperties,
                 sensitiveDataCipher,
@@ -345,7 +328,6 @@ class JointLoginServiceTest {
                 xiaohuaGatewayService,
                 memberInfoRepository,
                 memberChannelRepository,
-                memberReceivingAccountService,
                 new JwtUtil(authProperties),
                 authProperties,
                 sensitiveDataCipher,
@@ -373,7 +355,6 @@ class JointLoginServiceTest {
                 xiaohuaGatewayService,
                 memberInfoRepository,
                 memberChannelRepository,
-                memberReceivingAccountService,
                 new JwtUtil(authProperties),
                 authProperties,
                 sensitiveDataCipher,
@@ -403,7 +384,6 @@ class JointLoginServiceTest {
                 xiaohuaGatewayService,
                 memberInfoRepository,
                 memberChannelRepository,
-                memberReceivingAccountService,
                 new JwtUtil(authProperties),
                 authProperties,
                 sensitiveDataCipher,
@@ -433,7 +413,6 @@ class JointLoginServiceTest {
                 xiaohuaGatewayService,
                 memberInfoRepository,
                 memberChannelRepository,
-                memberReceivingAccountService,
                 new JwtUtil(authProperties),
                 authProperties,
                 sensitiveDataCipher,
@@ -463,7 +442,6 @@ class JointLoginServiceTest {
                 xiaohuaGatewayService,
                 memberInfoRepository,
                 memberChannelRepository,
-                memberReceivingAccountService,
                 new JwtUtil(authProperties),
                 authProperties,
                 sensitiveDataCipher,

@@ -18,6 +18,8 @@ import com.nexusfin.equity.repository.SignTaskRepository;
 import com.nexusfin.equity.support.AbstractYunkaXiaohuaIT;
 import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanItem;
 import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanResponse;
+import com.nexusfin.equity.thirdparty.yunka.UserCardListResponse;
+import com.nexusfin.equity.thirdparty.yunka.UserCardSummary;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import com.nexusfin.equity.util.JwtUtil;
 import com.nexusfin.equity.util.SensitiveDataCipher;
@@ -34,6 +36,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -93,23 +96,36 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     }
 
     @Test
-    void shouldReturnCalculatorConfigReceivingAccountFromDatabase() throws Exception {
+    void shouldReturnCalculatorConfigReceivingAccountFromFirstUserCardAndCacheAllCards() throws Exception {
         MemberInfo memberInfo = createMember("mem-loan-config-db", "user-loan-config-db");
-        insertReceivingAccount(memberInfo.getMemberId(), "acc-db-002", "测试银行", "4321");
+        when(xiaohuaGatewayService.queryUserCards(any(), eq("calculator-config"), any()))
+                .thenReturn(new UserCardListResponse(List.of(
+                        new UserCardSummary("card-first-002", "第一银行", "1111", 0),
+                        new UserCardSummary("card-second-003", "第二银行", "2222", 1)
+                )));
 
         mockMvc.perform(get("/api/loan/calculator-config")
                         .cookie(authCookie(memberInfo))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.receivingAccount.bankName").value("测试银行"))
-                .andExpect(jsonPath("$.data.receivingAccount.lastFour").value("4321"))
-                .andExpect(jsonPath("$.data.receivingAccount.accountId").value("acc-db-002"));
+                .andExpect(jsonPath("$.data.receivingAccount.bankName").value("第一银行"))
+                .andExpect(jsonPath("$.data.receivingAccount.lastFour").value("1111"))
+                .andExpect(jsonPath("$.data.receivingAccount.accountId").value("card-first-002"));
+
+        MemberReceivingAccount first = memberReceivingAccountRepository
+                .selectByMemberIdAndAccountId(memberInfo.getMemberId(), "card-first-002");
+        MemberReceivingAccount second = memberReceivingAccountRepository
+                .selectByMemberIdAndAccountId(memberInfo.getMemberId(), "card-second-003");
+        assertThat(first.getSourceIndex()).isZero();
+        assertThat(second.getSourceIndex()).isEqualTo(1);
     }
 
     @Test
-    void shouldReturnControlledErrorWhenReceivingAccountIsMissing() throws Exception {
+    void shouldReturnControlledErrorWhenUserCardListIsEmpty() throws Exception {
         MemberInfo memberInfo = createMember("mem-loan-config-empty", "user-loan-config-empty");
+        when(xiaohuaGatewayService.queryUserCards(any(), eq("calculator-config"), any()))
+                .thenReturn(new UserCardListResponse(List.of()));
 
         mockMvc.perform(get("/api/loan/calculator-config")
                         .cookie(authCookie(memberInfo))
@@ -117,7 +133,7 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(-1))
                 .andExpect(jsonPath("$.message")
-                        .value("MEMBER_RECEIVING_ACCOUNT_NOT_CONFIGURED:Member receiving account is not configured"));
+                        .value("USER_CARD_LIST_EMPTY:User card list is empty"));
     }
 
     @Test
@@ -276,6 +292,7 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
         account.setAccountStatus("ACTIVE");
         account.setIsDefault(1);
         account.setSource("TEST");
+        account.setSourceIndex(0);
         account.setCreatedTs(LocalDateTime.now());
         account.setUpdatedTs(LocalDateTime.now());
         memberReceivingAccountRepository.insert(account);

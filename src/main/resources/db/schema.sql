@@ -150,11 +150,41 @@ create table if not exists member_receiving_account (
     account_status varchar(32) not null,
     is_default tinyint not null,
     source varchar(32) not null,
+    source_index int not null default 0,
     created_ts timestamp not null,
     updated_ts timestamp not null,
     unique key uk_member_receiving_account_member_account (member_id, account_id),
-    key idx_member_receiving_account_default_status (member_id, is_default, account_status)
+    key idx_member_receiving_account_default_status (member_id, is_default, account_status),
+    key idx_member_receiving_account_source_index (member_id, source, source_index)
 );
+
+select if(
+    count(*) = 0,
+    'alter table member_receiving_account add column source_index int not null default 0',
+    'select 1'
+) into @member_receiving_account_source_index_column_ddl
+from information_schema.columns
+where table_schema = database()
+  and table_name = 'member_receiving_account'
+  and column_name = 'source_index';
+prepare member_receiving_account_source_index_column_stmt
+    from @member_receiving_account_source_index_column_ddl;
+execute member_receiving_account_source_index_column_stmt;
+deallocate prepare member_receiving_account_source_index_column_stmt;
+
+select if(
+    count(*) = 0,
+    'create index idx_member_receiving_account_source_index on member_receiving_account(member_id, source, source_index)',
+    'select 1'
+) into @member_receiving_account_source_index_index_ddl
+from information_schema.statistics
+where table_schema = database()
+  and table_name = 'member_receiving_account'
+  and index_name = 'idx_member_receiving_account_source_index';
+prepare member_receiving_account_source_index_index_stmt
+    from @member_receiving_account_source_index_index_ddl;
+execute member_receiving_account_source_index_index_stmt;
+deallocate prepare member_receiving_account_source_index_index_stmt;
 
 create table if not exists benefit_status_push_log (
     event_id varchar(64) primary key,

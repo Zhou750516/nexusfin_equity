@@ -22,6 +22,7 @@ import com.nexusfin.equity.service.XiaohuaGatewayService;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolLink;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryResponse;
 import com.nexusfin.equity.thirdparty.yunka.UserCardListResponse;
+import com.nexusfin.equity.thirdparty.yunka.UserCardSummary;
 import com.nexusfin.equity.util.JwtUtil;
 import com.nexusfin.equity.util.SensitiveDataCipher;
 import java.time.LocalDateTime;
@@ -140,7 +141,11 @@ class Phase9TaskGroupAIntegrationTest {
     @Test
     void shouldReturnCalculatorConfigForAuthenticatedUser() throws Exception {
         MemberInfo memberInfo = createMember("mem-loan-config", "user-loan-config");
-        insertReceivingAccount(memberInfo.getMemberId(), "acc-calculator-001", "招商银行", "8648");
+        when(xiaohuaGatewayService.queryUserCards(any(), eq("calculator-config"), any()))
+                .thenReturn(new UserCardListResponse(List.of(
+                        new UserCardSummary("acc-calculator-001", "招商银行", "8648", 0),
+                        new UserCardSummary("acc-calculator-002", "建设银行", "1234", 1)
+                )));
 
         mockMvc.perform(get("/api/loan/calculator-config")
                         .cookie(authCookie(memberInfo)))
@@ -156,6 +161,13 @@ class Phase9TaskGroupAIntegrationTest {
                 .andExpect(jsonPath("$.data.receivingAccount.bankName").value("招商银行"))
                 .andExpect(jsonPath("$.data.receivingAccount.lastFour").value("8648"))
                 .andExpect(jsonPath("$.data.receivingAccount.accountId").value("acc-calculator-001"));
+
+        MemberReceivingAccount first = memberReceivingAccountRepository
+                .selectByMemberIdAndAccountId(memberInfo.getMemberId(), "acc-calculator-001");
+        MemberReceivingAccount second = memberReceivingAccountRepository
+                .selectByMemberIdAndAccountId(memberInfo.getMemberId(), "acc-calculator-002");
+        assertThat(first.getSourceIndex()).isZero();
+        assertThat(second.getSourceIndex()).isEqualTo(1);
     }
 
     @Test
@@ -282,6 +294,7 @@ class Phase9TaskGroupAIntegrationTest {
         account.setAccountStatus("ACTIVE");
         account.setIsDefault(1);
         account.setSource("TEST");
+        account.setSourceIndex(0);
         account.setCreatedTs(LocalDateTime.now());
         account.setUpdatedTs(LocalDateTime.now());
         memberReceivingAccountRepository.insert(account);

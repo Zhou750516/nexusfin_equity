@@ -9,6 +9,9 @@ import com.nexusfin.equity.dto.response.LoanCalculatorConfigResponse;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.service.impl.LoanCalculatorServiceImpl;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
+import com.nexusfin.equity.thirdparty.yunka.UserCardListRequest;
+import com.nexusfin.equity.thirdparty.yunka.UserCardListResponse;
+import com.nexusfin.equity.thirdparty.yunka.UserCardSummary;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -37,6 +41,9 @@ class LoanCalculatorServiceTest {
     private MemberReceivingAccountService memberReceivingAccountService;
 
     @Mock
+    private XiaohuaGatewayService xiaohuaGatewayService;
+
+    @Mock
     private YunkaCallTemplate yunkaCallTemplate;
 
     private LoanCalculatorService loanCalculatorService;
@@ -49,14 +56,18 @@ class LoanCalculatorServiceTest {
                 yunkaProperties(),
                 h5I18nService,
                 memberReceivingAccountService,
+                xiaohuaGatewayService,
                 yunkaCallTemplate
         );
     }
 
     @Test
-    void shouldBuildCalculatorConfigFromDatabaseReceivingAccount() {
-        when(memberReceivingAccountService.getDefaultReceivingAccount("mem-test-001"))
-                .thenReturn(new MemberReceivingAccountService.ReceivingAccountDetails("acc-db-001", "测试银行", "1234"));
+    void shouldBuildCalculatorConfigFromFirstUserCardAndCacheAllCards() {
+        when(xiaohuaGatewayService.queryUserCards(any(), any(), any()))
+                .thenReturn(new UserCardListResponse(List.of(
+                        new UserCardSummary("card-first-001", "第一银行", "1111", 0),
+                        new UserCardSummary("card-second-002", "第二银行", "2222", 1)
+                )));
 
         LoanCalculatorConfigResponse response = loanCalculatorService.getCalculatorConfig("mem-test-001");
 
@@ -67,21 +78,38 @@ class LoanCalculatorServiceTest {
                 .containsExactly(3, 6);
         assertThat(response.annualRate()).isEqualByComparingTo("0.18");
         assertThat(response.lender()).isEqualTo("XX商业银行");
-        assertThat(response.receivingAccount().bankName()).isEqualTo("测试银行");
-        assertThat(response.receivingAccount().lastFour()).isEqualTo("1234");
-        assertThat(response.receivingAccount().accountId()).isEqualTo("acc-db-001");
+        assertThat(response.receivingAccount().bankName()).isEqualTo("第一银行");
+        assertThat(response.receivingAccount().lastFour()).isEqualTo("1111");
+        assertThat(response.receivingAccount().accountId()).isEqualTo("card-first-001");
+
+        ArgumentCaptor<UserCardListRequest> cardRequestCaptor = ArgumentCaptor.forClass(UserCardListRequest.class);
+        verify(xiaohuaGatewayService).queryUserCards(any(), eq("calculator-config"), cardRequestCaptor.capture());
+        assertThat(cardRequestCaptor.getValue().userId()).isEqualTo("mem-test-001");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<MemberReceivingAccountService.CardCacheCommand>> cacheCaptor =
+                ArgumentCaptor.forClass(List.class);
+        verify(memberReceivingAccountService).cacheReceivingAccounts(eq("mem-test-001"), cacheCaptor.capture());
+        assertThat(cacheCaptor.getValue())
+                .extracting(
+                        MemberReceivingAccountService.CardCacheCommand::accountId,
+                        MemberReceivingAccountService.CardCacheCommand::sourceIndex
+                )
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("card-first-001", 0),
+                        org.assertj.core.groups.Tuple.tuple("card-second-002", 1)
+                );
     }
 
     @Test
-    void shouldFailWhenDatabaseReceivingAccountIsMissing() {
-        when(memberReceivingAccountService.getDefaultReceivingAccount("mem-test-001"))
-                .thenThrow(new BizException("MEMBER_RECEIVING_ACCOUNT_NOT_CONFIGURED",
-                        "Member receiving account is not configured"));
+    void shouldFailWhenUserCardListIsEmpty() {
+        when(xiaohuaGatewayService.queryUserCards(any(), any(), any()))
+                .thenReturn(new UserCardListResponse(List.of()));
 
         assertThatThrownBy(() -> loanCalculatorService.getCalculatorConfig("mem-test-001"))
                 .isInstanceOf(BizException.class)
                 .extracting(throwable -> ((BizException) throwable).getErrorNo())
-                .isEqualTo("MEMBER_RECEIVING_ACCOUNT_NOT_CONFIGURED");
+                .isEqualTo("USER_CARD_LIST_EMPTY");
     }
 
     @Test

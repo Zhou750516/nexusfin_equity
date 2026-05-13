@@ -9,7 +9,11 @@ import com.nexusfin.equity.dto.response.LoanCalculatorConfigResponse;
 import com.nexusfin.equity.service.H5I18nService;
 import com.nexusfin.equity.service.LoanCalculatorService;
 import com.nexusfin.equity.service.MemberReceivingAccountService;
+import com.nexusfin.equity.service.XiaohuaGatewayService;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
+import com.nexusfin.equity.thirdparty.yunka.UserCardListRequest;
+import com.nexusfin.equity.thirdparty.yunka.UserCardSummary;
+import com.nexusfin.equity.exception.BizException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -27,11 +31,13 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
 
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Shanghai");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
+    private static final String USER_CARDS_SOURCE = "YUNKA_USER_CARDS";
 
     private final H5LoanProperties h5LoanProperties;
     private final YunkaProperties yunkaProperties;
     private final H5I18nService h5I18nService;
     private final MemberReceivingAccountService memberReceivingAccountService;
+    private final XiaohuaGatewayService xiaohuaGatewayService;
     private final YunkaCallTemplate yunkaCallTemplate;
 
     public LoanCalculatorServiceImpl(
@@ -39,19 +45,22 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
             YunkaProperties yunkaProperties,
             H5I18nService h5I18nService,
             MemberReceivingAccountService memberReceivingAccountService,
+            XiaohuaGatewayService xiaohuaGatewayService,
             YunkaCallTemplate yunkaCallTemplate
     ) {
         this.h5LoanProperties = h5LoanProperties;
         this.yunkaProperties = yunkaProperties;
         this.h5I18nService = h5I18nService;
         this.memberReceivingAccountService = memberReceivingAccountService;
+        this.xiaohuaGatewayService = xiaohuaGatewayService;
         this.yunkaCallTemplate = yunkaCallTemplate;
     }
 
     @Override
     public LoanCalculatorConfigResponse getCalculatorConfig(String memberId) {
-        MemberReceivingAccountService.ReceivingAccountDetails receivingAccount =
-                memberReceivingAccountService.getDefaultReceivingAccount(memberId);
+        List<UserCardSummary> userCards = queryUserCards(memberId);
+        UserCardSummary displayCard = userCards.get(0);
+        memberReceivingAccountService.cacheReceivingAccounts(memberId, toCacheCommands(userCards));
         return new LoanCalculatorConfigResponse(
                 new LoanCalculatorConfigResponse.AmountRange(
                         h5LoanProperties.amountRange().min(),
@@ -63,9 +72,9 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
                 h5LoanProperties.annualRate(),
                 h5I18nService.text("loan.lender", h5LoanProperties.lender()),
                 new LoanCalculatorConfigResponse.ReceivingAccount(
-                        receivingAccount.bankName(),
-                        receivingAccount.lastFour(),
-                        receivingAccount.accountId()
+                        displayCard.bankName(),
+                        displayCard.cardLastFour(),
+                        displayCard.cardId()
                 )
         );
     }
@@ -101,6 +110,51 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
                         termOption.value()
                 ))
                 .toList();
+    }
+
+    private List<UserCardSummary> queryUserCards(String memberId) {
+        String requestId = next("LCC");
+        List<UserCardSummary> cards = xiaohuaGatewayService.queryUserCards(
+                requestId,
+                "calculator-config",
+                new UserCardListRequest(memberId)
+        ).cards();
+        if (cards == null || cards.isEmpty()) {
+            throw new BizException("USER_CARD_LIST_EMPTY", "User card list is empty");
+        }
+        for (UserCardSummary card : cards) {
+            validateUserCard(card);
+        }
+        return cards;
+    }
+
+    private void validateUserCard(UserCardSummary card) {
+        if (card == null
+                || !hasText(card.cardId())
+                || !hasText(card.bankName())
+                || !hasText(card.cardLastFour())) {
+            throw new BizException("USER_CARD_LIST_UNAVAILABLE", "User card list contains unavailable card data");
+        }
+    }
+
+    private List<MemberReceivingAccountService.CardCacheCommand> toCacheCommands(List<UserCardSummary> cards) {
+        java.util.ArrayList<MemberReceivingAccountService.CardCacheCommand> commands = new java.util.ArrayList<>();
+        for (int index = 0; index < cards.size(); index++) {
+            UserCardSummary card = cards.get(index);
+            commands.add(new MemberReceivingAccountService.CardCacheCommand(
+                    card.cardId(),
+                    card.bankName(),
+                    card.cardLastFour(),
+                    card.isDefault(),
+                    index,
+                    USER_CARDS_SOURCE
+            ));
+        }
+        return commands;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private void validateCalculateRequest(LoanCalculateRequest request) {

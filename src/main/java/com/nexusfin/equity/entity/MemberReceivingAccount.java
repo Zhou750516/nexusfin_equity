@@ -17,6 +17,7 @@ public class MemberReceivingAccount {
     private String accountStatus;
     private Integer isDefault;
     private String source;
+    private Integer sourceIndex;
     private LocalDateTime createdTs;
     private LocalDateTime updatedTs;
 
@@ -82,6 +83,14 @@ public class MemberReceivingAccount {
 
     public void setSource(String source) {
         this.source = source;
+    }
+
+    public Integer getSourceIndex() {
+        return sourceIndex;
+    }
+
+    public void setSourceIndex(Integer sourceIndex) {
+        this.sourceIndex = sourceIndex;
     }
 
     public LocalDateTime getCreatedTs() {

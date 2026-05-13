@@ -152,6 +152,7 @@ create table if not exists member_receiving_account (
     account_status varchar(32) not null,
     is_default tinyint not null,
     source varchar(32) not null,
+    source_index int not null default 0,
     created_ts timestamp not null,
     updated_ts timestamp not null
 );
@@ -160,6 +161,11 @@ create unique index if not exists uk_member_receiving_account_member_account
     on member_receiving_account(member_id, account_id);
 create index if not exists idx_member_receiving_account_default_status
     on member_receiving_account(member_id, is_default, account_status);
+create index if not exists idx_member_receiving_account_source_index
+    on member_receiving_account(member_id, source, source_index);
+
+alter table member_receiving_account
+    add column if not exists source_index int not null default 0;
 
 create table if not exists benefit_status_push_log (
     event_id varchar(64) primary key,

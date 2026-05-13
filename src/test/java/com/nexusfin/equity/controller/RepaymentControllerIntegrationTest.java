@@ -387,6 +387,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
         account.setAccountStatus("ACTIVE");
         account.setIsDefault(1);
         account.setSource("TEST");
+        account.setSourceIndex(0);
         account.setCreatedTs(LocalDateTime.now());
         account.setUpdatedTs(LocalDateTime.now());
         memberReceivingAccountRepository.insert(account);
