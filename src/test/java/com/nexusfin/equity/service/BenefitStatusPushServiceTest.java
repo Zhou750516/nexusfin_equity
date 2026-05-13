@@ -55,7 +55,7 @@ class BenefitStatusPushServiceTest {
                 benefitStatusPushLogRepository,
                 techPlatformBenefitStatusClient
         );
-        doThrow(new BizException("TECH_PLATFORM_STATUS_PUSH_NOT_READY", "contract is not configured"))
+        doThrow(new BizException("TECH_PLATFORM_REJECTED", "Tech platform rejected request: rejected"))
                 .when(techPlatformBenefitStatusClient)
                 .push(any());
 
@@ -66,13 +66,13 @@ class BenefitStatusPushServiceTest {
                 "xh-user-001",
                 "PENDING"
         ))).isInstanceOf(BizException.class)
-                .hasMessageContaining("contract is not configured");
+                .hasMessageContaining("Tech platform rejected request");
 
         ArgumentCaptor<BenefitStatusPushLog> captor = ArgumentCaptor.forClass(BenefitStatusPushLog.class);
         verify(benefitStatusPushLogRepository).insert(captor.capture());
         verify(benefitStatusPushLogRepository).updateById(captor.capture());
         assertThat(captor.getAllValues().get(0).getPushStatus()).isEqualTo("INIT");
         assertThat(captor.getAllValues().get(1).getPushStatus()).isEqualTo("FAIL");
-        assertThat(captor.getAllValues().get(1).getErrorMessage()).contains("contract is not configured");
+        assertThat(captor.getAllValues().get(1).getErrorMessage()).contains("Tech platform rejected request");
     }
 }

@@ -63,6 +63,15 @@ public class TechPlatformClientImpl implements TechPlatformClient {
         return invoke(properties.getPaths().getRepayInfoNotice(), request);
     }
 
+    @Override
+    public TechPlatformNotifyResponse notifyBenefitOrder(BenefitOrderNoticeRequest request) {
+        ensureEnabled();
+        if (properties.getMode() == TechPlatformProperties.Mode.MOCK) {
+            return mockResponse("benefitOrderNotice");
+        }
+        return invoke(properties.getPaths().getBenefitOrderNotice(), request);
+    }
+
     private TechPlatformNotifyResponse invoke(String path, Object businessRequest) {
         String param = payloadCodec.encrypt(businessRequest);
         String timestamp = String.valueOf(System.currentTimeMillis());

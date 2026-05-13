@@ -7,4 +7,6 @@ public interface TechPlatformClient {
     TechPlatformNotifyResponse notifyLoanInfo(LoanInfoNoticeRequest request);
 
     TechPlatformNotifyResponse notifyRepaymentInfo(RepayInfoNoticeRequest request);
+
+    TechPlatformNotifyResponse notifyBenefitOrder(BenefitOrderNoticeRequest request);
 }

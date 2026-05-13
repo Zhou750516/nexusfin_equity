@@ -162,6 +162,7 @@ nexusfin:
         credit-status-notice: ${TECH_PLATFORM_API_CREDIT_STATUS_NOTICE_PATH:/guide/api/creditStatusNotice}
         loan-info-notice: ${TECH_PLATFORM_API_LOAN_INFO_NOTICE_PATH:/guide/api/loanInfoNotice}
         repay-info-notice: ${TECH_PLATFORM_API_REPAY_INFO_NOTICE_PATH:/guide/api/repayInfoNotice}
+        benefit-order-notice: ${TECH_PLATFORM_API_BENEFIT_ORDER_NOTICE_PATH:/huijuapi/vip/orderNotice}
     qw:
       enabled: ${QW_ENABLED:true}
       mode: ${QW_MODE:MOCK}

@@ -147,6 +147,7 @@ public class TechPlatformProperties {
         private String creditStatusNotice = "/guide/api/creditStatusNotice";
         private String loanInfoNotice = "/guide/api/loanInfoNotice";
         private String repayInfoNotice = "/guide/api/repayInfoNotice";
+        private String benefitOrderNotice = "/huijuapi/vip/orderNotice";
 
         public String getCreditStatusNotice() {
             return creditStatusNotice;
@@ -170,6 +171,14 @@ public class TechPlatformProperties {
 
         public void setRepayInfoNotice(String repayInfoNotice) {
             this.repayInfoNotice = repayInfoNotice;
+        }
+
+        public String getBenefitOrderNotice() {
+            return benefitOrderNotice;
+        }
+
+        public void setBenefitOrderNotice(String benefitOrderNotice) {
+            this.benefitOrderNotice = benefitOrderNotice;
         }
     }
 }

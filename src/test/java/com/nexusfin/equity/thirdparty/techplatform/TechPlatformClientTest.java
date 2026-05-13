@@ -76,6 +76,46 @@ class TechPlatformClientTest {
     }
 
     @Test
+    void shouldSendBenefitOrderNoticeWithSignedEncryptedPayload() throws Exception {
+        TechPlatformProperties properties = buildProperties();
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+
+        TechPlatformPayloadCodec codec = new TechPlatformPayloadCodec(properties, objectMapper);
+        server.expect(requestTo("https://tech-platform.test/huijuapi/vip/orderNotice"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("channelId", "abs-001"))
+                .andExpect(header("version", "1.0.0"))
+                .andExpect(request -> {
+                    MockClientHttpRequest mockRequest = (MockClientHttpRequest) request;
+                    String body = mockRequest.getBodyAsString(StandardCharsets.UTF_8);
+                    JsonNode jsonNode = objectMapper.readTree(body);
+                    String param = jsonNode.path("param").asText();
+                    assertThat(param).isNotBlank();
+                    assertThat(param).doesNotContain("BEN-001");
+                    String timestamp = request.getHeaders().getFirst("timestamp");
+                    assertThat(timestamp).isNotBlank();
+                    assertThat(request.getHeaders().getFirst("sign"))
+                            .isEqualTo(codec.sign(timestamp, param));
+                })
+                .andRespond(withSuccess("{\"code\":\"0\",\"msg\":\"ok\"}", MediaType.APPLICATION_JSON));
+
+        TechPlatformClient client = new TechPlatformClientImpl(properties, objectMapper, restClientBuilder);
+        TechPlatformNotifyResponse response = client.notifyBenefitOrder(new BenefitOrderNoticeRequest(
+                "evt-001",
+                "BEN-001",
+                "EXERCISE_SUCCESS",
+                "SUCCESS",
+                "cid-001",
+                "PENDING"
+        ));
+
+        assertThat(response.code()).isEqualTo("0");
+        assertThat(response.msg()).isEqualTo("ok");
+        server.verify();
+    }
+
+    @Test
     void shouldParseEncryptedNotifyResponse() throws Exception {
         TechPlatformProperties properties = buildProperties();
         RestClient.Builder restClientBuilder = RestClient.builder();
@@ -167,6 +207,30 @@ class TechPlatformClientTest {
                 .hasMessageContaining("TECH_PLATFORM_REJECTED");
     }
 
+    @Test
+    void shouldRejectNonSuccessBenefitOrderNoticeResponse() {
+        TechPlatformProperties properties = buildProperties();
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+
+        server.expect(requestTo("https://tech-platform.test/huijuapi/vip/orderNotice"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{\"code\":\"1\",\"msg\":\"rejected\"}", MediaType.APPLICATION_JSON));
+
+        TechPlatformClient client = new TechPlatformClientImpl(properties, objectMapper, restClientBuilder);
+
+        assertThatThrownBy(() -> client.notifyBenefitOrder(new BenefitOrderNoticeRequest(
+                "evt-001",
+                "BEN-001",
+                "EXERCISE_SUCCESS",
+                "SUCCESS",
+                "cid-001",
+                "PENDING"
+        )))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("TECH_PLATFORM_REJECTED");
+    }
+
     private TechPlatformProperties buildProperties() {
         TechPlatformProperties properties = new TechPlatformProperties();
         properties.setEnabled(true);
@@ -183,6 +247,7 @@ class TechPlatformClientTest {
         properties.getPaths().setCreditStatusNotice("/guide/api/creditStatusNotice");
         properties.getPaths().setLoanInfoNotice("/guide/api/loanInfoNotice");
         properties.getPaths().setRepayInfoNotice("/guide/api/repayInfoNotice");
+        properties.getPaths().setBenefitOrderNotice("/huijuapi/vip/orderNotice");
         return properties;
     }
 }

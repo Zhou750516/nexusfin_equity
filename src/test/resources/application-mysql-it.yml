@@ -54,6 +54,7 @@ nexusfin:
         credit-status-notice: /guide/api/creditStatusNotice
         loan-info-notice: /guide/api/loanInfoNotice
         repay-info-notice: /guide/api/repayInfoNotice
+        benefit-order-notice: /huijuapi/vip/orderNotice
     qw:
       enabled: true
       mode: MOCK
