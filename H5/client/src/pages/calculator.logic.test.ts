@@ -95,6 +95,27 @@ describe("calculator apply payload", () => {
     });
   });
 
+  it("allows apply payload without platform benefit order number", () => {
+    expect(
+      buildApplyLoanPayload({
+        amount: 3000,
+        orderAmount: 300,
+        term: 3,
+        receivingAccountId: "acc_001",
+        agreedProtocols: ["user_agreement", "loan_agreement"],
+        purposeKey: "calculator.loanPurpose.rent",
+        platformBenefitOrderNo: null,
+      }),
+    ).toEqual({
+      amount: 3000,
+      orderAmount: 300,
+      term: 3,
+      receivingAccountId: "acc_001",
+      agreedProtocols: ["user_agreement", "loan_agreement"],
+      purpose: "rent",
+    });
+  });
+
   it("resolves platform benefit order number from joint-login params", () => {
     expect(resolvePlatformBenefitOrderNo({
       token: "joint-token-001",
@@ -141,6 +162,18 @@ describe("calculator apply payload", () => {
   });
 
   it("keeps submit available when calculator config has a receiving account and calculation result", () => {
+    expect(
+      resolveCalculatorSubmitDisabled({
+        config: calculatorConfig(),
+        calculateResult: calculateResult(),
+        isSubmitting: false,
+        isCalculating: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not disable submit just because platform benefit order number is missing", () => {
+    expect(resolvePlatformBenefitOrderNo(null)).toBeNull();
     expect(
       resolveCalculatorSubmitDisabled({
         config: calculatorConfig(),

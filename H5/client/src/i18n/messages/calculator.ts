@@ -57,7 +57,6 @@ const calculatorMessages: Record<Locale, Record<string, string>> = {
     "calculator.bindCardRequiredShort": "请先绑卡",
     "calculator.bindCardBack": "返回上一页",
     "calculator.bindCardAck": "我知道了",
-    "calculator.platformBenefitOrderMissing": "缺少科技平台订单号，请重新从科技平台进入",
     "calculator.submit": "确认借款"
   },
   "zh-TW": {
@@ -119,7 +118,6 @@ const calculatorMessages: Record<Locale, Record<string, string>> = {
     "calculator.bindCardRequiredShort": "請先綁卡",
     "calculator.bindCardBack": "返回上一頁",
     "calculator.bindCardAck": "我知道了",
-    "calculator.platformBenefitOrderMissing": "缺少科技平台訂單號，請重新從科技平台進入",
     "calculator.submit": "確認借款"
   },
   "en-US": {
@@ -183,7 +181,6 @@ const calculatorMessages: Record<Locale, Record<string, string>> = {
     "calculator.bindCardRequiredShort": "Bind a card first",
     "calculator.bindCardBack": "Go back",
     "calculator.bindCardAck": "Got it",
-    "calculator.platformBenefitOrderMissing": "Tech platform order number is missing. Please re-enter from the tech platform.",
     "calculator.submit": "Confirm Loan"
   },
   "vi-VN": {
@@ -247,7 +244,6 @@ const calculatorMessages: Record<Locale, Record<string, string>> = {
     "calculator.bindCardRequiredShort": "Vui lòng liên kết thẻ trước",
     "calculator.bindCardBack": "Quay lại",
     "calculator.bindCardAck": "Đã hiểu",
-    "calculator.platformBenefitOrderMissing": "Thiếu mã đơn hàng nền tảng công nghệ. Vui lòng vào lại từ nền tảng công nghệ.",
     "calculator.submit": "Xác nhận vay"
   }
 };

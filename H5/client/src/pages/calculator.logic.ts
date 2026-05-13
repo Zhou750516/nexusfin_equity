@@ -8,17 +8,20 @@ export function buildApplyLoanPayload(input: {
   receivingAccountId: string;
   agreedProtocols: string[];
   purposeKey: string;
-  platformBenefitOrderNo: string;
+  platformBenefitOrderNo: string | null;
 }): ApplyParams {
-  return {
+  const payload: ApplyParams = {
     amount: input.amount,
     orderAmount: input.orderAmount,
     term: input.term,
     receivingAccountId: input.receivingAccountId,
     agreedProtocols: input.agreedProtocols,
     purpose: toLoanPurpose(input.purposeKey),
-    platformBenefitOrderNo: input.platformBenefitOrderNo,
   };
+  if (input.platformBenefitOrderNo) {
+    payload.platformBenefitOrderNo = input.platformBenefitOrderNo;
+  }
+  return payload;
 }
 
 export function resolvePlatformBenefitOrderNo(params: JointLoginParams | null): string | null {

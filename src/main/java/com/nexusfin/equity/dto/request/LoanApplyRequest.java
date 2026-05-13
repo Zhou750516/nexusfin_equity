@@ -25,6 +25,6 @@ public record LoanApplyRequest(
         JsonNode supplementInfo,
         JsonNode optionInfo,
         JsonNode imageInfo,
-        @NotBlank String platformBenefitOrderNo
+        String platformBenefitOrderNo
 ) {
 }

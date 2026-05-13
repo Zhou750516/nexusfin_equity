@@ -149,10 +149,6 @@ export function useCalculatorPageState() {
     if (!config || !calculateResult || config.bindCardRequired) {
       return;
     }
-    if (!platformBenefitOrderNo) {
-      setError(t("calculator.platformBenefitOrderMissing"));
-      return;
-    }
 
     setIsSubmitting(true);
     setError(null);

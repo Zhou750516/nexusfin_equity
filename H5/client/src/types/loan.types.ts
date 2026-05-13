@@ -61,7 +61,7 @@ export interface ApplyParams {
   receivingAccountId: string;
   agreedProtocols: string[];
   purpose: LoanPurpose;
-  platformBenefitOrderNo: string;
+  platformBenefitOrderNo?: string;
 }
 
 export interface ApplyResult {

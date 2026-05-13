@@ -256,9 +256,20 @@ class Phase9TaskGroupEIntegrationTest {
     }
 
     @Test
-    void shouldRejectLoanApplyWhenPlatformBenefitOrderNoIsMissing() throws Exception {
+    void shouldAllowLoanApplyWhenPlatformBenefitOrderNoIsMissing() throws Exception {
         MemberInfo memberInfo = createReadyMember("mem-loan-pbo-missing", "user-loan-pbo-missing");
         createProduct("HUXUAN_CARD");
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                        0,
+                        "SUCCESS",
+                        objectMapper.readTree("""
+                                {
+                                  "loanId": "LN-PBO-MISSING",
+                                  "remark": "借款申请已受理"
+                                }
+                                """)
+                ));
 
         mockMvc.perform(post("/api/loan/apply")
                         .cookie(authCookie(memberInfo))
@@ -274,8 +285,59 @@ class Phase9TaskGroupEIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("platformBenefitOrderNo")));
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.status").value("pending"))
+                .andExpect(jsonPath("$.data.applicationId").isNotEmpty())
+                .andExpect(jsonPath("$.data.benefitOrderNo").isNotEmpty());
+
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> requestCaptor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(requestCaptor.capture());
+        JsonNode data = objectMapper.valueToTree(requestCaptor.getValue().data());
+        assertThat(requestCaptor.getValue().path()).isEqualTo("/loan/apply");
+        assertThat(data.has("platformBenefitOrderNo")).isTrue();
+        assertThat(data.path("platformBenefitOrderNo").isNull()).isTrue();
+    }
+
+    @Test
+    void shouldAllowLoanApplyWhenPlatformBenefitOrderNoIsBlank() throws Exception {
+        MemberInfo memberInfo = createReadyMember("mem-loan-pbo-blank", "user-loan-pbo-blank");
+        createProduct("HUXUAN_CARD");
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                        0,
+                        "SUCCESS",
+                        objectMapper.readTree("""
+                                {
+                                  "loanId": "LN-PBO-BLANK",
+                                  "remark": "借款申请已受理"
+                                }
+                                """)
+                ));
+
+        mockMvc.perform(post("/api/loan/apply")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": 3000,
+                                  "orderAmount": 299,
+                                  "term": 3,
+                                  "receivingAccountId": "acc-mem-loan-pbo-blank",
+                                  "agreedProtocols": ["user_agreement", "loan_agreement", "privacy_policy"],
+                                  "purpose": "shopping",
+                                  "platformBenefitOrderNo": ""
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.status").value("pending"));
+
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> requestCaptor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(requestCaptor.capture());
+        JsonNode data = objectMapper.valueToTree(requestCaptor.getValue().data());
+        assertThat(data.path("platformBenefitOrderNo").asText()).isEmpty();
     }
 
     @Test

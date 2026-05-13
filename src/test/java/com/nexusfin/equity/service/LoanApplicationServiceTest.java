@@ -136,6 +136,47 @@ class LoanApplicationServiceTest {
     }
 
     @Test
+    void shouldAllowLoanApplyWithoutPlatformBenefitOrderNoAndForwardMissingValueToYunka() throws Exception {
+        when(loanApplicationGateway.findLatestPendingMapping("mem-test-001")).thenReturn(null);
+        when(benefitOrderService.createOrder(eq("mem-test-001"), any()))
+                .thenReturn(new CreateBenefitOrderResponse("BEN-NO-PBO", "FIRST_DEDUCT_PENDING", "/redirect"));
+        when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                0,
+                "SUCCESS",
+                objectMapper.readTree("""
+                        {
+                          "loanId": "LN-UPSTREAM-NO-PBO",
+                          "remark": "处理中"
+                        }
+                        """)
+        ));
+
+        LoanApplyResponse response = loanApplicationService.apply(
+                "mem-test-001",
+                "cid-test-001",
+                buildApplyRequest(null)
+        );
+
+        assertThat(response.status()).isEqualTo("pending");
+        assertThat(response.benefitOrderNo()).isEqualTo("BEN-NO-PBO");
+
+        verify(benefitOrderService).createOrder(eq("mem-test-001"), any());
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> yunkaCaptor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(yunkaCaptor.capture());
+        JsonNode forwardData = objectMapper.valueToTree(yunkaCaptor.getValue().data());
+        assertThat(forwardData.path("userId").asText()).isEqualTo("mem-test-001");
+        assertThat(forwardData.has("platformBenefitOrderNo")).isTrue();
+        assertThat(forwardData.path("platformBenefitOrderNo").isNull()).isTrue();
+
+        ArgumentCaptor<LoanApplicationGateway.SaveCommand> saveCaptor =
+                ArgumentCaptor.forClass(LoanApplicationGateway.SaveCommand.class);
+        verify(loanApplicationGateway).save(saveCaptor.capture());
+        assertThat(saveCaptor.getValue().benefitOrderNo()).isEqualTo("BEN-NO-PBO");
+        assertThat(saveCaptor.getValue().upstreamLoanId()).isEqualTo("LN-UPSTREAM-NO-PBO");
+    }
+
+    @Test
     void shouldReturnFailedResponseWhenLoanApplyIsRejected(CapturedOutput output) throws Exception {
         when(loanApplicationGateway.findLatestPendingMapping("mem-test-001")).thenReturn(null);
         when(benefitOrderService.createOrder(eq("mem-test-001"), any()))
@@ -259,6 +300,10 @@ class LoanApplicationServiceTest {
     }
 
     private LoanApplyRequest buildApplyRequest() throws Exception {
+        return buildApplyRequest("PBEN-001");
+    }
+
+    private LoanApplyRequest buildApplyRequest(String platformBenefitOrderNo) throws Exception {
         return new LoanApplyRequest(
                 3000L,
                 299L,
@@ -286,7 +331,7 @@ class LoanApplicationServiceTest {
                 objectMapper.readTree("""
                         [{"type":"FACE","base64":"abc"}]
                         """),
-                "PBEN-001"
+                platformBenefitOrderNo
         );
     }
 
