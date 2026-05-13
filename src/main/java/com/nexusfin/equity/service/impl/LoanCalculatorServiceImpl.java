@@ -60,7 +60,7 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
     }
 
     @Override
-    public LoanCalculateResponse calculate(String memberId, String uid, LoanCalculateRequest request) {
+    public LoanCalculateResponse calculate(String memberId, String userId, LoanCalculateRequest request) {
         validateCalculateRequest(request);
         String requestId = next("LC");
         BigDecimal requestedAmount = BigDecimal.valueOf(request.amount()).setScale(2, RoundingMode.UNNECESSARY);
@@ -70,7 +70,7 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
                         requestId,
                         yunkaProperties.paths().loanCalculate(),
                         requestId,
-                        new LoanTrailForwardData(uid, requestId, requestedAmount, request.term())
+                        new LoanTrailForwardData(userId, requestedAmount, request.term())
                 ).withMemberId(memberId)
         );
         BigDecimal receiveAmount = readAmountOrDefault(data, requestedAmount, "receiveAmount");
@@ -128,8 +128,7 @@ public class LoanCalculatorServiceImpl implements LoanCalculatorService {
     }
 
     private record LoanTrailForwardData(
-            String uid,
-            String applyId,
+            String userId,
             BigDecimal loanAmount,
             Integer loanPeriod
     ) {

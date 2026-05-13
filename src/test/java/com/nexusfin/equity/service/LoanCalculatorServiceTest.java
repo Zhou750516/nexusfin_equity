@@ -108,8 +108,12 @@ class LoanCalculatorServiceTest {
         assertThat(captor.getValue().scene()).isEqualTo("loan calculate");
         assertThat(captor.getValue().memberId()).isEqualTo("mem-001");
         assertThat(captor.getValue().path()).isEqualTo("/loan/trial");
-        assertThat(objectMapper.valueToTree(captor.getValue().payload()).path("loanAmount").decimalValue())
+        var payload = objectMapper.valueToTree(captor.getValue().payload());
+        assertThat(payload.path("loanAmount").decimalValue())
                 .isEqualByComparingTo("3000.00");
+        assertThat(payload.path("userId").asText()).isEqualTo("user-001");
+        assertThat(payload.has("uid")).isFalse();
+        assertThat(payload.has("applyId")).isFalse();
     }
 
     @Test
