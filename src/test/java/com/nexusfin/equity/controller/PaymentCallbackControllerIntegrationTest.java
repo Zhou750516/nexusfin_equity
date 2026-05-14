@@ -2,9 +2,11 @@ package com.nexusfin.equity.controller;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.nexusfin.equity.entity.BenefitOrder;
+import com.nexusfin.equity.entity.BenefitStatusPushLog;
 import com.nexusfin.equity.entity.IdempotencyRecord;
 import com.nexusfin.equity.entity.PaymentRecord;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
+import com.nexusfin.equity.repository.BenefitStatusPushLogRepository;
 import com.nexusfin.equity.repository.IdempotencyRecordRepository;
 import com.nexusfin.equity.repository.PaymentRecordRepository;
 import com.nexusfin.equity.util.SignatureUtil;
@@ -41,8 +43,12 @@ class PaymentCallbackControllerIntegrationTest {
     @Autowired
     private IdempotencyRecordRepository idempotencyRecordRepository;
 
+    @Autowired
+    private BenefitStatusPushLogRepository benefitStatusPushLogRepository;
+
     @BeforeEach
     void setUp() {
+        benefitStatusPushLogRepository.delete(null);
         paymentRecordRepository.delete(null);
         idempotencyRecordRepository.delete(null);
         benefitOrderRepository.delete(null);
@@ -77,6 +83,14 @@ class PaymentCallbackControllerIntegrationTest {
         IdempotencyRecord idempotencyRecord = idempotencyRecordRepository.selectById(requestId);
         assertThat(idempotencyRecord).isNotNull();
         assertThat(idempotencyRecord.getBizType()).isEqualTo("FIRST_DEDUCT");
+
+        BenefitStatusPushLog pushLog = benefitStatusPushLogRepository.selectOne(Wrappers.<BenefitStatusPushLog>lambdaQuery()
+                .eq(BenefitStatusPushLog::getBenefitOrderNo, order.getBenefitOrderNo())
+                .last("limit 1"));
+        assertThat(pushLog).isNotNull();
+        assertThat(pushLog.getEventType()).isEqualTo("FIRST_DEDUCT_SUCCESS");
+        assertThat(pushLog.getStatusAfter()).isEqualTo("SUCCESS");
+        assertThat(pushLog.getPushStatus()).isEqualTo("SUCCESS");
     }
 
     @Test

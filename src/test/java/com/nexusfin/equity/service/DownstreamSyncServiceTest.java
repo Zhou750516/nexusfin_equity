@@ -28,6 +28,9 @@ class DownstreamSyncServiceTest {
     @Mock
     private IdempotencyService idempotencyService;
 
+    @Mock
+    private BenefitStatusPushService benefitStatusPushService;
+
     @InjectMocks
     private DownstreamSyncServiceImpl downstreamSyncService;
 
@@ -40,6 +43,13 @@ class DownstreamSyncServiceTest {
         downstreamSyncService.syncOrder(order);
 
         assertThat(order.getSyncStatus()).isEqualTo("SYNC_SUCCESS");
+        verify(benefitStatusPushService).pushStatus(new BenefitStatusPushService.BenefitStatusPushCommand(
+                "ord-sync-direct",
+                "FIRST_DEDUCT_SUCCESS",
+                "SUCCESS",
+                "user-ord-sync-direct",
+                "PENDING"
+        ));
         verify(benefitOrderRepository).updateById(order);
         verify(idempotencyService).markProcessed(
                 argThat(requestId -> requestId != null && requestId.startsWith("sync-") && requestId.length() <= 29),
@@ -58,6 +68,7 @@ class DownstreamSyncServiceTest {
         downstreamSyncService.syncOrder(order);
 
         assertThat(order.getSyncStatus()).isEqualTo("SYNC_SUCCESS");
+        verify(benefitStatusPushService, never()).pushStatus(any());
         verify(idempotencyService).markProcessed(
                 argThat(requestId -> requestId != null && requestId.startsWith("sync-") && requestId.length() <= 29),
                 argThat("DOWNSTREAM_SYNC"::equals),
@@ -85,8 +96,10 @@ class DownstreamSyncServiceTest {
         BenefitOrder order = new BenefitOrder();
         order.setBenefitOrderNo(benefitOrderNo);
         order.setMemberId("mem-" + benefitOrderNo);
+        order.setExternalUserId("user-" + benefitOrderNo);
         order.setProductCode("PROD-" + benefitOrderNo);
         order.setOrderStatus(orderStatus);
+        order.setFirstDeductStatus(orderStatus.equals("FIRST_DEDUCT_SUCCESS") ? "SUCCESS" : "FAIL");
         order.setSyncStatus("SYNC_PENDING");
         return order;
     }

@@ -4,6 +4,7 @@ import com.nexusfin.equity.entity.BenefitOrder;
 import com.nexusfin.equity.enums.BenefitOrderStatusEnum;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
+import com.nexusfin.equity.service.BenefitStatusPushService;
 import com.nexusfin.equity.service.IdempotencyService;
 import com.nexusfin.equity.util.SensitiveDataUtil;
 import com.nexusfin.equity.service.DownstreamSyncService;
@@ -23,13 +24,16 @@ public class DownstreamSyncServiceImpl implements DownstreamSyncService {
 
     private final BenefitOrderRepository benefitOrderRepository;
     private final IdempotencyService idempotencyService;
+    private final BenefitStatusPushService benefitStatusPushService;
 
     public DownstreamSyncServiceImpl(
             BenefitOrderRepository benefitOrderRepository,
-            IdempotencyService idempotencyService
+            IdempotencyService idempotencyService,
+            BenefitStatusPushService benefitStatusPushService
     ) {
         this.benefitOrderRepository = benefitOrderRepository;
         this.idempotencyService = idempotencyService;
+        this.benefitStatusPushService = benefitStatusPushService;
     }
 
     @Override
@@ -44,6 +48,15 @@ public class DownstreamSyncServiceImpl implements DownstreamSyncService {
             order.setUpdatedTs(LocalDateTime.now());
             benefitOrderRepository.updateById(order);
             throw new BizException("SYNC_DATA_MISSING", "Order missing required downstream sync fields");
+        }
+        if (ROUTE_DIRECT.equals(route)) {
+            benefitStatusPushService.pushStatus(new BenefitStatusPushService.BenefitStatusPushCommand(
+                    order.getBenefitOrderNo(),
+                    order.getOrderStatus(),
+                    order.getFirstDeductStatus(),
+                    order.getExternalUserId(),
+                    "PENDING"
+            ));
         }
         order.setSyncStatus(BenefitOrderStatusEnum.SYNC_SUCCESS.name());
         order.setUpdatedTs(LocalDateTime.now());
