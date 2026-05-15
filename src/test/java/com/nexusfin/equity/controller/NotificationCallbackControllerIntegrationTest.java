@@ -61,6 +61,7 @@ class NotificationCallbackControllerIntegrationTest {
         order.setFirstDeductStatus("FAIL");
         order.setUpdatedTs(LocalDateTime.now());
         benefitOrderRepository.updateById(order);
+        createFirstDeductRecord(order.getBenefitOrderNo(), "qw-serial-grant-success");
 
         String requestId = "req-grant-success-" + UUID.randomUUID().toString().replace("-", "");
         String body = """
@@ -240,10 +241,26 @@ class NotificationCallbackControllerIntegrationTest {
         order.setGrantStatus("PENDING");
         order.setSyncStatus("SYNC_PENDING");
         order.setRequestId("req-order-" + externalUserId);
+        order.setQwUserSignIdSnapshot(99887766L);
         order.setCreatedTs(LocalDateTime.now());
         order.setUpdatedTs(LocalDateTime.now());
         benefitOrderRepository.insert(order);
         return order;
+    }
+
+    private void createFirstDeductRecord(String benefitOrderNo, String serialNo) {
+        PaymentRecord paymentRecord = new PaymentRecord();
+        paymentRecord.setPaymentNo("pay-" + serialNo);
+        paymentRecord.setBenefitOrderNo(benefitOrderNo);
+        paymentRecord.setPaymentType("FIRST_DEDUCT");
+        paymentRecord.setProviderCode("QW");
+        paymentRecord.setChannelTradeNo(serialNo);
+        paymentRecord.setAmount(680000L);
+        paymentRecord.setPaymentStatus("SUCCESS");
+        paymentRecord.setRequestId("req-pay-" + serialNo);
+        paymentRecord.setCreatedTs(LocalDateTime.now());
+        paymentRecord.setUpdatedTs(LocalDateTime.now());
+        paymentRecordRepository.insert(paymentRecord);
     }
 
     private HttpHeaders signatureHeaders(String nonce) {

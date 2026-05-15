@@ -175,7 +175,7 @@ class AllinpayDirectConfigurationTest {
                         org.mockito.Mockito.mock(AllinpayRequestSigner.class),
                         new AllinpayMemberSyncPayloadMapper(),
                         new AllinpayExerciseUrlPayloadMapper(),
-                        new AllinpayLendingNotifyPayloadMapper()
+                        new AllinpayDeductionNotifyPayloadMapper()
                 );
 
         @Bean

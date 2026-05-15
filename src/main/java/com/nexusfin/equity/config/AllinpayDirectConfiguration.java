@@ -11,7 +11,7 @@ import com.nexusfin.equity.thirdparty.qw.AllinpayDirectResponseParser;
 import com.nexusfin.equity.thirdparty.qw.AllinpayDirectResponseVerificationStage;
 import com.nexusfin.equity.thirdparty.qw.AllinpayDirectSignatureTransportMapper;
 import com.nexusfin.equity.thirdparty.qw.AllinpayExerciseUrlPayloadMapper;
-import com.nexusfin.equity.thirdparty.qw.AllinpayLendingNotifyPayloadMapper;
+import com.nexusfin.equity.thirdparty.qw.AllinpayDeductionNotifyPayloadMapper;
 import com.nexusfin.equity.thirdparty.qw.AllinpayMemberSyncPayloadMapper;
 import com.nexusfin.equity.thirdparty.qw.AllinpayDirectTransportMapper;
 import com.nexusfin.equity.thirdparty.qw.AllinpayDirectUnsupportedProtocolHandler;
@@ -41,7 +41,7 @@ public class AllinpayDirectConfiguration {
                 protocolSerializer,
                 new AllinpayMemberSyncPayloadMapper(),
                 new AllinpayExerciseUrlPayloadMapper(),
-                new AllinpayLendingNotifyPayloadMapper()
+                new AllinpayDeductionNotifyPayloadMapper()
         );
     }
 

@@ -243,6 +243,39 @@ class QwBenefitClientImplTest {
     }
 
     @Test
+    void shouldEncodeDeductionNotifyRequestFor0515Contract() throws Exception {
+        QwBenefitClientImpl client = new QwBenefitClientImpl(qwProperties(), objectMapper);
+
+        String ciphertext = (String) invoke(client, "encodeBusinessData", new Class<?>[]{Object.class},
+                new QwDeductionNotifyRequest("user-1", "ord-1", "serial-1", 1, 99887766L));
+
+        assertThat(decryptHex("FbRW7iaiwcEKk2kY", ciphertext))
+                .isEqualTo("{\"uniqueId\":\"user-1\",\"partnerOrderNo\":\"ord-1\",\"serialNo\":\"serial-1\",\"status\":1,\"userSignId\":99887766}");
+    }
+
+    @Test
+    void shouldReturnMockDeductionQueryStatusForMockMode() {
+        QwProperties properties = qwProperties();
+        properties.setMode(QwProperties.Mode.MOCK);
+        QwBenefitClientImpl client = new QwBenefitClientImpl(properties, objectMapper);
+
+        QwDeductionQueryResponse response = client.queryDeduction(new QwDeductionQueryRequest("user-1", "ord-1"));
+
+        assertThat(response.status()).isEqualTo(2);
+    }
+
+    @Test
+    void shouldReturnMockOrderCancelSuccessForMockMode() {
+        QwProperties properties = qwProperties();
+        properties.setMode(QwProperties.Mode.MOCK);
+        QwBenefitClientImpl client = new QwBenefitClientImpl(properties, objectMapper);
+
+        QwOrderCancelResponse response = client.cancelOrder(new QwOrderCancelRequest("ord-1"));
+
+        assertThat(response.success()).isTrue();
+    }
+
+    @Test
     void shouldPrepareReusableRestInfrastructureAtConstructionTime() throws Exception {
         QwBenefitClientImpl client = new QwBenefitClientImpl(qwProperties(), objectMapper);
 

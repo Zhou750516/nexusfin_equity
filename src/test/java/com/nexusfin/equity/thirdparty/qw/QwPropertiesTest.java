@@ -22,6 +22,7 @@ class QwPropertiesTest {
         properties.getDirect().setUserName("20000000000780404");
         properties.getDirect().setPkcs12Path("docs/third-part/齐为/通联测试证书/user-rsa.p12");
         properties.getDirect().setVerifyCertPath("docs/third-part/齐为/通联测试证书/public-rsa.cer");
+        properties.getDirect().setDeductionNotifyServiceCode("DEDUCT_NOTIFY001");
 
         assertThat(properties.getMode()).isEqualTo(QwProperties.Mode.ALLINPAY_DIRECT);
         assertThat(properties.getSecurity().getAesKey()).isEqualTo("FbRW7iaiwcEKk2kY");
@@ -34,5 +35,6 @@ class QwPropertiesTest {
         assertThat(properties.getDirect().getUserName()).isEqualTo("20000000000780404");
         assertThat(properties.getDirect().getPkcs12Path()).contains("user-rsa.p12");
         assertThat(properties.getDirect().getVerifyCertPath()).contains("public-rsa.cer");
+        assertThat(properties.getDirect().getDeductionNotifyServiceCode()).isEqualTo("DEDUCT_NOTIFY001");
     }
 }

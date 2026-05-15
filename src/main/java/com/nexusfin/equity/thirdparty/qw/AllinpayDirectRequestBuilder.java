@@ -81,10 +81,10 @@ public class AllinpayDirectRequestBuilder {
         ));
     }
 
-    public AllinpayDirectPreparedRequest prepareLendingNotify(QwLendingNotifyRequest request) {
+    public AllinpayDirectPreparedRequest prepareDeductionNotify(QwDeductionNotifyRequest request) {
         return prepare(buildInvocation(
-                AllinpayDirectOperation.LENDING_NOTIFY,
-                properties.getDirect().getLendingNotifyServiceCode(),
+                AllinpayDirectOperation.DEDUCTION_NOTIFY,
+                properties.getDirect().getDeductionNotifyServiceCode(),
                 request
         ));
     }
@@ -154,7 +154,7 @@ public class AllinpayDirectRequestBuilder {
         return switch (operation) {
             case MEMBER_SYNC -> "direct.memberSyncServiceCode";
             case EXERCISE_URL -> "direct.exerciseUrlServiceCode";
-            case LENDING_NOTIFY -> "direct.lendingNotifyServiceCode";
+            case DEDUCTION_NOTIFY -> "direct.deductionNotifyServiceCode";
         };
     }
 

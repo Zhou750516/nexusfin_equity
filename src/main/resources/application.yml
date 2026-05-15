@@ -67,7 +67,7 @@ nexusfin:
       annual-rate: 0.18
       lender: XX商业银行
     benefits:
-      product-code: HUXUAN_CARD
+      product-code: ${H5_BENEFITS_PRODUCT_CODE:abs001}
       activate:
         default-loan-amount: 300000
         supported-card-type: huixuan_card
@@ -202,7 +202,7 @@ nexusfin:
         read-timeout-ms: ${QW_DIRECT_READ_TIMEOUT_MS:5000}
         member-sync-service-code: ${QW_DIRECT_MEMBER_SYNC_SERVICE_CODE:}
         exercise-url-service-code: ${QW_DIRECT_EXERCISE_URL_SERVICE_CODE:}
-        lending-notify-service-code: ${QW_DIRECT_LENDING_NOTIFY_SERVICE_CODE:}
+        deduction-notify-service-code: ${QW_DIRECT_DEDUCTION_NOTIFY_SERVICE_CODE:}
   crypto:
     dek:
       key-id: ${NEXUSFIN_CRYPTO_DEK_KEY_ID:DEK_USER_PROFILE}

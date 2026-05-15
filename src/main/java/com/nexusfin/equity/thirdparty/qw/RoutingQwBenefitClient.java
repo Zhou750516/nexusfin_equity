@@ -40,8 +40,18 @@ public class RoutingQwBenefitClient implements QwBenefitClient {
     }
 
     @Override
-    public QwLendingNotifyResponse notifyLending(QwLendingNotifyRequest request) {
-        return currentDelegate().notifyLending(request);
+    public QwDeductionNotifyResponse notifyDeduction(QwDeductionNotifyRequest request) {
+        return currentDelegate().notifyDeduction(request);
+    }
+
+    @Override
+    public QwDeductionQueryResponse queryDeduction(QwDeductionQueryRequest request) {
+        return currentDelegate().queryDeduction(request);
+    }
+
+    @Override
+    public QwOrderCancelResponse cancelOrder(QwOrderCancelRequest request) {
+        return currentDelegate().cancelOrder(request);
     }
 
     @Override

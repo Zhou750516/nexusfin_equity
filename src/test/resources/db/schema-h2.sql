@@ -52,6 +52,7 @@ create table if not exists benefit_order (
     request_id varchar(64) not null,
     pay_protocol_no_snapshot varchar(128),
     pay_protocol_source varchar(32),
+    qw_user_sign_id_snapshot bigint,
     created_ts timestamp not null,
     updated_ts timestamp not null
 );

@@ -24,7 +24,7 @@ class AllinpayDirectRequestBuilderTest {
                 requestSigner,
                 new AllinpayMemberSyncPayloadMapper(),
                 new AllinpayExerciseUrlPayloadMapper(),
-                new AllinpayLendingNotifyPayloadMapper()
+                new AllinpayDeductionNotifyPayloadMapper()
         );
 
         AllinpayDirectPreparedRequest prepared = builder.prepareMemberSync(new QwMemberSyncRequest(
@@ -63,7 +63,7 @@ class AllinpayDirectRequestBuilderTest {
                 requestSigner,
                 new AllinpayMemberSyncPayloadMapper(),
                 new AllinpayExerciseUrlPayloadMapper(),
-                new AllinpayLendingNotifyPayloadMapper()
+                new AllinpayDeductionNotifyPayloadMapper()
         );
 
         assertThatThrownBy(() -> builder.prepareMemberSync(new QwMemberSyncRequest(
@@ -84,6 +84,31 @@ class AllinpayDirectRequestBuilderTest {
                 .hasMessageContaining("direct.merchantId");
     }
 
+    @Test
+    void shouldBuildDeductionNotifyPreparedRequestWith0515Fields() {
+        QwProperties properties = directProperties();
+        AllinpayRequestSigner requestSigner = mock(AllinpayRequestSigner.class);
+        when(requestSigner.sign(anyString())).thenReturn("signed-payload");
+        AllinpayDirectRequestBuilder builder = new AllinpayDirectRequestBuilder(
+                properties,
+                new ObjectMapper(),
+                requestSigner,
+                new AllinpayMemberSyncPayloadMapper(),
+                new AllinpayExerciseUrlPayloadMapper(),
+                new AllinpayDeductionNotifyPayloadMapper()
+        );
+
+        AllinpayDirectPreparedRequest prepared = builder.prepareDeductionNotify(
+                new QwDeductionNotifyRequest("uid-001", "ord-001", "serial-001", 1, 99887766L));
+
+        assertThat(prepared.requestBody()).contains("\"serviceCode\":\"DEDUCT_NOTIFY001\"");
+        assertThat(prepared.requestBody()).contains("\"uniqueId\":\"uid-001\"");
+        assertThat(prepared.requestBody()).contains("\"partnerOrderNo\":\"ord-001\"");
+        assertThat(prepared.requestBody()).contains("\"serialNo\":\"serial-001\"");
+        assertThat(prepared.requestBody()).contains("\"status\":1");
+        assertThat(prepared.requestBody()).contains("\"userSignId\":99887766");
+    }
+
     private QwProperties directProperties() {
         QwProperties properties = new QwProperties();
         properties.setMode(QwProperties.Mode.ALLINPAY_DIRECT);
@@ -94,7 +119,7 @@ class AllinpayDirectRequestBuilderTest {
         properties.getDirect().setUserPassword("111111");
         properties.getDirect().setMemberSyncServiceCode("SYNC001");
         properties.getDirect().setExerciseUrlServiceCode("TOKEN001");
-        properties.getDirect().setLendingNotifyServiceCode("LEND001");
+        properties.getDirect().setDeductionNotifyServiceCode("DEDUCT_NOTIFY001");
         return properties;
     }
 }

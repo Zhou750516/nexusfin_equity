@@ -6,11 +6,16 @@ import com.nexusfin.equity.dto.request.RepaymentResultCallbackRequest;
 import com.nexusfin.equity.dto.request.RefundCallbackRequest;
 import com.nexusfin.equity.entity.BenefitOrder;
 import com.nexusfin.equity.entity.NotificationReceiveLog;
+import com.nexusfin.equity.entity.PaymentRecord;
+import com.nexusfin.equity.enums.PaymentStatusEnum;
+import com.nexusfin.equity.enums.PaymentTypeEnum;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.repository.NotificationReceiveLogRepository;
+import com.nexusfin.equity.repository.PaymentRecordRepository;
 import com.nexusfin.equity.service.impl.NotificationServiceImpl;
 import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
-import com.nexusfin.equity.thirdparty.qw.QwLendingNotifyResponse;
+import com.nexusfin.equity.thirdparty.qw.QwDeductionNotifyRequest;
+import com.nexusfin.equity.thirdparty.qw.QwDeductionNotifyResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -34,6 +39,9 @@ class NotificationServiceTest {
     private NotificationReceiveLogRepository notificationReceiveLogRepository;
 
     @Mock
+    private PaymentRecordRepository paymentRecordRepository;
+
+    @Mock
     private FallbackDeductService fallbackDeductService;
 
     @Mock
@@ -51,16 +59,25 @@ class NotificationServiceTest {
         order.setBenefitOrderNo("ord-1");
         order.setOrderStatus("FIRST_DEDUCT_FAIL");
         order.setExternalUserId("user-1");
+        order.setQwUserSignIdSnapshot(99887766L);
         when(idempotencyService.isProcessed("req-1")).thenReturn(false);
         when(benefitOrderRepository.selectById("ord-1")).thenReturn(order);
         when(notificationReceiveLogRepository.selectOne(any())).thenReturn(null);
-        when(qwBenefitClient.notifyLending(any())).thenReturn(new QwLendingNotifyResponse("qw-order-1"));
+        when(paymentRecordRepository.selectOne(any())).thenReturn(firstDeductRecord("ord-1", "serial-1"));
+        when(qwBenefitClient.notifyDeduction(any())).thenReturn(new QwDeductionNotifyResponse("qw-order-1"));
 
         notificationService.handleGrant(new LoanResultCallbackRequest(
                 "req-1", "user-1", null, "ord-1", "ord-1", "loan-1",
                 7001, null, 680000L, 710000L, 1711197120L, null, null, null));
 
         verify(fallbackDeductService).triggerFallback(any(BenefitOrder.class), any(LoanResultCallbackRequest.class));
+        ArgumentCaptor<QwDeductionNotifyRequest> deductionCaptor = ArgumentCaptor.forClass(QwDeductionNotifyRequest.class);
+        verify(qwBenefitClient).notifyDeduction(deductionCaptor.capture());
+        assertThat(deductionCaptor.getValue().uniqueId()).isEqualTo("user-1");
+        assertThat(deductionCaptor.getValue().partnerOrderNo()).isEqualTo("ord-1");
+        assertThat(deductionCaptor.getValue().serialNo()).isEqualTo("serial-1");
+        assertThat(deductionCaptor.getValue().status()).isEqualTo(1);
+        assertThat(deductionCaptor.getValue().userSignId()).isEqualTo(99887766L);
         verify(benefitOrderRepository).updateById(order);
         verify(idempotencyService).markProcessed("req-1", "GRANT", "ord-1", "7001");
     }
@@ -103,10 +120,12 @@ class NotificationServiceTest {
         order.setBenefitOrderNo("ord-5");
         order.setOrderStatus("FIRST_DEDUCT_SUCCESS");
         order.setExternalUserId("user-5");
+        order.setQwUserSignIdSnapshot(99887765L);
         when(idempotencyService.isProcessed("req-5")).thenReturn(false);
         when(benefitOrderRepository.selectById("ord-5")).thenReturn(order);
         when(notificationReceiveLogRepository.selectOne(any())).thenReturn(null);
-        when(qwBenefitClient.notifyLending(any())).thenReturn(new QwLendingNotifyResponse("qw-order-5"));
+        when(paymentRecordRepository.selectOne(any())).thenReturn(firstDeductRecord("ord-5", "serial-5"));
+        when(qwBenefitClient.notifyDeduction(any())).thenReturn(new QwDeductionNotifyResponse("qw-order-5"));
 
         notificationService.handleGrant(new LoanResultCallbackRequest(
                 "req-5", "user-5", null, "ord-5", "ord-5", "loan-5",
@@ -118,6 +137,10 @@ class NotificationServiceTest {
         assertThat(captor.getValue().getRequestId()).isEqualTo("req-5");
         verify(notificationReceiveLogRepository).updateById(captor.capture());
         assertThat(captor.getAllValues().get(1).getProcessStatus()).isEqualTo("PROCESSED");
+        ArgumentCaptor<QwDeductionNotifyRequest> deductionCaptor = ArgumentCaptor.forClass(QwDeductionNotifyRequest.class);
+        verify(qwBenefitClient).notifyDeduction(deductionCaptor.capture());
+        assertThat(deductionCaptor.getValue().status()).isEqualTo(0);
+        assertThat(deductionCaptor.getValue().serialNo()).isEqualTo("serial-5");
     }
 
     @Test
@@ -171,7 +194,17 @@ class NotificationServiceTest {
         verify(benefitOrderRepository).updateById(order);
         assertThat(order.getGrantStatus()).isEqualTo("PROCESSING");
         verify(fallbackDeductService, never()).triggerFallback(any(), any());
-        verify(qwBenefitClient, never()).notifyLending(any());
+        verify(qwBenefitClient, never()).notifyDeduction(any());
         verify(idempotencyService).markProcessed("req-7", "GRANT", "ord-7", "7002");
+    }
+
+    private PaymentRecord firstDeductRecord(String benefitOrderNo, String serialNo) {
+        PaymentRecord record = new PaymentRecord();
+        record.setPaymentNo("pay-" + serialNo);
+        record.setBenefitOrderNo(benefitOrderNo);
+        record.setPaymentType(PaymentTypeEnum.FIRST_DEDUCT.name());
+        record.setPaymentStatus(PaymentStatusEnum.SUCCESS.name());
+        record.setChannelTradeNo(serialNo);
+        return record;
     }
 }

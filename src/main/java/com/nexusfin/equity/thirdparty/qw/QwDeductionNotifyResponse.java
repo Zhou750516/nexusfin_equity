@@ -1,6 +1,6 @@
 package com.nexusfin.equity.thirdparty.qw;
 
-public record QwLendingNotifyResponse(
+public record QwDeductionNotifyResponse(
         String orderNo
 ) {
 }

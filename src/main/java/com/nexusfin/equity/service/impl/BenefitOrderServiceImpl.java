@@ -151,6 +151,7 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         Long userSignId = parseUserSignId(resolvedPaymentProtocol.signRequestNo());
         benefitOrder.setPayProtocolNoSnapshot(resolvedPaymentProtocol.protocolNo());
         benefitOrder.setPayProtocolSource(resolvedPaymentProtocol.source());
+        benefitOrder.setQwUserSignIdSnapshot(userSignId);
         benefitOrder.setCreatedTs(LocalDateTime.now());
         benefitOrder.setUpdatedTs(LocalDateTime.now());
         benefitOrderRepository.insert(benefitOrder);

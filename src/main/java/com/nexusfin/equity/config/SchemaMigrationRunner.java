@@ -48,6 +48,7 @@ public class SchemaMigrationRunner {
         renameColumnIfNeeded(metaData, databaseProduct, "benefit_order", "qw_exercise_status", "exercise_status", "varchar(32) not null");
         addColumnIfNeeded(metaData, "benefit_order", "pay_protocol_no_snapshot", "varchar(128)");
         addColumnIfNeeded(metaData, "benefit_order", "pay_protocol_source", "varchar(32)");
+        addColumnIfNeeded(metaData, "benefit_order", "qw_user_sign_id_snapshot", "bigint");
     }
 
     private void migratePaymentRecord(DatabaseMetaData metaData, String databaseProduct) throws SQLException {

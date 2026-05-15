@@ -26,6 +26,7 @@ public class BenefitOrder {
     private String requestId;
     private String payProtocolNoSnapshot;
     private String payProtocolSource;
+    private Long qwUserSignIdSnapshot;
     private LocalDateTime createdTs;
     private LocalDateTime updatedTs;
 
@@ -171,6 +172,14 @@ public class BenefitOrder {
 
     public void setPayProtocolSource(String payProtocolSource) {
         this.payProtocolSource = payProtocolSource;
+    }
+
+    public Long getQwUserSignIdSnapshot() {
+        return qwUserSignIdSnapshot;
+    }
+
+    public void setQwUserSignIdSnapshot(Long qwUserSignIdSnapshot) {
+        this.qwUserSignIdSnapshot = qwUserSignIdSnapshot;
     }
 
     public LocalDateTime getCreatedTs() {

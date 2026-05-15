@@ -133,7 +133,7 @@ class AllinpayDirectQwBenefitClientTest {
                 serializer,
                 new AllinpayMemberSyncPayloadMapper(),
                 new AllinpayExerciseUrlPayloadMapper(),
-                new AllinpayLendingNotifyPayloadMapper()
+                new AllinpayDeductionNotifyPayloadMapper()
         );
 
         AllinpayDirectQwBenefitClient client = new AllinpayDirectQwBenefitClient(
@@ -175,7 +175,7 @@ class AllinpayDirectQwBenefitClientTest {
         properties.getDirect().setVerifyCertPath("docs/third-part/齐为/通联测试证书/public-rsa.cer");
         properties.getDirect().setMemberSyncServiceCode("SYNC001");
         properties.getDirect().setExerciseUrlServiceCode("TOKEN001");
-        properties.getDirect().setLendingNotifyServiceCode("NOTIFY001");
+        properties.getDirect().setDeductionNotifyServiceCode("NOTIFY001");
         return properties;
     }
 }

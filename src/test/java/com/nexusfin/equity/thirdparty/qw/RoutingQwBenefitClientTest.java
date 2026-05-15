@@ -88,13 +88,42 @@ class RoutingQwBenefitClientTest {
         QwProperties properties = new QwProperties();
         properties.setMode(QwProperties.Mode.ALLINPAY_DIRECT);
         RoutingQwBenefitClient routingClient = new RoutingQwBenefitClient(properties, qweimobileClient, allinpayDirectClient);
-        QwLendingNotifyResponse expected = new QwLendingNotifyResponse("qw-order-1");
-        when(allinpayDirectClient.notifyLending(any())).thenReturn(expected);
+        QwDeductionNotifyResponse expected = new QwDeductionNotifyResponse("qw-order-1");
+        when(allinpayDirectClient.notifyDeduction(any())).thenReturn(expected);
 
-        QwLendingNotifyResponse response = routingClient.notifyLending(new QwLendingNotifyRequest("user-1", "ord-1", 1));
+        QwDeductionNotifyResponse response = routingClient.notifyDeduction(
+                new QwDeductionNotifyRequest("user-1", "ord-1", "serial-1", 1, 99887766L));
 
         assertThat(response).isSameAs(expected);
-        verify(allinpayDirectClient).notifyLending(any());
+        verify(allinpayDirectClient).notifyDeduction(any());
+    }
+
+    @Test
+    void shouldRouteDeductionQueryToCurrentBusinessDelegate() {
+        QwProperties properties = new QwProperties();
+        properties.setMode(QwProperties.Mode.QWEIMOBILE_HTTP);
+        RoutingQwBenefitClient routingClient = new RoutingQwBenefitClient(properties, qweimobileClient, allinpayDirectClient);
+        QwDeductionQueryResponse expected = new QwDeductionQueryResponse(2);
+        when(qweimobileClient.queryDeduction(any())).thenReturn(expected);
+
+        QwDeductionQueryResponse response = routingClient.queryDeduction(new QwDeductionQueryRequest("user-1", "ord-1"));
+
+        assertThat(response).isSameAs(expected);
+        verify(qweimobileClient).queryDeduction(any());
+    }
+
+    @Test
+    void shouldRouteOrderCancelToCurrentBusinessDelegate() {
+        QwProperties properties = new QwProperties();
+        properties.setMode(QwProperties.Mode.QWEIMOBILE_HTTP);
+        RoutingQwBenefitClient routingClient = new RoutingQwBenefitClient(properties, qweimobileClient, allinpayDirectClient);
+        QwOrderCancelResponse expected = new QwOrderCancelResponse(true);
+        when(qweimobileClient.cancelOrder(any())).thenReturn(expected);
+
+        QwOrderCancelResponse response = routingClient.cancelOrder(new QwOrderCancelRequest("ord-1"));
+
+        assertThat(response).isSameAs(expected);
+        verify(qweimobileClient).cancelOrder(any());
     }
 
     @Test

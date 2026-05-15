@@ -75,12 +75,30 @@ public class QwBenefitClientImpl implements QwBenefitClient {
     }
 
     @Override
-    public QwLendingNotifyResponse notifyLending(QwLendingNotifyRequest request) {
+    public QwDeductionNotifyResponse notifyDeduction(QwDeductionNotifyRequest request) {
         ensureEnabled();
         if (qwProperties.getMode() == QwProperties.Mode.MOCK) {
-            return mockLendingNotify(request);
+            return mockDeductionNotify(request);
         }
-        return invoke("abs.lending.notify", request, QwLendingNotifyResponse.class);
+        return invoke("abs.deduction.notify", request, QwDeductionNotifyResponse.class);
+    }
+
+    @Override
+    public QwDeductionQueryResponse queryDeduction(QwDeductionQueryRequest request) {
+        ensureEnabled();
+        if (qwProperties.getMode() == QwProperties.Mode.MOCK) {
+            return mockDeductionQuery(request);
+        }
+        return invoke("abs.deduction.query", request, QwDeductionQueryResponse.class);
+    }
+
+    @Override
+    public QwOrderCancelResponse cancelOrder(QwOrderCancelRequest request) {
+        ensureEnabled();
+        if (qwProperties.getMode() == QwProperties.Mode.MOCK) {
+            return mockOrderCancel(request);
+        }
+        return invoke("abs.order.cancel", request, QwOrderCancelResponse.class);
     }
 
     @Override
@@ -332,9 +350,19 @@ public class QwBenefitClientImpl implements QwBenefitClient {
         );
     }
 
-    private QwLendingNotifyResponse mockLendingNotify(QwLendingNotifyRequest request) {
+    private QwDeductionNotifyResponse mockDeductionNotify(QwDeductionNotifyRequest request) {
         applyMockFault(request.partnerOrderNo(), request.uniqueId(), TraceIdUtil.getTraceId());
-        return new QwLendingNotifyResponse("qw-order-" + request.partnerOrderNo());
+        return new QwDeductionNotifyResponse("qw-order-" + request.partnerOrderNo());
+    }
+
+    private QwDeductionQueryResponse mockDeductionQuery(QwDeductionQueryRequest request) {
+        applyMockFault(request.partnerOrderNo(), request.uniqueId(), TraceIdUtil.getTraceId());
+        return new QwDeductionQueryResponse(2);
+    }
+
+    private QwOrderCancelResponse mockOrderCancel(QwOrderCancelRequest request) {
+        applyMockFault(request.partnerOrderNo(), TraceIdUtil.getTraceId());
+        return new QwOrderCancelResponse(true);
     }
 
     private QwSignStatusResponse mockSignStatus(QwSignStatusRequest request) {

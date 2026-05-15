@@ -125,6 +125,7 @@ class BenefitOrderServiceTest {
         assertThat(captor.getValue().getRequestId()).isEqualTo("req-order-1");
         assertThat(captor.getValue().getPayProtocolNoSnapshot()).isEqualTo("AGRM-REAL-001");
         assertThat(captor.getValue().getPayProtocolSource()).isEqualTo("QW_SIGN");
+        assertThat(captor.getValue().getQwUserSignIdSnapshot()).isEqualTo(10001L);
         assertThat(syncRequestCaptor.getValue().userSignId()).isEqualTo(10001L);
         verify(idempotencyService).markProcessed("req-order-1", "CREATE_ORDER", captor.getValue().getBenefitOrderNo(), "FIRST_DEDUCT_PENDING");
     }
@@ -162,6 +163,7 @@ class BenefitOrderServiceTest {
         verify(qwBenefitClient).syncMemberOrder(requestCaptor.capture());
         assertThat(orderCaptor.getValue().getPayProtocolNoSnapshot()).isEqualTo("AGRM211926033187CF73483");
         assertThat(orderCaptor.getValue().getPayProtocolSource()).isEqualTo("QW_SIGN");
+        assertThat(orderCaptor.getValue().getQwUserSignIdSnapshot()).isEqualTo(778899L);
         assertThat(requestCaptor.getValue().userSignId()).isEqualTo(778899L);
     }
 

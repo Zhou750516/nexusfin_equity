@@ -7,16 +7,21 @@ import com.nexusfin.equity.dto.request.RepaymentResultCallbackRequest;
 import com.nexusfin.equity.dto.request.RefundCallbackRequest;
 import com.nexusfin.equity.entity.BenefitOrder;
 import com.nexusfin.equity.entity.NotificationReceiveLog;
+import com.nexusfin.equity.entity.PaymentRecord;
 import com.nexusfin.equity.enums.BenefitOrderStatusEnum;
 import com.nexusfin.equity.enums.NotificationProcessStatusEnum;
 import com.nexusfin.equity.enums.NotificationTypeEnum;
+import com.nexusfin.equity.enums.PaymentStatusEnum;
+import com.nexusfin.equity.enums.PaymentTypeEnum;
+import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.repository.NotificationReceiveLogRepository;
+import com.nexusfin.equity.repository.PaymentRecordRepository;
 import com.nexusfin.equity.service.FallbackDeductService;
 import com.nexusfin.equity.service.IdempotencyService;
 import com.nexusfin.equity.service.NotificationService;
 import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
-import com.nexusfin.equity.thirdparty.qw.QwLendingNotifyRequest;
+import com.nexusfin.equity.thirdparty.qw.QwDeductionNotifyRequest;
 import com.nexusfin.equity.util.OrderStateMachine;
 import com.nexusfin.equity.util.RequestIdUtil;
 import com.nexusfin.equity.util.TraceIdUtil;
@@ -33,6 +38,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final BenefitOrderRepository benefitOrderRepository;
     private final NotificationReceiveLogRepository notificationReceiveLogRepository;
+    private final PaymentRecordRepository paymentRecordRepository;
     private final FallbackDeductService fallbackDeductService;
     private final IdempotencyService idempotencyService;
     private final QwBenefitClient qwBenefitClient;
@@ -40,12 +46,14 @@ public class NotificationServiceImpl implements NotificationService {
     public NotificationServiceImpl(
             BenefitOrderRepository benefitOrderRepository,
             NotificationReceiveLogRepository notificationReceiveLogRepository,
+            PaymentRecordRepository paymentRecordRepository,
             FallbackDeductService fallbackDeductService,
             IdempotencyService idempotencyService,
             QwBenefitClient qwBenefitClient
     ) {
         this.benefitOrderRepository = benefitOrderRepository;
         this.notificationReceiveLogRepository = notificationReceiveLogRepository;
+        this.paymentRecordRepository = paymentRecordRepository;
         this.fallbackDeductService = fallbackDeductService;
         this.idempotencyService = idempotencyService;
         this.qwBenefitClient = qwBenefitClient;
@@ -92,10 +100,14 @@ public class NotificationServiceImpl implements NotificationService {
             order.setUpdatedTs(LocalDateTime.now());
             benefitOrderRepository.updateById(order);
             if (!request.isProcessing()) {
-                qwBenefitClient.notifyLending(new QwLendingNotifyRequest(
+                PaymentRecord firstDeductRecord = requireFirstDeductRecord(order.getBenefitOrderNo());
+                Long userSignId = requireQwUserSignId(order);
+                qwBenefitClient.notifyDeduction(new QwDeductionNotifyRequest(
                         order.getExternalUserId(),
                         order.getBenefitOrderNo(),
-                        request.isSuccess() ? 1 : 0
+                        firstDeductRecord.getChannelTradeNo(),
+                        request.isSuccess() ? 1 : 0,
+                        userSignId
                 ));
             }
             markNotification(notificationLog, NotificationProcessStatusEnum.PROCESSED);
@@ -242,6 +254,28 @@ public class NotificationServiceImpl implements NotificationService {
         return benefitOrderRepository.selectOne(Wrappers.<BenefitOrder>lambdaQuery()
                 .eq(BenefitOrder::getLoanOrderNo, loanOrderNo)
                 .last("limit 1"));
+    }
+
+    private PaymentRecord requireFirstDeductRecord(String benefitOrderNo) {
+        PaymentRecord paymentRecord = paymentRecordRepository.selectOne(Wrappers.<PaymentRecord>lambdaQuery()
+                .eq(PaymentRecord::getBenefitOrderNo, benefitOrderNo)
+                .eq(PaymentRecord::getPaymentType, PaymentTypeEnum.FIRST_DEDUCT.name())
+                .eq(PaymentRecord::getPaymentStatus, PaymentStatusEnum.SUCCESS.name())
+                .orderByDesc(PaymentRecord::getCreatedTs)
+                .last("limit 1"));
+        if (paymentRecord == null
+                || paymentRecord.getChannelTradeNo() == null
+                || paymentRecord.getChannelTradeNo().isBlank()) {
+            throw new BizException("QW_DEDUCTION_SERIAL_MISSING", "QW deduction serialNo is missing");
+        }
+        return paymentRecord;
+    }
+
+    private Long requireQwUserSignId(BenefitOrder order) {
+        if (order.getQwUserSignIdSnapshot() == null) {
+            throw new BizException("QW_SIGN_REFERENCE_MISSING", "QW sign userSignId snapshot is missing");
+        }
+        return order.getQwUserSignIdSnapshot();
     }
 
     private void markNotification(NotificationReceiveLog notificationReceiveLog, NotificationProcessStatusEnum processStatus) {

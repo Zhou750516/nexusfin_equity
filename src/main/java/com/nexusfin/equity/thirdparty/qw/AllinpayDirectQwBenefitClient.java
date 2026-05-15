@@ -120,15 +120,25 @@ public class AllinpayDirectQwBenefitClient implements QwBenefitClient {
     }
 
     @Override
-    public QwLendingNotifyResponse notifyLending(QwLendingNotifyRequest request) {
-        ensureReady("lendingNotify", properties.getDirect().getLendingNotifyServiceCode());
-        AllinpayDirectPreparedRequest preparedRequest = requestBuilder.prepareLendingNotify(request);
+    public QwDeductionNotifyResponse notifyDeduction(QwDeductionNotifyRequest request) {
+        ensureReady("deductionNotify", properties.getDirect().getDeductionNotifyServiceCode());
+        AllinpayDirectPreparedRequest preparedRequest = requestBuilder.prepareDeductionNotify(request);
         return execute(
-                AllinpayDirectOperation.LENDING_NOTIFY,
-                properties.getDirect().getLendingNotifyServiceCode(),
+                AllinpayDirectOperation.DEDUCTION_NOTIFY,
+                properties.getDirect().getDeductionNotifyServiceCode(),
                 preparedRequest,
-                QwLendingNotifyResponse.class
+                QwDeductionNotifyResponse.class
         );
+    }
+
+    @Override
+    public QwDeductionQueryResponse queryDeduction(QwDeductionQueryRequest request) {
+        throw new BizException("ALLINPAY_DIRECT_UNSUPPORTED", "Allinpay direct mode does not support deduction query");
+    }
+
+    @Override
+    public QwOrderCancelResponse cancelOrder(QwOrderCancelRequest request) {
+        throw new BizException("ALLINPAY_DIRECT_UNSUPPORTED", "Allinpay direct mode does not support order cancel");
     }
 
     @Override
@@ -184,7 +194,7 @@ public class AllinpayDirectQwBenefitClient implements QwBenefitClient {
                         protocolSerializer,
                         new AllinpayMemberSyncPayloadMapper(),
                         new AllinpayExerciseUrlPayloadMapper(),
-                        new AllinpayLendingNotifyPayloadMapper()
+                        new AllinpayDeductionNotifyPayloadMapper()
                 );
             }
             if (responseVerifier == null) {

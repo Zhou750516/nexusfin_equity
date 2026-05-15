@@ -16,7 +16,7 @@ public class QwDirectProperties {
     private int readTimeoutMs = 5000;
     private String memberSyncServiceCode;
     private String exerciseUrlServiceCode;
-    private String lendingNotifyServiceCode;
+    private String deductionNotifyServiceCode;
 
     public String getBaseUrl() {
         return baseUrl;
@@ -130,11 +130,11 @@ public class QwDirectProperties {
         this.exerciseUrlServiceCode = exerciseUrlServiceCode;
     }
 
-    public String getLendingNotifyServiceCode() {
-        return lendingNotifyServiceCode;
+    public String getDeductionNotifyServiceCode() {
+        return deductionNotifyServiceCode;
     }
 
-    public void setLendingNotifyServiceCode(String lendingNotifyServiceCode) {
-        this.lendingNotifyServiceCode = lendingNotifyServiceCode;
+    public void setDeductionNotifyServiceCode(String deductionNotifyServiceCode) {
+        this.deductionNotifyServiceCode = deductionNotifyServiceCode;
     }
 }
