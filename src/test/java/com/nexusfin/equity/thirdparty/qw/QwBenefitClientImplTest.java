@@ -5,17 +5,27 @@ import com.nexusfin.equity.config.QwProperties;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.util.TraceIdUtil;
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.List;
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.mock.http.client.MockClientHttpRequest;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class QwBenefitClientImplTest {
 
@@ -29,14 +39,14 @@ class QwBenefitClientImplTest {
                 new QwExerciseUrlRequest("user-1", "ord-1"));
 
         assertThat(ciphertext).matches("[0-9a-f]+$");
-        assertThat(decryptHex("FbRW7iaiwcEKk2kY", ciphertext))
+        assertThat(decryptHex("unit-test-aes-16", ciphertext))
                 .isEqualTo("{\"uniqueId\":\"user-1\",\"partnerOrderNo\":\"ord-1\"}");
     }
 
     @Test
     void shouldDecryptHexEncryptedResponseBodyForQweimobileProtocol() throws Exception {
         String responsePayload = encryptHex(
-                "FbRW7iaiwcEKk2kY",
+                "unit-test-aes-16",
                 "{\"memberFlag\":0,\"redirectUrl\":\"https://redirect.test\",\"token\":\"token-1\",\"cardCreatedDate\":\"2026-04-01 00:00:00\",\"cardExpiryDate\":\"2027-04-01 00:00:00\"}"
         );
         QwBenefitClientImpl client = new QwBenefitClientImpl(qwProperties(), objectMapper);
@@ -77,7 +87,7 @@ class QwBenefitClientImplTest {
         String ciphertext = (String) invoke(client, "encodeBusinessData", new Class<?>[]{Object.class},
                 new QwSignStatusRequest("200000000007804", "13800138000", "测试用户", "6222020202020208"));
 
-        assertThat(decryptHex("FbRW7iaiwcEKk2kY", ciphertext))
+        assertThat(decryptHex("unit-test-aes-16", ciphertext))
                 .isEqualTo("{\"merchantId\":\"200000000007804\",\"phone\":\"13800138000\",\"name\":\"测试用户\",\"accountNo\":\"6222020202020208\"}");
     }
 
@@ -238,7 +248,7 @@ class QwBenefitClientImplTest {
         String ciphertext = (String) invoke(client, "encodeBusinessData", new Class<?>[]{Object.class},
                 new QwSignConfirmRequest(5678L, "123456"));
 
-        assertThat(decryptHex("FbRW7iaiwcEKk2kY", ciphertext))
+        assertThat(decryptHex("unit-test-aes-16", ciphertext))
                 .isEqualTo("{\"userSignId\":5678,\"verCode\":\"123456\"}");
     }
 
@@ -249,7 +259,7 @@ class QwBenefitClientImplTest {
         String ciphertext = (String) invoke(client, "encodeBusinessData", new Class<?>[]{Object.class},
                 new QwDeductionNotifyRequest("user-1", "ord-1", "serial-1", 1, 99887766L));
 
-        assertThat(decryptHex("FbRW7iaiwcEKk2kY", ciphertext))
+        assertThat(decryptHex("unit-test-aes-16", ciphertext))
                 .isEqualTo("{\"uniqueId\":\"user-1\",\"partnerOrderNo\":\"ord-1\",\"serialNo\":\"serial-1\",\"status\":1,\"userSignId\":99887766}");
     }
 
@@ -276,6 +286,65 @@ class QwBenefitClientImplTest {
     }
 
     @Test
+    void shouldPostHttpMode0515MethodsToConfiguredMethodEndpointWithEncryptedEnvelope() throws Exception {
+        List<CapturedQwRequest> capturedRequests = new ArrayList<>();
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        server.expect(requestTo("https://t-api.test.qweimobile.com/api/abs/method"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(request -> captureRequest(request, capturedRequests))
+                .andRespond(withSuccess(responseBody("{\"orderNo\":\"qw-order-real\"}"), MediaType.APPLICATION_JSON));
+        server.expect(requestTo("https://t-api.test.qweimobile.com/api/abs/method"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(request -> captureRequest(request, capturedRequests))
+                .andRespond(withSuccess(responseBody("{\"status\":2}"), MediaType.APPLICATION_JSON));
+        server.expect(requestTo("https://t-api.test.qweimobile.com/api/abs/method"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(request -> captureRequest(request, capturedRequests))
+                .andRespond(withSuccess(responseBody("{\"success\":true}"), MediaType.APPLICATION_JSON));
+        QwProperties properties = qwProperties();
+        properties.setMode(QwProperties.Mode.HTTP);
+        QwBenefitClientImpl client = new QwBenefitClientImpl(properties, objectMapper, restClientBuilder.build());
+
+        QwDeductionNotifyResponse notifyResponse = client.notifyDeduction(
+                new QwDeductionNotifyRequest("user-1", "ord-1", "serial-1", 1, 99887766L));
+        QwDeductionQueryResponse queryResponse = client.queryDeduction(new QwDeductionQueryRequest("user-1", "ord-1"));
+        QwOrderCancelResponse cancelResponse = client.cancelOrder(new QwOrderCancelRequest("ord-1"));
+
+        assertThat(notifyResponse.orderNo()).isEqualTo("qw-order-real");
+        assertThat(queryResponse.status()).isEqualTo(2);
+        assertThat(cancelResponse.success()).isTrue();
+        assertThat(capturedRequests)
+                .extracting(CapturedQwRequest::path)
+                .containsExactly("/api/abs/method", "/api/abs/method", "/api/abs/method");
+        assertThat(capturedRequests)
+                .extracting(CapturedQwRequest::method)
+                .containsExactly("abs.deduction.notify", "abs.deduction.query", "abs.order.cancel");
+        assertThat(capturedRequests)
+                .extracting(CapturedQwRequest::partnerNo)
+                .containsExactly("abs", "abs", "abs");
+        assertThat(capturedRequests.get(0).requestBody()).matches("[0-9a-f]+");
+        assertThat(decryptHex("unit-test-aes-16", capturedRequests.get(0).requestBody()))
+                .isEqualTo("{\"uniqueId\":\"user-1\",\"partnerOrderNo\":\"ord-1\",\"serialNo\":\"serial-1\",\"status\":1,\"userSignId\":99887766}");
+        assertThat(capturedRequests)
+                .allSatisfy(request -> assertThat(request.rawBody())
+                        .doesNotContain("unit-test-sign-key-not-secret")
+                        .doesNotContain("unit-test-aes-16"));
+        server.verify();
+    }
+
+    @Test
+    void shouldRejectHttpModeWhenDefaultPlaceholderSecretsAreStillConfigured() {
+        QwProperties properties = new QwProperties();
+        properties.setMode(QwProperties.Mode.HTTP);
+
+        assertThatThrownBy(() -> new QwBenefitClientImpl(properties, objectMapper))
+                .isInstanceOf(BizException.class)
+                .extracting(error -> ((BizException) error).getErrorNo())
+                .isEqualTo("QW_HTTP_CONFIG_INVALID");
+    }
+
+    @Test
     void shouldPrepareReusableRestInfrastructureAtConstructionTime() throws Exception {
         QwBenefitClientImpl client = new QwBenefitClientImpl(qwProperties(), objectMapper);
 
@@ -294,8 +363,8 @@ class QwBenefitClientImplTest {
         properties.getHttp().setMethodPath("/api/abs/method");
         properties.setPartnerNo("abs");
         properties.setVersion("v1.0");
-        properties.getSecurity().setSignKey("h2Zh53keYy8eksijfj7HfPCncmEMCBXt");
-        properties.getSecurity().setAesKey("FbRW7iaiwcEKk2kY");
+        properties.getSecurity().setSignKey("unit-test-sign-key-not-secret");
+        properties.getSecurity().setAesKey("unit-test-aes-16");
         properties.getSecurity().setAesKeyEncoding(QwProperties.AesKeyEncoding.RAW);
         properties.getSecurity().setAesAlgorithm("AES/ECB/PKCS5Padding");
         properties.getSecurity().setCiphertextEncoding(QwProperties.CiphertextEncoding.HEX);
@@ -324,5 +393,38 @@ class QwBenefitClientImplTest {
         var field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         return field.get(target);
+    }
+
+    private void captureRequest(org.springframework.http.client.ClientHttpRequest request,
+                                List<CapturedQwRequest> capturedRequests) throws IOException {
+        MockClientHttpRequest mockRequest = (MockClientHttpRequest) request;
+        String rawBody = mockRequest.getBodyAsString(StandardCharsets.UTF_8);
+        var root = objectMapper.readTree(rawBody);
+        capturedRequests.add(new CapturedQwRequest(
+                request.getURI().getPath(),
+                root.path("requestHead").path("method").asText(),
+                root.path("requestHead").path("partnerNo").asText(),
+                root.path("requestBody").asText(),
+                rawBody
+        ));
+    }
+
+    private String responseBody(String responsePayload) throws IOException {
+        try {
+            return "{\"code\":200,\"msg\":\"success\",\"data\":\""
+                    + encryptHex("unit-test-aes-16", responsePayload)
+                    + "\"}";
+        } catch (Exception exception) {
+            throw new IOException(exception);
+        }
+    }
+
+    private record CapturedQwRequest(
+            String path,
+            String method,
+            String partnerNo,
+            String requestBody,
+            String rawBody
+    ) {
     }
 }

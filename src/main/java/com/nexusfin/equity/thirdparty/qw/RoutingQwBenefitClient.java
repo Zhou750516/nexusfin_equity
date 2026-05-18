@@ -27,6 +27,15 @@ public class RoutingQwBenefitClient implements QwBenefitClient {
         log.info("qw benefit client routing initialized mode={} businessDelegate={} signDelegate=qweimobileClient",
                 properties.getMode(),
                 currentBusinessDelegateName());
+        log.info("qw runtime configuration qw_mode={} qw_base_url={} qw_method_path={} qw_partner_no={} "
+                        + "qw_sign_key={} qw_aes_key={} businessDelegate={} signDelegate=qweimobileClient",
+                properties.getMode(),
+                properties.getHttp().getBaseUrl(),
+                properties.getHttp().getMethodPath(),
+                properties.getPartnerNo(),
+                configuredState(properties.getSecurity().getSignKey()),
+                configuredState(currentAesKeyValue()),
+                currentBusinessDelegateName());
     }
 
     @Override
@@ -81,5 +90,16 @@ public class RoutingQwBenefitClient implements QwBenefitClient {
             case ALLINPAY_DIRECT -> "allinpayDirectClient";
             case MOCK, HTTP, QWEIMOBILE_HTTP -> "qweimobileClient";
         };
+    }
+
+    private String currentAesKeyValue() {
+        return switch (properties.getSecurity().getAesKeyEncoding()) {
+            case RAW -> properties.getSecurity().getAesKey();
+            case BASE64 -> properties.getSecurity().getAesKeyBase64();
+        };
+    }
+
+    private String configuredState(String value) {
+        return value == null || value.isBlank() ? "missing" : "configured";
     }
 }

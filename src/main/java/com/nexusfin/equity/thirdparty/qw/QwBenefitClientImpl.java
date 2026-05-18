@@ -25,6 +25,8 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import org.slf4j.MDC;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
@@ -34,8 +36,12 @@ import org.springframework.web.client.RestClientException;
 @Service
 public class QwBenefitClientImpl implements QwBenefitClient {
 
+    private static final Logger log = LoggerFactory.getLogger(QwBenefitClientImpl.class);
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final String QW_UPSTREAM_REJECTED = "QW_UPSTREAM_REJECTED";
+    private static final String DEFAULT_SIGN_KEY_PLACEHOLDER = "abs-secret-key";
+    private static final String DEFAULT_AES_KEY_PLACEHOLDER = "0123456789abcdef";
+    private static final String DEFAULT_AES_KEY_BASE64_PLACEHOLDER = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
     private static final Pattern REJECT_PATTERN = Pattern.compile(".*_FAULT_REJECT_(\\d+)$");
     private static final Pattern DELAY_PATTERN = Pattern.compile(".*_FAULT_DELAY_(\\d+)$");
 
@@ -47,13 +53,20 @@ public class QwBenefitClientImpl implements QwBenefitClient {
     private final RestClient restClient;
 
     public QwBenefitClientImpl(QwProperties qwProperties, ObjectMapper objectMapper) {
+        this(qwProperties, objectMapper, null);
+    }
+
+    QwBenefitClientImpl(QwProperties qwProperties, ObjectMapper objectMapper, RestClient restClient) {
         this.qwProperties = qwProperties;
         this.objectMapper = objectMapper;
+        validateHttpModeConfiguration();
         this.secretKey = buildSecretKey();
         this.requestFactory = buildRequestFactory();
-        this.restClient = RestClient.builder()
-                .requestFactory(requestFactory)
-                .build();
+        this.restClient = restClient == null
+                ? RestClient.builder()
+                        .requestFactory(requestFactory)
+                        .build()
+                : restClient;
     }
 
     @Override
@@ -130,6 +143,12 @@ public class QwBenefitClientImpl implements QwBenefitClient {
 
     private <T> T invoke(String method, Object businessRequest, Class<T> responseType) {
         long timestamp = System.currentTimeMillis();
+        URI targetUri = URI.create(qwProperties.getHttp().getBaseUrl() + qwProperties.getHttp().getMethodPath());
+        log.info("qw http request prepared qw_mode={} qw_target_uri={} qw_method={} qw_partner_no={}",
+                qwProperties.getMode(),
+                targetUri,
+                method,
+                qwProperties.getPartnerNo());
         QwEnvelopeRequest request = new QwEnvelopeRequest(
                 new QwRequestHead(
                         qwProperties.getPartnerNo(),
@@ -142,7 +161,7 @@ public class QwBenefitClientImpl implements QwBenefitClient {
         );
         try {
             String rawResponse = restClient.post()
-                    .uri(URI.create(qwProperties.getHttp().getBaseUrl() + qwProperties.getHttp().getMethodPath()))
+                    .uri(targetUri)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(request)
                     .retrieve()
@@ -154,6 +173,50 @@ public class QwBenefitClientImpl implements QwBenefitClient {
             }
             throw new BizException("QW_UPSTREAM_FAILED", "Failed to call QW upstream service");
         }
+    }
+
+    private void validateHttpModeConfiguration() {
+        if (!isQweimobileHttpMode()) {
+            return;
+        }
+        requireConfigured(qwProperties.getHttp().getBaseUrl(), "baseUrl");
+        requireConfigured(qwProperties.getHttp().getMethodPath(), "methodPath");
+        requireConfigured(qwProperties.getPartnerNo(), "partnerNo");
+        requireConfigured(qwProperties.getVersion(), "version");
+        requireConfigured(qwProperties.getSecurity().getSignKey(), "signKey");
+        if (DEFAULT_SIGN_KEY_PLACEHOLDER.equals(qwProperties.getSecurity().getSignKey())) {
+            throwInvalidHttpConfig("signKey must be provided by environment or secure configuration");
+        }
+        requireConfigured(qwProperties.getSecurity().getAesAlgorithm(), "aesAlgorithm");
+        if (qwProperties.getSecurity().getCiphertextEncoding() == null) {
+            throwInvalidHttpConfig("ciphertextEncoding must not be null");
+        }
+        if (qwProperties.getSecurity().getAesKeyEncoding() == QwProperties.AesKeyEncoding.RAW) {
+            requireConfigured(qwProperties.getSecurity().getAesKey(), "aesKey");
+            if (DEFAULT_AES_KEY_PLACEHOLDER.equals(qwProperties.getSecurity().getAesKey())) {
+                throwInvalidHttpConfig("aesKey must be provided by environment or secure configuration");
+            }
+            return;
+        }
+        requireConfigured(qwProperties.getSecurity().getAesKeyBase64(), "aesKeyBase64");
+        if (DEFAULT_AES_KEY_BASE64_PLACEHOLDER.equals(qwProperties.getSecurity().getAesKeyBase64())) {
+            throwInvalidHttpConfig("aesKeyBase64 must be provided by environment or secure configuration");
+        }
+    }
+
+    private boolean isQweimobileHttpMode() {
+        return qwProperties.getMode() == QwProperties.Mode.HTTP
+                || qwProperties.getMode() == QwProperties.Mode.QWEIMOBILE_HTTP;
+    }
+
+    private void requireConfigured(String value, String propertyName) {
+        if (value == null || value.isBlank()) {
+            throwInvalidHttpConfig(propertyName + " must not be blank");
+        }
+    }
+
+    private void throwInvalidHttpConfig(String message) {
+        throw new BizException("QW_HTTP_CONFIG_INVALID", message);
     }
 
     private <T> T parseResponse(String rawResponse, Class<T> responseType) {

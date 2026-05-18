@@ -12,7 +12,7 @@ class QwPropertiesTest {
         QwProperties properties = new QwProperties();
 
         properties.setMode(QwProperties.Mode.ALLINPAY_DIRECT);
-        properties.getSecurity().setAesKey("FbRW7iaiwcEKk2kY");
+        properties.getSecurity().setAesKey("unit-test-aes-16");
         properties.getSecurity().setAesKeyEncoding(QwProperties.AesKeyEncoding.RAW);
         properties.getSecurity().setCiphertextEncoding(QwProperties.CiphertextEncoding.HEX);
         properties.getPayment().setAllowMemberSyncPayProtocolNoOverride(true);
@@ -25,7 +25,7 @@ class QwPropertiesTest {
         properties.getDirect().setDeductionNotifyServiceCode("DEDUCT_NOTIFY001");
 
         assertThat(properties.getMode()).isEqualTo(QwProperties.Mode.ALLINPAY_DIRECT);
-        assertThat(properties.getSecurity().getAesKey()).isEqualTo("FbRW7iaiwcEKk2kY");
+        assertThat(properties.getSecurity().getAesKey()).isEqualTo("unit-test-aes-16");
         assertThat(properties.getSecurity().getAesKeyEncoding()).isEqualTo(QwProperties.AesKeyEncoding.RAW);
         assertThat(properties.getSecurity().getCiphertextEncoding()).isEqualTo(QwProperties.CiphertextEncoding.HEX);
         assertThat(properties.getPayment().isAllowMemberSyncPayProtocolNoOverride()).isTrue();

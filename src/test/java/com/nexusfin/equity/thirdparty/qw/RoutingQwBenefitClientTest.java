@@ -36,6 +36,29 @@ class RoutingQwBenefitClientTest {
     }
 
     @Test
+    void shouldLogSanitizedHttpRuntimeConfigurationAtInitialization(CapturedOutput output) {
+        QwProperties properties = new QwProperties();
+        properties.setMode(QwProperties.Mode.HTTP);
+        properties.getHttp().setBaseUrl("https://t-api.test.qweimobile.com");
+        properties.getHttp().setMethodPath("/api/abs/method");
+        properties.setPartnerNo("abs");
+        properties.getSecurity().setSignKey("secret-sign-key-for-test");
+        properties.getSecurity().setAesKey("secret-aes-key-16");
+
+        new RoutingQwBenefitClient(properties, qweimobileClient, allinpayDirectClient);
+
+        assertThat(output).contains("qw_mode=HTTP");
+        assertThat(output).contains("qw_base_url=https://t-api.test.qweimobile.com");
+        assertThat(output).contains("qw_method_path=/api/abs/method");
+        assertThat(output).contains("qw_partner_no=abs");
+        assertThat(output).contains("qw_sign_key=configured");
+        assertThat(output).contains("qw_aes_key=configured");
+        assertThat(output).contains("businessDelegate=qweimobileClient");
+        assertThat(output).doesNotContain("secret-sign-key-for-test");
+        assertThat(output).doesNotContain("secret-aes-key-16");
+    }
+
+    @Test
     void shouldRouteMockModeToQweimobileClient() {
         QwProperties properties = new QwProperties();
         properties.setMode(QwProperties.Mode.MOCK);
