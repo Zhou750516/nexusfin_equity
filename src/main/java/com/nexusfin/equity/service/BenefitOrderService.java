@@ -12,6 +12,8 @@ public interface BenefitOrderService {
 
     CreateBenefitOrderResponse createOrder(String memberId, CreateBenefitOrderRequest request);
 
+    CreateBenefitOrderResponse createLocalOrder(String memberId, CreateBenefitOrderRequest request);
+
     BenefitOrderStatusResponse getOrderStatus(String benefitOrderNo);
 
     ExerciseUrlResponse getExerciseUrl(String benefitOrderNo);

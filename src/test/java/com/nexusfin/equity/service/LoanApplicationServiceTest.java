@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -81,7 +82,7 @@ class LoanApplicationServiceTest {
     @Test
     void shouldForwardRichApplyFieldsAndCreateActiveMappingOnSuccessfulLoanApply() throws Exception {
         when(loanApplicationGateway.findLatestPendingMapping("mem-test-001")).thenReturn(null);
-        when(benefitOrderService.createOrder(eq("mem-test-001"), any()))
+        when(benefitOrderService.createLocalOrder(eq("mem-test-001"), any()))
                 .thenReturn(new CreateBenefitOrderResponse("BEN-001", "FIRST_DEDUCT_PENDING", "/redirect"));
         when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
                 0,
@@ -104,8 +105,9 @@ class LoanApplicationServiceTest {
 
         ArgumentCaptor<com.nexusfin.equity.dto.request.CreateBenefitOrderRequest> benefitOrderCaptor =
                 ArgumentCaptor.forClass(com.nexusfin.equity.dto.request.CreateBenefitOrderRequest.class);
-        verify(benefitOrderService).createOrder(eq("mem-test-001"), benefitOrderCaptor.capture());
+        verify(benefitOrderService).createLocalOrder(eq("mem-test-001"), benefitOrderCaptor.capture());
         assertThat(benefitOrderCaptor.getValue().loanAmount()).isEqualTo(29900L);
+        verify(benefitOrderService, never()).createOrder(any(), any());
 
         ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> yunkaCaptor =
                 ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
@@ -138,7 +140,7 @@ class LoanApplicationServiceTest {
     @Test
     void shouldAllowLoanApplyWithoutPlatformBenefitOrderNoAndForwardMissingValueToYunka() throws Exception {
         when(loanApplicationGateway.findLatestPendingMapping("mem-test-001")).thenReturn(null);
-        when(benefitOrderService.createOrder(eq("mem-test-001"), any()))
+        when(benefitOrderService.createLocalOrder(eq("mem-test-001"), any()))
                 .thenReturn(new CreateBenefitOrderResponse("BEN-NO-PBO", "FIRST_DEDUCT_PENDING", "/redirect"));
         when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
                 0,
@@ -160,7 +162,8 @@ class LoanApplicationServiceTest {
         assertThat(response.status()).isEqualTo("pending");
         assertThat(response.benefitOrderNo()).isEqualTo("BEN-NO-PBO");
 
-        verify(benefitOrderService).createOrder(eq("mem-test-001"), any());
+        verify(benefitOrderService).createLocalOrder(eq("mem-test-001"), any());
+        verify(benefitOrderService, never()).createOrder(any(), any());
         ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> yunkaCaptor =
                 ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
         verify(yunkaGatewayClient).proxy(yunkaCaptor.capture());
@@ -179,7 +182,7 @@ class LoanApplicationServiceTest {
     @Test
     void shouldReturnFailedResponseWhenLoanApplyIsRejected(CapturedOutput output) throws Exception {
         when(loanApplicationGateway.findLatestPendingMapping("mem-test-001")).thenReturn(null);
-        when(benefitOrderService.createOrder(eq("mem-test-001"), any()))
+        when(benefitOrderService.createLocalOrder(eq("mem-test-001"), any()))
                 .thenReturn(new CreateBenefitOrderResponse("BEN-REJECT", "FIRST_DEDUCT_PENDING", "/redirect"));
         when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
                 10003,
@@ -204,7 +207,7 @@ class LoanApplicationServiceTest {
     void shouldEnqueueCompensationAndSavePendingReviewMappingWhenLoanApplyTimesOut(CapturedOutput output)
             throws Exception {
         when(loanApplicationGateway.findLatestPendingMapping("mem-test-001")).thenReturn(null);
-        when(benefitOrderService.createOrder(eq("mem-test-001"), any()))
+        when(benefitOrderService.createLocalOrder(eq("mem-test-001"), any()))
                 .thenReturn(new CreateBenefitOrderResponse("BEN-TIMEOUT", "FIRST_DEDUCT_PENDING", "/redirect"));
         when(yunkaGatewayClient.proxy(any()))
                 .thenThrow(new UpstreamTimeoutException("Yunka gateway timeout"));

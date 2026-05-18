@@ -81,7 +81,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
         }
         String applicationId = next("APP");
         String loanId = next("LN");
-        CreateBenefitOrderResponse benefitOrder = benefitOrderService.createOrder(
+        CreateBenefitOrderResponse benefitOrder = benefitOrderService.createLocalOrder(
                 memberId,
                 new CreateBenefitOrderRequest(
                         "loan-apply-" + applicationId,

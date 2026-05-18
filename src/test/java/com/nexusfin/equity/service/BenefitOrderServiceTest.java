@@ -248,6 +248,75 @@ class BenefitOrderServiceTest {
     }
 
     @Test
+    void shouldCreateLocalOrderWithoutResolvingQwSignOrSyncingQw() {
+        BenefitProduct product = new BenefitProduct();
+        product.setProductCode("P-LOCAL");
+        product.setProductName("权益产品");
+        product.setStatus("ACTIVE");
+        MemberInfo memberInfo = new MemberInfo();
+        memberInfo.setMemberId("mem-local");
+        MemberChannel memberChannel = new MemberChannel();
+        memberChannel.setChannelCode("KJ");
+        memberChannel.setExternalUserId("user-local");
+        when(benefitProductRepository.selectById("P-LOCAL")).thenReturn(product);
+        when(memberInfoRepository.selectById("mem-local")).thenReturn(memberInfo);
+        when(memberChannelRepository.selectOne(any())).thenReturn(memberChannel);
+        when(idempotencyService.isProcessed("req-local-order")).thenReturn(false);
+
+        CreateBenefitOrderResponse response = benefitOrderService.createLocalOrder(
+                "mem-local",
+                new CreateBenefitOrderRequest("req-local-order", "P-LOCAL", 680000L, true)
+        );
+
+        ArgumentCaptor<BenefitOrder> orderCaptor = ArgumentCaptor.forClass(BenefitOrder.class);
+        verify(benefitOrderRepository).insert(orderCaptor.capture());
+        verify(agreementService).ensureAgreementArtifacts(orderCaptor.getValue());
+        verify(paymentProtocolService, never()).resolveForBenefitOrder(any());
+        verify(qwBenefitClient, never()).syncMemberOrder(any());
+        verify(asyncCompensationEnqueueService, never()).enqueue(any());
+        verify(idempotencyService).markProcessed(
+                "req-local-order",
+                "CREATE_ORDER",
+                orderCaptor.getValue().getBenefitOrderNo(),
+                "FIRST_DEDUCT_PENDING"
+        );
+        assertThat(response.benefitOrderNo()).isEqualTo(orderCaptor.getValue().getBenefitOrderNo());
+        assertThat(orderCaptor.getValue().getSyncStatus()).isEqualTo(BenefitOrderStatusEnum.SYNC_PENDING.name());
+        assertThat(orderCaptor.getValue().getPayProtocolNoSnapshot()).isNull();
+        assertThat(orderCaptor.getValue().getPayProtocolSource()).isNull();
+        assertThat(orderCaptor.getValue().getQwUserSignIdSnapshot()).isNull();
+    }
+
+    @Test
+    void shouldNotBlockLocalOrderWhenQwSignWouldBeMissing() {
+        BenefitProduct product = new BenefitProduct();
+        product.setProductCode("P-LOCAL-NO-SIGN");
+        product.setProductName("权益产品");
+        product.setStatus("ACTIVE");
+        MemberInfo memberInfo = new MemberInfo();
+        memberInfo.setMemberId("mem-local-no-sign");
+        MemberChannel memberChannel = new MemberChannel();
+        memberChannel.setChannelCode("KJ");
+        memberChannel.setExternalUserId("user-local-no-sign");
+        when(benefitProductRepository.selectById("P-LOCAL-NO-SIGN")).thenReturn(product);
+        when(memberInfoRepository.selectById("mem-local-no-sign")).thenReturn(memberInfo);
+        when(memberChannelRepository.selectOne(any())).thenReturn(memberChannel);
+        when(idempotencyService.isProcessed("req-local-no-sign")).thenReturn(false);
+
+        CreateBenefitOrderResponse response = benefitOrderService.createLocalOrder(
+                "mem-local-no-sign",
+                new CreateBenefitOrderRequest("req-local-no-sign", "P-LOCAL-NO-SIGN", 680000L, true)
+        );
+
+        ArgumentCaptor<BenefitOrder> orderCaptor = ArgumentCaptor.forClass(BenefitOrder.class);
+        verify(benefitOrderRepository).insert(orderCaptor.capture());
+        verify(paymentProtocolService, never()).resolveForBenefitOrder(any());
+        verify(qwBenefitClient, never()).syncMemberOrder(any());
+        assertThat(response.orderStatus()).isEqualTo("FIRST_DEDUCT_PENDING");
+        assertThat(orderCaptor.getValue().getSyncStatus()).isEqualTo(BenefitOrderStatusEnum.SYNC_PENDING.name());
+    }
+
+    @Test
     void shouldGetExerciseUrlFromQwClient() {
         BenefitOrder order = new BenefitOrder();
         order.setBenefitOrderNo("ord-ex-1");

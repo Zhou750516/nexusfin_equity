@@ -99,6 +99,20 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
     @Override
     @Transactional(noRollbackFor = BenefitPurchaseSyncTimeoutCompensationException.class)
     public CreateBenefitOrderResponse createOrder(String memberId, CreateBenefitOrderRequest request) {
+        return createOrderInternal(memberId, request, true);
+    }
+
+    @Override
+    @Transactional
+    public CreateBenefitOrderResponse createLocalOrder(String memberId, CreateBenefitOrderRequest request) {
+        return createOrderInternal(memberId, request, false);
+    }
+
+    private CreateBenefitOrderResponse createOrderInternal(
+            String memberId,
+            CreateBenefitOrderRequest request,
+            boolean syncQwImmediately
+    ) {
         BenefitOrder requestReplayOrder = benefitOrderRepository.selectOne(Wrappers.<BenefitOrder>lambdaQuery()
                 .eq(BenefitOrder::getRequestId, request.requestId())
                 .last("limit 1"));
@@ -146,17 +160,34 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         benefitOrder.setGrantStatus("PENDING");
         benefitOrder.setSyncStatus(BenefitOrderStatusEnum.SYNC_PENDING.name());
         benefitOrder.setRequestId(request.requestId());
-        PaymentProtocolService.ResolvedPaymentProtocol resolvedPaymentProtocol =
-                paymentProtocolService.resolveForBenefitOrder(benefitOrder);
-        Long userSignId = parseUserSignId(resolvedPaymentProtocol.signRequestNo());
-        benefitOrder.setPayProtocolNoSnapshot(resolvedPaymentProtocol.protocolNo());
-        benefitOrder.setPayProtocolSource(resolvedPaymentProtocol.source());
-        benefitOrder.setQwUserSignIdSnapshot(userSignId);
+        Long userSignId = null;
+        if (syncQwImmediately) {
+            PaymentProtocolService.ResolvedPaymentProtocol resolvedPaymentProtocol =
+                    paymentProtocolService.resolveForBenefitOrder(benefitOrder);
+            userSignId = parseUserSignId(resolvedPaymentProtocol.signRequestNo());
+            benefitOrder.setPayProtocolNoSnapshot(resolvedPaymentProtocol.protocolNo());
+            benefitOrder.setPayProtocolSource(resolvedPaymentProtocol.source());
+            benefitOrder.setQwUserSignIdSnapshot(userSignId);
+        }
         benefitOrder.setCreatedTs(LocalDateTime.now());
         benefitOrder.setUpdatedTs(LocalDateTime.now());
         benefitOrderRepository.insert(benefitOrder);
         // 创建订单后立即补齐协议任务与归档，确保后续支付和审计链路都有完整基础数据。
         agreementService.ensureAgreementArtifacts(benefitOrder);
+        if (!syncQwImmediately) {
+            idempotencyService.markProcessed(
+                    request.requestId(),
+                    "CREATE_ORDER",
+                    benefitOrder.getBenefitOrderNo(),
+                    benefitOrder.getOrderStatus()
+            );
+            log.info("traceId={} bizOrderNo={} memberId={} syncStatus={} reason=loan_apply_defer_qw_sync benefit order created without immediate qw sync",
+                    com.nexusfin.equity.util.TraceIdUtil.getTraceId(),
+                    benefitOrder.getBenefitOrderNo(),
+                    benefitOrder.getMemberId(),
+                    benefitOrder.getSyncStatus());
+            return buildCreateOrderResponse(benefitOrder);
+        }
         QwMemberSyncResponse syncResponse;
         try {
             log.info("traceId={} bizOrderNo={} externalUserId={} productCode={} userSignId={} qw member sync requested",
