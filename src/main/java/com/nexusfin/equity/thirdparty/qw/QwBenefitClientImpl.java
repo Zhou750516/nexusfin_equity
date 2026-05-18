@@ -28,6 +28,7 @@ import org.slf4j.MDC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -52,6 +53,7 @@ public class QwBenefitClientImpl implements QwBenefitClient {
     private final SimpleClientHttpRequestFactory requestFactory;
     private final RestClient restClient;
 
+    @Autowired
     public QwBenefitClientImpl(QwProperties qwProperties, ObjectMapper objectMapper) {
         this(qwProperties, objectMapper, null);
     }
