@@ -28,7 +28,21 @@ const benefitsMessages: Record<Locale, Record<string, string>> = {
     "benefits.tip1": "权益服务费基于惠聚会员服务收取，包含影音娱乐、购物出行、生活服务、放款通道匹配等特权。",
     "benefits.tip2": "本费用为互联网增值服务，独立于借款，非贷款利率、保障金或违约金。",
     "benefits.tip3": "您充分知晓服务内容，先享后付模式下系统将从您指定银行卡扣费。",
-    "benefits.openNow": "立即开通"
+    "benefits.openNow": "立即开通",
+    "benefits.sign.title": "完成扣费签约",
+    "benefits.sign.subtitle": "开通权益前需先完成齐为扣费签约，签约成功后将自动继续开通权益。",
+    "benefits.sign.close": "关闭签约弹窗",
+    "benefits.sign.cardLabel": "签约银行卡",
+    "benefits.sign.getCode": "获取验证码",
+    "benefits.sign.resendCode": "重新获取验证码",
+    "benefits.sign.codeLabel": "短信验证码",
+    "benefits.sign.codePlaceholder": "请输入验证码",
+    "benefits.sign.confirm": "确认签约",
+    "benefits.sign.noCard": "暂无可用银行卡，请先绑定银行卡",
+    "benefits.sign.smsSent": "验证码已发送",
+    "benefits.sign.success": "签约成功",
+    "benefits.sign.applyFirst": "请先获取验证码",
+    "benefits.sign.codeRequired": "请输入短信验证码"
   },
   "zh-TW": {
     "benefits.title": "服務詳情",
@@ -55,7 +69,21 @@ const benefitsMessages: Record<Locale, Record<string, string>> = {
     "benefits.tip1": "權益服務費基於惠聚會員服務收取，包含影音娛樂、購物出行、生活服務、放款通道匹配等特權。",
     "benefits.tip2": "本費用為互聯網增值服務，獨立於借款，非貸款利率、保證金或違約金。",
     "benefits.tip3": "您充分知曉服務內容，先享後付模式下系統將從您指定銀行卡扣費。",
-    "benefits.openNow": "立即開通"
+    "benefits.openNow": "立即開通",
+    "benefits.sign.title": "完成扣費簽約",
+    "benefits.sign.subtitle": "開通權益前需先完成齊為扣費簽約，簽約成功後將自動繼續開通權益。",
+    "benefits.sign.close": "關閉簽約彈窗",
+    "benefits.sign.cardLabel": "簽約銀行卡",
+    "benefits.sign.getCode": "獲取驗證碼",
+    "benefits.sign.resendCode": "重新獲取驗證碼",
+    "benefits.sign.codeLabel": "短信驗證碼",
+    "benefits.sign.codePlaceholder": "請輸入驗證碼",
+    "benefits.sign.confirm": "確認簽約",
+    "benefits.sign.noCard": "暫無可用銀行卡，請先綁定銀行卡",
+    "benefits.sign.smsSent": "驗證碼已發送",
+    "benefits.sign.success": "簽約成功",
+    "benefits.sign.applyFirst": "請先獲取驗證碼",
+    "benefits.sign.codeRequired": "請輸入短信驗證碼"
   },
   "en-US": {
     "benefits.title": "Service Details",
@@ -82,7 +110,21 @@ const benefitsMessages: Record<Locale, Record<string, string>> = {
     "benefits.tip1": "The service fee covers member benefits including entertainment, shopping, travel and channel matching.",
     "benefits.tip2": "This is an internet value-added service fee and is independent of the loan.",
     "benefits.tip3": "By activating first-use-then-pay, the system will charge your designated bank card.",
-    "benefits.openNow": "Activate Now"
+    "benefits.openNow": "Activate Now",
+    "benefits.sign.title": "Complete Payment Signing",
+    "benefits.sign.subtitle": "Complete QW payment signing before activation. Benefits activation will continue automatically after signing.",
+    "benefits.sign.close": "Close signing dialog",
+    "benefits.sign.cardLabel": "Signing bank card",
+    "benefits.sign.getCode": "Get Code",
+    "benefits.sign.resendCode": "Resend Code",
+    "benefits.sign.codeLabel": "SMS Code",
+    "benefits.sign.codePlaceholder": "Enter code",
+    "benefits.sign.confirm": "Confirm Signing",
+    "benefits.sign.noCard": "No available bank card. Please bind a bank card first.",
+    "benefits.sign.smsSent": "Verification code sent",
+    "benefits.sign.success": "Signing completed",
+    "benefits.sign.applyFirst": "Get the verification code first",
+    "benefits.sign.codeRequired": "Enter the SMS verification code"
   },
   "vi-VN": {
     "benefits.title": "Chi tiết dịch vụ",
@@ -109,7 +151,21 @@ const benefitsMessages: Record<Locale, Record<string, string>> = {
     "benefits.tip1": "Phí dịch vụ bao gồm các quyền lợi thành viên như giải trí, mua sắm, di chuyển và ghép kênh giải ngân.",
     "benefits.tip2": "Đây là phí dịch vụ giá trị gia tăng trên internet, độc lập với khoản vay.",
     "benefits.tip3": "Khi kích hoạt dùng trước trả sau, hệ thống sẽ khấu trừ từ thẻ ngân hàng đã chỉ định.",
-    "benefits.openNow": "Kích hoạt ngay"
+    "benefits.openNow": "Kích hoạt ngay",
+    "benefits.sign.title": "Hoàn tất ký khấu trừ",
+    "benefits.sign.subtitle": "Cần hoàn tất ký khấu trừ QW trước khi kích hoạt. Hệ thống sẽ tự tiếp tục kích hoạt sau khi ký thành công.",
+    "benefits.sign.close": "Đóng hộp ký",
+    "benefits.sign.cardLabel": "Thẻ ngân hàng ký",
+    "benefits.sign.getCode": "Lấy mã",
+    "benefits.sign.resendCode": "Gửi lại mã",
+    "benefits.sign.codeLabel": "Mã SMS",
+    "benefits.sign.codePlaceholder": "Nhập mã",
+    "benefits.sign.confirm": "Xác nhận ký",
+    "benefits.sign.noCard": "Chưa có thẻ ngân hàng khả dụng. Vui lòng liên kết thẻ trước.",
+    "benefits.sign.smsSent": "Đã gửi mã xác minh",
+    "benefits.sign.success": "Ký thành công",
+    "benefits.sign.applyFirst": "Vui lòng lấy mã xác minh trước",
+    "benefits.sign.codeRequired": "Vui lòng nhập mã SMS"
   }
 };
 

@@ -7,12 +7,24 @@ import { useI18n } from "@/i18n/I18nProvider";
 import type { Locale } from "@/i18n/locale";
 import { formatCurrency } from "@/lib/format";
 import { readJointLoginParams } from "@/lib/joint-session";
-import { activateBenefitsCard, getBenefitsCardDetail } from "@/lib/loan-api";
+import {
+  activateBenefitsCard,
+  applyBankCardSign,
+  confirmBankCardSign,
+  getBankCardSignStatus,
+  getBenefitsCardDetail,
+} from "@/lib/loan-api";
 import { shouldRequestLocalizedData } from "@/lib/localized-request";
 import { buildPath, getQueryParam } from "@/lib/route";
-import { canActivateBenefits, resolveDefaultBenefitsUserCard } from "@/pages/benefits-card.logic";
+import {
+  applyBenefitsSign,
+  canStartBenefitsActivation,
+  checkBenefitsActivationSignGate,
+  confirmBenefitsSignAndActivate,
+  resolveDefaultBenefitsUserCard,
+} from "@/pages/benefits-card.logic";
 import type { BenefitCategory, BenefitsCardDetail } from "@/types/loan.types";
-import { Car, Check, ChevronLeft, FileText, ShoppingBag, Sparkles, Tv, Utensils, WalletCards } from "lucide-react";
+import { Car, Check, ChevronLeft, FileText, ShoppingBag, Sparkles, Tv, Utensils, WalletCards, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -31,10 +43,10 @@ const MISSING_JOINT_TOKEN_COPY: Record<Locale, string> = {
 };
 
 const PROTOCOL_NOT_READY_COPY: Record<Locale, string> = {
-  "zh-CN": "当前缺少可用协议或扣费协议未生效，请先完成签约后再开通权益。",
-  "zh-TW": "目前缺少可用協議或扣費協議尚未生效，請先完成簽約後再開通權益。",
-  "en-US": "Required agreements or payment protocol are not ready yet. Complete signing before activating benefits.",
-  "vi-VN": "Thỏa thuận cần thiết hoặc giao thức khấu trừ chưa sẵn sàng. Hãy hoàn tất ký kết trước khi kích hoạt.",
+  "zh-CN": "当前扣费协议待完成，点击开通后将先引导您完成齐为签约。",
+  "zh-TW": "目前扣費協議待完成，點擊開通後將先引導您完成齊為簽約。",
+  "en-US": "Payment signing is pending. Tap activate to complete signing first.",
+  "vi-VN": "Chưa hoàn tất ký khấu trừ. Nhấn kích hoạt để hoàn tất ký trước.",
 };
 
 const SECTION_COPY: Record<Locale, {
@@ -84,6 +96,32 @@ const SECTION_COPY: Record<Locale, {
   },
 };
 
+interface SignDialogState {
+  open: boolean;
+  accountNo: string;
+  bankName: string;
+  maskedCardNo: string;
+  userSignId: number | null;
+  verificationCode: string;
+  applySent: boolean;
+  isApplying: boolean;
+  isConfirming: boolean;
+  error: string | null;
+}
+
+const CLOSED_SIGN_DIALOG: SignDialogState = {
+  open: false,
+  accountNo: "",
+  bankName: "",
+  maskedCardNo: "",
+  userSignId: null,
+  verificationCode: "",
+  applySent: false,
+  isApplying: false,
+  isConfirming: false,
+  error: null,
+};
+
 export default function BenefitsCardPage() {
   const [, navigate] = useLocation();
   const loan = useLoan();
@@ -93,6 +131,8 @@ export default function BenefitsCardPage() {
   const [loadedLocale, setLoadedLocale] = useState<Locale | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isActivating, setIsActivating] = useState(false);
+  const [isCheckingSign, setIsCheckingSign] = useState(false);
+  const [signDialog, setSignDialog] = useState<SignDialogState>(CLOSED_SIGN_DIALOG);
   const [error, setError] = useState<string | null>(null);
 
   const applicationId = getQueryParam("applicationId") ?? loan.applicationId;
@@ -121,7 +161,7 @@ export default function BenefitsCardPage() {
     }
   }
 
-  async function handleActivate() {
+  async function activateCard() {
     if (!applicationId) {
       setError(MISSING_CONTEXT_COPY[locale]);
       return;
@@ -144,9 +184,119 @@ export default function BenefitsCardPage() {
       navigate(pendingPath);
     } catch (activateError) {
       setError(readErrorMessage(activateError));
+      throw activateError;
     } finally {
       setIsActivating(false);
     }
+  }
+
+  async function handleActivate() {
+    if (!applicationId) {
+      setError(MISSING_CONTEXT_COPY[locale]);
+      return;
+    }
+    if (!jointLoginToken) {
+      setError(MISSING_JOINT_TOKEN_COPY[locale]);
+      return;
+    }
+    if (!detail) {
+      return;
+    }
+
+    const defaultUserCard = resolveDefaultBenefitsUserCard(detail.userCards);
+    setIsCheckingSign(true);
+    setError(null);
+    try {
+      const signGate = await checkBenefitsActivationSignGate({
+        userCard: defaultUserCard,
+        getSignStatus: getBankCardSignStatus,
+      });
+
+      if (signGate.type === "no-card") {
+        setError(t("benefits.sign.noCard"));
+        return;
+      }
+      if (signGate.type === "sign-required") {
+        setSignDialog({
+          ...CLOSED_SIGN_DIALOG,
+          open: true,
+          accountNo: signGate.accountNo,
+          bankName: signGate.bankName,
+          maskedCardNo: signGate.maskedCardNo,
+        });
+        return;
+      }
+      await activateCard();
+    } catch (signCheckError) {
+      setError(readErrorMessage(signCheckError));
+    } finally {
+      setIsCheckingSign(false);
+    }
+  }
+
+  async function handleSignApply() {
+    if (!signDialog.accountNo) {
+      setSignDialog((current) => ({ ...current, error: t("benefits.sign.noCard") }));
+      return;
+    }
+    setSignDialog((current) => ({ ...current, isApplying: true, error: null }));
+    try {
+      const response = await applyBenefitsSign({
+        accountNo: signDialog.accountNo,
+        applySign: applyBankCardSign,
+      });
+      setSignDialog((current) => ({
+        ...current,
+        userSignId: response.userSignId,
+        applySent: true,
+        isApplying: false,
+        error: null,
+      }));
+      toast.success(t("benefits.sign.smsSent"));
+    } catch (applyError) {
+      setSignDialog((current) => ({
+        ...current,
+        isApplying: false,
+        error: readErrorMessage(applyError),
+      }));
+    }
+  }
+
+  async function handleSignConfirm() {
+    if (signDialog.userSignId == null) {
+      setSignDialog((current) => ({ ...current, error: t("benefits.sign.applyFirst") }));
+      return;
+    }
+    if (!signDialog.verificationCode.trim()) {
+      setSignDialog((current) => ({ ...current, error: t("benefits.sign.codeRequired") }));
+      return;
+    }
+
+    setSignDialog((current) => ({ ...current, isConfirming: true, error: null }));
+    try {
+      await confirmBenefitsSignAndActivate({
+        userSignId: signDialog.userSignId,
+        verificationCode: signDialog.verificationCode.trim(),
+        confirmSign: confirmBankCardSign,
+        activate: activateCard,
+      });
+      toast.success(t("benefits.sign.success"));
+      setSignDialog(CLOSED_SIGN_DIALOG);
+      void loadDetail();
+    } catch (confirmError) {
+      setSignDialog((current) => ({
+        ...current,
+        isConfirming: false,
+        error: readErrorMessage(confirmError),
+      }));
+    }
+  }
+
+  function closeSignDialog() {
+    if (signDialog.isApplying || signDialog.isConfirming || isActivating) {
+      return;
+    }
+    setSignDialog(CLOSED_SIGN_DIALOG);
   }
 
   if (isLoading && !detail) {
@@ -168,11 +318,11 @@ export default function BenefitsCardPage() {
   const activeCategory = detail?.categories[activeTab] ?? null;
   const activateLabelLines = t("benefits.activateCta").split("\n");
   const defaultUserCard = detail ? resolveDefaultBenefitsUserCard(detail.userCards) : null;
-  const activationAllowed = detail ? canActivateBenefits({
+  const activationAllowed = detail ? canStartBenefitsActivation({
     applicationId,
-    protocolReady: detail.protocolReady,
     hasJointLoginToken: Boolean(jointLoginToken),
   }) : false;
+  const isActivateBusy = isActivating || isCheckingSign;
 
   return (
     <MobileLayout>
@@ -212,7 +362,7 @@ export default function BenefitsCardPage() {
                 </div>
                 <button
                   onClick={() => void handleActivate()}
-                  disabled={isActivating || !activationAllowed}
+                  disabled={isActivateBusy || !activationAllowed}
                   className="relative h-[64px] min-w-[115px] rounded-full overflow-hidden shadow-[0_8px_24px_-4px_rgba(251,175,25,0.4)] disabled:opacity-60 disabled:cursor-not-allowed"
                   style={{ backgroundImage: "linear-gradient(151deg, #ff6b2c 0%, #fbaf19 50%, #ffd24c 100%)" }}
                 >
@@ -464,17 +614,106 @@ export default function BenefitsCardPage() {
         primary={
           <button
             onClick={() => void handleActivate()}
-            disabled={isActivating || !activationAllowed}
+            disabled={isActivateBusy || !activationAllowed}
             className={`w-full text-base tracking-tight ${
-              isActivating || !activationAllowed
+              isActivateBusy || !activationAllowed
                 ? "h-14 cursor-not-allowed rounded-full bg-[#c9cdd4] font-semibold text-white"
                 : "h5-primary-button w-full text-base"
             }`}
           >
-            {isActivating ? `${t("benefits.openNow")}...` : t("benefits.openNow")}
+            {isActivateBusy ? `${t("benefits.openNow")}...` : t("benefits.openNow")}
           </button>
         }
       />
+      {signDialog.open ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 px-4 pb-4">
+          <div className="w-full max-w-[420px] rounded-[24px] bg-white px-5 pt-5 pb-6 shadow-[0_20px_60px_rgba(15,23,42,0.24)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-[#1d2129] text-lg font-bold leading-7 tracking-tight">
+                  {t("benefits.sign.title")}
+                </h3>
+                <p className="mt-1 text-[#86909c] text-sm leading-[21px]">
+                  {t("benefits.sign.subtitle")}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeSignDialog}
+                disabled={signDialog.isApplying || signDialog.isConfirming || isActivating}
+                className="size-9 rounded-full bg-[#f2f3f5] text-[#4e5969] flex items-center justify-center disabled:opacity-50"
+                aria-label={t("benefits.sign.close")}
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-[#e5e6eb] bg-[#f7f8fa] px-4 py-4">
+              <p className="text-[#86909c] text-xs leading-[18px]">
+                {t("benefits.sign.cardLabel")}
+              </p>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <span className="text-[#1d2129] text-sm font-semibold tracking-tight">
+                  {signDialog.bankName}
+                </span>
+                <span className="text-[#4e5969] text-sm font-medium tracking-tight">
+                  {signDialog.maskedCardNo}
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void handleSignApply()}
+              disabled={signDialog.isApplying || signDialog.isConfirming}
+              className="mt-5 h-12 w-full rounded-full bg-[#165dff] text-white text-sm font-semibold tracking-tight disabled:cursor-not-allowed disabled:bg-[#c9cdd4]"
+            >
+              {signDialog.isApplying
+                ? `${t("benefits.sign.getCode")}...`
+                : signDialog.applySent
+                  ? t("benefits.sign.resendCode")
+                  : t("benefits.sign.getCode")}
+            </button>
+
+            {signDialog.applySent ? (
+              <div className="mt-4">
+                <label className="text-[#4e5969] text-sm font-medium" htmlFor="benefits-sign-code">
+                  {t("benefits.sign.codeLabel")}
+                </label>
+                <input
+                  id="benefits-sign-code"
+                  value={signDialog.verificationCode}
+                  onChange={(event) => setSignDialog((current) => ({
+                    ...current,
+                    verificationCode: event.target.value,
+                    error: null,
+                  }))}
+                  inputMode="numeric"
+                  maxLength={8}
+                  placeholder={t("benefits.sign.codePlaceholder")}
+                  className="mt-2 h-12 w-full rounded-xl border border-[#e5e6eb] bg-white px-4 text-base tracking-[0.2em] outline-none focus:border-[#165dff]"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleSignConfirm()}
+                  disabled={signDialog.isConfirming || isActivating}
+                  className="mt-4 h-12 w-full rounded-full bg-[#ff6b2c] text-white text-sm font-semibold tracking-tight disabled:cursor-not-allowed disabled:bg-[#c9cdd4]"
+                >
+                  {signDialog.isConfirming || isActivating
+                    ? `${t("benefits.sign.confirm")}...`
+                    : t("benefits.sign.confirm")}
+                </button>
+              </div>
+            ) : null}
+
+            {signDialog.error ? (
+              <p className="mt-4 rounded-xl bg-[#fff2f0] px-4 py-3 text-[#cf1322] text-[13px] leading-[20px]">
+                {signDialog.error}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </MobileLayout>
   );
 }

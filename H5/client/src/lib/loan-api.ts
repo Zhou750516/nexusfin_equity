@@ -6,6 +6,11 @@ import type {
   ApplyResult,
   ApprovalResult,
   ApprovalStatus,
+  BankCardSignApplyParams,
+  BankCardSignApplyResult,
+  BankCardSignConfirmParams,
+  BankCardSignConfirmResult,
+  BankCardSignStatusResult,
   BenefitsCardDetail,
   CalculateParams,
   CalculateResult,
@@ -61,6 +66,29 @@ export function activateBenefitsCard(payload: ActivateParams) {
   return apiRequest<ActivateResult>({
     method: "POST",
     url: "/benefits/activate",
+    data: payload,
+  });
+}
+
+export function getBankCardSignStatus(accountNo: string) {
+  return apiRequest<BankCardSignStatusResult>({
+    method: "GET",
+    url: `/bank-card/sign-status?accountNo=${encodeURIComponent(accountNo)}`,
+  });
+}
+
+export function applyBankCardSign(payload: BankCardSignApplyParams) {
+  return apiRequest<BankCardSignApplyResult>({
+    method: "POST",
+    url: "/bank-card/sign-apply",
+    data: payload,
+  });
+}
+
+export function confirmBankCardSign(payload: BankCardSignConfirmParams) {
+  return apiRequest<BankCardSignConfirmResult>({
+    method: "POST",
+    url: "/bank-card/sign-confirm",
     data: payload,
   });
 }

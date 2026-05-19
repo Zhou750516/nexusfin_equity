@@ -153,6 +153,34 @@ export interface ActivateResult {
   message: string;
 }
 
+export interface BankCardSignStatusResult {
+  accountNo: string;
+  signed: boolean;
+  status: string;
+}
+
+export interface BankCardSignApplyParams {
+  accountNo: string;
+}
+
+export interface BankCardSignApplyResult {
+  userSignId: number;
+  applyTime: string;
+  status: string;
+}
+
+export interface BankCardSignConfirmParams {
+  userSignId: number;
+  verificationCode: string;
+}
+
+export interface BankCardSignConfirmResult {
+  userSignId: number;
+  agreementNo: string;
+  signed: boolean;
+  status: string;
+}
+
 export interface ApprovalResult {
   applicationId: string;
   status: "reviewing" | "approved" | "rejected";
