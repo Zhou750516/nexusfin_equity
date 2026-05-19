@@ -101,6 +101,8 @@ class BenefitOrderServiceTest {
         when(memberInfoRepository.selectById("mem-2")).thenReturn(memberInfo);
         when(memberChannelRepository.selectOne(any())).thenReturn(memberChannel);
         when(idempotencyService.isProcessed("req-order-1")).thenReturn(false);
+        when(paymentProtocolService.resolveForBenefitOrder(any(BenefitOrder.class)))
+                .thenReturn(new PaymentProtocolService.ResolvedPaymentProtocol("AGRM-REAL-001", "10001", "QW_SIGN"));
         when(qwBenefitClient.syncMemberOrder(any())).thenReturn(new QwMemberSyncResponse(
                 "qw-order-1", "card-1", "1710000000000", 0, "P-2", "权益产品", "independence",
                 "2026-03-26 12:00:00", "2027-03-26 12:00:00"
@@ -121,16 +123,15 @@ class BenefitOrderServiceTest {
         assertThat(captor.getValue().getProductCode()).isEqualTo("P-2");
         assertThat(captor.getValue().getMemberId()).isEqualTo("mem-2");
         assertThat(captor.getValue().getRequestId()).isEqualTo("req-order-1");
-        assertThat(captor.getValue().getPayProtocolNoSnapshot()).isNull();
-        assertThat(captor.getValue().getPayProtocolSource()).isNull();
-        assertThat(captor.getValue().getQwUserSignIdSnapshot()).isNull();
-        assertThat(syncRequestCaptor.getValue().userSignId()).isNull();
-        verify(paymentProtocolService, never()).resolveForBenefitOrder(any());
+        assertThat(captor.getValue().getPayProtocolNoSnapshot()).isEqualTo("AGRM-REAL-001");
+        assertThat(captor.getValue().getPayProtocolSource()).isEqualTo("QW_SIGN");
+        assertThat(captor.getValue().getQwUserSignIdSnapshot()).isEqualTo(10001L);
+        assertThat(syncRequestCaptor.getValue().userSignId()).isEqualTo(10001L);
         verify(idempotencyService).markProcessed("req-order-1", "CREATE_ORDER", captor.getValue().getBenefitOrderNo(), "FIRST_DEDUCT_PENDING");
     }
 
     @Test
-    void shouldNotForwardExistingQwSignReferenceForMemberSync() {
+    void shouldUseResolvedQwSignReferenceForQwSync() {
         BenefitProduct product = new BenefitProduct();
         product.setProductCode("P-2");
         product.setProductName("权益产品");
@@ -144,6 +145,8 @@ class BenefitOrderServiceTest {
         when(memberInfoRepository.selectById("mem-2")).thenReturn(memberInfo);
         when(memberChannelRepository.selectOne(any())).thenReturn(memberChannel);
         when(idempotencyService.isProcessed("req-order-sign-ref")).thenReturn(false);
+        when(paymentProtocolService.resolveForBenefitOrder(any(BenefitOrder.class)))
+                .thenReturn(new PaymentProtocolService.ResolvedPaymentProtocol("AGRM211926033187CF73483", "778899", "QW_SIGN"));
         when(qwBenefitClient.syncMemberOrder(any())).thenReturn(new QwMemberSyncResponse(
                 "qw-order-1", "card-1", "1710000000000", 0, "P-2", "权益产品", "independence",
                 "2026-03-26 12:00:00", "2027-03-26 12:00:00"
@@ -158,11 +161,10 @@ class BenefitOrderServiceTest {
         ArgumentCaptor<QwMemberSyncRequest> requestCaptor = ArgumentCaptor.forClass(QwMemberSyncRequest.class);
         verify(benefitOrderRepository).insert(orderCaptor.capture());
         verify(qwBenefitClient).syncMemberOrder(requestCaptor.capture());
-        verify(paymentProtocolService, never()).resolveForBenefitOrder(any());
-        assertThat(orderCaptor.getValue().getPayProtocolNoSnapshot()).isNull();
-        assertThat(orderCaptor.getValue().getPayProtocolSource()).isNull();
-        assertThat(orderCaptor.getValue().getQwUserSignIdSnapshot()).isNull();
-        assertThat(requestCaptor.getValue().userSignId()).isNull();
+        assertThat(orderCaptor.getValue().getPayProtocolNoSnapshot()).isEqualTo("AGRM211926033187CF73483");
+        assertThat(orderCaptor.getValue().getPayProtocolSource()).isEqualTo("QW_SIGN");
+        assertThat(orderCaptor.getValue().getQwUserSignIdSnapshot()).isEqualTo(778899L);
+        assertThat(requestCaptor.getValue().userSignId()).isEqualTo(778899L);
     }
 
     @Test
@@ -217,7 +219,7 @@ class BenefitOrderServiceTest {
     }
 
     @Test
-    void shouldCreateAndSyncOrderWhenNoActiveQwSignProtocolExists() {
+    void shouldRejectOrderCreationWhenNoActiveQwSignProtocolExists() {
         BenefitProduct product = new BenefitProduct();
         product.setProductCode("P-QW-SIGN");
         product.setProductName("权益产品");
@@ -231,27 +233,46 @@ class BenefitOrderServiceTest {
         when(memberInfoRepository.selectById("mem-qw-sign")).thenReturn(memberInfo);
         when(memberChannelRepository.selectOne(any())).thenReturn(memberChannel);
         when(idempotencyService.isProcessed("req-order-qw-sign")).thenReturn(false);
-        when(qwBenefitClient.syncMemberOrder(any())).thenReturn(new QwMemberSyncResponse(
-                "qw-order-no-sign", "card-no-sign", "1710000000000", 0, "P-QW-SIGN", "权益产品", "independence",
-                "2026-03-26 12:00:00", "2027-03-26 12:00:00"
-        ));
+        when(paymentProtocolService.resolveForBenefitOrder(any(BenefitOrder.class)))
+                .thenThrow(new BizException("QW_SIGN_REQUIRED", "QW sign confirmation required before benefit order"));
 
-        CreateBenefitOrderResponse response = benefitOrderService.createOrder(
+        assertThatThrownBy(() -> benefitOrderService.createOrder(
                 "mem-qw-sign",
-                new CreateBenefitOrderRequest("req-order-qw-sign", "P-QW-SIGN", 680000L, true));
+                new CreateBenefitOrderRequest("req-order-qw-sign", "P-QW-SIGN", 680000L, true)))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("QW_SIGN_REQUIRED")
+                .hasMessageContaining("QW sign confirmation required before benefit order");
 
-        ArgumentCaptor<BenefitOrder> orderCaptor = ArgumentCaptor.forClass(BenefitOrder.class);
-        ArgumentCaptor<QwMemberSyncRequest> requestCaptor = ArgumentCaptor.forClass(QwMemberSyncRequest.class);
-        verify(benefitOrderRepository).insert(orderCaptor.capture());
-        verify(paymentProtocolService, never()).resolveForBenefitOrder(any());
-        verify(qwBenefitClient).syncMemberOrder(requestCaptor.capture());
+        verify(qwBenefitClient, never()).syncMemberOrder(any());
         verify(asyncCompensationEnqueueService, never()).enqueue(any());
-        assertThat(response.orderStatus()).isEqualTo("FIRST_DEDUCT_PENDING");
-        assertThat(orderCaptor.getValue().getSyncStatus()).isEqualTo(BenefitOrderStatusEnum.SYNC_SUCCESS.name());
-        assertThat(orderCaptor.getValue().getPayProtocolNoSnapshot()).isNull();
-        assertThat(orderCaptor.getValue().getPayProtocolSource()).isNull();
-        assertThat(orderCaptor.getValue().getQwUserSignIdSnapshot()).isNull();
-        assertThat(requestCaptor.getValue().userSignId()).isNull();
+    }
+
+    @Test
+    void shouldRejectOrderCreationWhenQwSignReferenceIsInvalid() {
+        BenefitProduct product = new BenefitProduct();
+        product.setProductCode("P-QW-SIGN-INVALID");
+        product.setProductName("权益产品");
+        product.setStatus("ACTIVE");
+        MemberInfo memberInfo = new MemberInfo();
+        memberInfo.setMemberId("mem-qw-invalid");
+        MemberChannel memberChannel = new MemberChannel();
+        memberChannel.setChannelCode("KJ");
+        memberChannel.setExternalUserId("user-qw-invalid");
+        when(benefitProductRepository.selectById("P-QW-SIGN-INVALID")).thenReturn(product);
+        when(memberInfoRepository.selectById("mem-qw-invalid")).thenReturn(memberInfo);
+        when(memberChannelRepository.selectOne(any())).thenReturn(memberChannel);
+        when(idempotencyService.isProcessed("req-order-qw-invalid")).thenReturn(false);
+        when(paymentProtocolService.resolveForBenefitOrder(any(BenefitOrder.class)))
+                .thenReturn(new PaymentProtocolService.ResolvedPaymentProtocol("AGRM-INVALID", "not-a-number", "QW_SIGN"));
+
+        assertThatThrownBy(() -> benefitOrderService.createOrder(
+                "mem-qw-invalid",
+                new CreateBenefitOrderRequest("req-order-qw-invalid", "P-QW-SIGN-INVALID", 680000L, true)))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("QW_SIGN_REFERENCE_INVALID");
+
+        verify(qwBenefitClient, never()).syncMemberOrder(any());
+        verify(asyncCompensationEnqueueService, never()).enqueue(any());
     }
 
     @Test
@@ -358,6 +379,8 @@ class BenefitOrderServiceTest {
         when(memberInfoRepository.selectById("mem-4")).thenReturn(memberInfo);
         when(memberChannelRepository.selectOne(any())).thenReturn(memberChannel);
         when(idempotencyService.isProcessed("req-order-timeout")).thenReturn(false);
+        when(paymentProtocolService.resolveForBenefitOrder(any(BenefitOrder.class)))
+                .thenReturn(new PaymentProtocolService.ResolvedPaymentProtocol("AGRM-REAL-004", "10004", "QW_SIGN"));
         when(qwBenefitClient.syncMemberOrder(any()))
                 .thenThrow(new UpstreamTimeoutException("QW member sync timeout"));
 
@@ -377,7 +400,7 @@ class BenefitOrderServiceTest {
         AsyncCompensationEnqueuePayload.QwBenefitPurchaseRetry payload =
                 (AsyncCompensationEnqueuePayload.QwBenefitPurchaseRetry) enqueueCaptor.getValue().requestPayload();
         assertThat(payload.externalUserId()).isEqualTo("user-4");
-        assertThat(payload.userSignId()).isNull();
+        assertThat(payload.userSignId()).isEqualTo(10004L);
         assertThat(payload.productCode()).isEqualTo("P-4");
         assertThat(payload.loanAmount()).isEqualTo(680000L);
     }

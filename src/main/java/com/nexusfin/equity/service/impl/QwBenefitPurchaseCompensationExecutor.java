@@ -53,7 +53,7 @@ public class QwBenefitPurchaseCompensationExecutor implements AsyncCompensationE
                 payload.loanAmount(),
                 payload.productCode(),
                 payload.productCode(),
-                null,
+                requireUserSignId(payload.userSignId()),
                 null,
                 0,
                 null,
@@ -68,6 +68,13 @@ public class QwBenefitPurchaseCompensationExecutor implements AsyncCompensationE
             benefitOrderRepository.updateById(update);
         }
         return new ExecutionResult(writeResponse(response));
+    }
+
+    private Long requireUserSignId(Long userSignId) {
+        if (userSignId == null) {
+            throw new BizException("QW_SIGN_REFERENCE_MISSING", "QW sign userSignId is missing in compensation payload");
+        }
+        return userSignId;
     }
 
     private QwBenefitPurchasePayload readPayload(AsyncCompensationTask task) {

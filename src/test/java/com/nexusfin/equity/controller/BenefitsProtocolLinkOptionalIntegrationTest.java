@@ -102,7 +102,7 @@ class BenefitsProtocolLinkOptionalIntegrationTest {
     }
 
     @Test
-    void shouldActivateWhenProtocolLinksAreMissingWithoutQwSign() throws Exception {
+    void shouldRejectActivationWhenProtocolLinksAreOptionalButQwSignIsMissing() throws Exception {
         MemberInfo memberInfo = createMember("mem-benefits-link-optional", "user-benefits-link-optional");
         createProduct();
         when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
@@ -111,11 +111,6 @@ class BenefitsProtocolLinkOptionalIntegrationTest {
                 .thenReturn(new UserCardListResponse(List.of(
                         new UserCardSummary("card-001", "招商银行", "8648", 1)
                 )));
-        when(benefitRedirectUrlService.generate(any()))
-                .thenReturn(new BenefitRedirectUrlService.BenefitRedirectUrlResult("https://redirect.test/exercise"));
-        when(xiaohuaGatewayService.syncBenefitOrder(any(), any(), any()))
-                .thenReturn(new BenefitOrderSyncResponse("SUCCESS", "ok"));
-
         mockMvc.perform(post("/api/benefits/activate")
                         .cookie(authCookie(memberInfo))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -127,17 +122,17 @@ class BenefitsProtocolLinkOptionalIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.status").value("activated"));
+                .andExpect(jsonPath("$.code").value(-1))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("QW_SIGN_REQUIRED")));
 
-        assertThat(benefitOrderRepository.selectCount(Wrappers.emptyWrapper())).isEqualTo(1);
+        assertThat(benefitOrderRepository.selectCount(Wrappers.emptyWrapper())).isZero();
     }
 
     @Test
-    void shouldActivateWhenProtocolLinksAreOptionalAndQwSignExistsWithoutForwardingSignSnapshot() throws Exception {
-        MemberInfo memberInfo = createMember("mem-benefits-old-qw-sign", "user-benefits-old-qw-sign");
+    void shouldActivateWhenProtocolLinksAreOptionalAndQwSignExistsWithSignSnapshot() throws Exception {
+        MemberInfo memberInfo = createMember("mem-benefits-qw-sign", "user-benefits-qw-sign");
         createProduct();
-        insertLegacyQwSign(memberInfo);
+        insertQwSign(memberInfo, "1234");
         when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(new ProtocolQueryResponse(List.of()));
         when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
@@ -154,9 +149,9 @@ class BenefitsProtocolLinkOptionalIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "applicationId": "APP-benefits-old-qw-sign",
+                                  "applicationId": "APP-benefits-qw-sign",
                                   "cardType": "huixuan_card",
-                                  "token": "joint-token-benefits-old-qw-sign"
+                                  "token": "joint-token-benefits-qw-sign"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -165,9 +160,38 @@ class BenefitsProtocolLinkOptionalIntegrationTest {
 
         assertThat(benefitOrderRepository.selectCount(Wrappers.emptyWrapper())).isEqualTo(1);
         var order = benefitOrderRepository.selectOne(Wrappers.emptyWrapper());
-        assertThat(order.getPayProtocolNoSnapshot()).isNull();
-        assertThat(order.getPayProtocolSource()).isNull();
-        assertThat(order.getQwUserSignIdSnapshot()).isNull();
+        assertThat(order.getPayProtocolNoSnapshot()).isEqualTo("QW-" + memberInfo.getMemberId());
+        assertThat(order.getPayProtocolSource()).isEqualTo("QW_SIGN");
+        assertThat(order.getQwUserSignIdSnapshot()).isEqualTo(1234L);
+    }
+
+    @Test
+    void shouldRejectActivationWhenQwSignReferenceIsInvalid() throws Exception {
+        MemberInfo memberInfo = createMember("mem-benefits-invalid-qw-sign", "user-benefits-invalid-qw-sign");
+        createProduct();
+        insertQwSign(memberInfo, "not-a-number");
+        when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(new ProtocolQueryResponse(List.of()));
+        when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(new UserCardListResponse(List.of(
+                        new UserCardSummary("card-001", "招商银行", "8648", 1)
+                )));
+
+        mockMvc.perform(post("/api/benefits/activate")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "applicationId": "APP-benefits-invalid-qw-sign",
+                                  "cardType": "huixuan_card",
+                                  "token": "joint-token-benefits-invalid-qw-sign"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(-1))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("QW_SIGN_REFERENCE_INVALID")));
+
+        assertThat(benefitOrderRepository.selectCount(Wrappers.emptyWrapper())).isZero();
     }
 
     private BenefitProduct createProduct() {
@@ -208,13 +232,13 @@ class BenefitsProtocolLinkOptionalIntegrationTest {
         return memberInfo;
     }
 
-    private void insertLegacyQwSign(MemberInfo memberInfo) {
+    private void insertQwSign(MemberInfo memberInfo, String signRequestNo) {
         com.nexusfin.equity.entity.MemberPaymentProtocol protocol = new com.nexusfin.equity.entity.MemberPaymentProtocol();
         protocol.setMemberId(memberInfo.getMemberId());
         protocol.setExternalUserId(memberInfo.getExternalUserId());
         protocol.setProviderCode("QW_SIGN");
         protocol.setProtocolNo("QW-" + memberInfo.getMemberId());
-        protocol.setSignRequestNo("1234");
+        protocol.setSignRequestNo(signRequestNo);
         protocol.setProtocolStatus("ACTIVE");
         protocol.setChannelCode("KJ");
         protocol.setSignedTs(LocalDateTime.now());
