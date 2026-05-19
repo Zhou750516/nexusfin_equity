@@ -83,6 +83,20 @@ class BankCardSignControllerIntegrationTest {
     }
 
     @Test
+    void shouldReturnUnsignedSignStatusForAuthenticatedMember() throws Exception {
+        MemberInfo memberInfo = createMember("mem-sign-status-unsigned", "tech-user-sign-status-unsigned");
+        createChannel(memberInfo.getMemberId(), memberInfo.getExternalUserId());
+
+        mockMvc.perform(get("/api/bank-card/sign-status")
+                        .cookie(authCookie(memberInfo))
+                        .param("accountNo", "6222020202020207"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.signed").value(false))
+                .andExpect(jsonPath("$.data.status").value("UNSIGNED"));
+    }
+
+    @Test
     void shouldReturnControlledBizErrorWhenMockSignStatusTimesOut() throws Exception {
         MemberInfo memberInfo = createMember("mem-sign-status-timeout", "tech-user-sign-status-timeout");
         createChannel(memberInfo.getMemberId(), memberInfo.getExternalUserId());

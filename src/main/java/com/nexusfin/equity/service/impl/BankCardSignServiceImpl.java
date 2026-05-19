@@ -92,6 +92,14 @@ public class BankCardSignServiceImpl implements BankCardSignService {
         } catch (UpstreamTimeoutException exception) {
             logFailure("bank-card sign status qw request failed", bizOrderNo, requestId, memberId, startNanos, exception);
             throw new BizException(QW_SIGN_UPSTREAM_TIMEOUT, "QW sign status temporarily unavailable");
+        } catch (BizException exception) {
+            if (isQwUserUnsigned(exception)) {
+                log.info("traceId={} bizOrderNo={} requestId={} memberId={} elapsedMs={} status={} bank-card sign status qw request unsigned",
+                        TraceIdUtil.getTraceId(), bizOrderNo, requestId, memberId, elapsedMs(startNanos), STATUS_UNSIGNED);
+                return new BankCardSignStatusResponse(accountNo, false, STATUS_UNSIGNED);
+            }
+            logFailure("bank-card sign status qw request failed", bizOrderNo, requestId, memberId, startNanos, exception);
+            throw exception;
         } catch (RuntimeException exception) {
             logFailure("bank-card sign status qw request failed", bizOrderNo, requestId, memberId, startNanos, exception);
             throw exception;
@@ -247,6 +255,11 @@ public class BankCardSignServiceImpl implements BankCardSignService {
             return bizException.getErrorMsg();
         }
         return firstNonBlank(exception.getMessage(), "QW sign upstream failed");
+    }
+
+    private boolean isQwUserUnsigned(BizException exception) {
+        return "QW_UPSTREAM_REJECTED".equals(exception.getErrorNo())
+                && firstNonBlank(exception.getErrorMsg(), exception.getMessage()).contains("用户未签约");
     }
 
     private static String bankCardBizOrderNo(String accountNo) {

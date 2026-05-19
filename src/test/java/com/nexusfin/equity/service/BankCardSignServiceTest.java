@@ -99,6 +99,45 @@ class BankCardSignServiceTest {
     }
 
     @Test
+    void shouldReturnUnsignedWhenQwReportsUserNotSigned(CapturedOutput output) {
+        MemberInfo memberInfo = buildMember();
+        when(memberInfoRepository.selectById("mem-1")).thenReturn(memberInfo);
+        when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
+        when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户");
+        when(qwProperties.getDirect()).thenReturn(qwDirectProperties);
+        when(qwDirectProperties.getMerchantId()).thenReturn("200000000007804");
+        when(qwBenefitClient.querySignStatus(any()))
+                .thenThrow(new BizException("QW_UPSTREAM_REJECTED", "用户未签约"));
+
+        BankCardSignStatusResponse response = bankCardSignService.getSignStatus("mem-1", "6222020202027568");
+
+        assertThat(response.accountNo()).isEqualTo("6222020202027568");
+        assertThat(response.signed()).isFalse();
+        assertThat(response.status()).isEqualTo("UNSIGNED");
+        assertThat(output).contains("bank-card sign status qw request unsigned");
+        assertThat(output).contains("status=UNSIGNED");
+        assertThat(output).contains("bizOrderNo=bank-card-7568");
+        assertThat(output).doesNotContain("6222020202027568");
+    }
+
+    @Test
+    void shouldStillThrowOtherQwSignStatusRejections() {
+        MemberInfo memberInfo = buildMember();
+        when(memberInfoRepository.selectById("mem-1")).thenReturn(memberInfo);
+        when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
+        when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户");
+        when(qwProperties.getDirect()).thenReturn(qwDirectProperties);
+        when(qwDirectProperties.getMerchantId()).thenReturn("200000000007804");
+        when(qwBenefitClient.querySignStatus(any()))
+                .thenThrow(new BizException("QW_UPSTREAM_REJECTED", "参数错误"));
+
+        assertThatThrownBy(() -> bankCardSignService.getSignStatus("mem-1", "6222020202027568"))
+                .isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo("QW_UPSTREAM_REJECTED");
+    }
+
+    @Test
     void shouldApplySignUsingMemberSensitiveFields(CapturedOutput output) {
         MemberInfo memberInfo = buildMember();
         when(memberInfoRepository.selectById("mem-1")).thenReturn(memberInfo);
