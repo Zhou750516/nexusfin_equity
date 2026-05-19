@@ -98,6 +98,22 @@ public class GlobalExceptionHandler {
         return Result.failure(404, message);
     }
 
+    @ExceptionHandler(UpstreamTimeoutException.class)
+    public Result<Void> handleUpstreamTimeout(UpstreamTimeoutException exception, HttpServletRequest request) {
+        String message = exception.getMessage() == null || exception.getMessage().isBlank()
+                ? "Upstream gateway timeout"
+                : exception.getMessage();
+        log.warn("traceId={} remoteIp={} bizOrderNo={} method={} path={} errorNo={} errorMsg={}",
+                TraceIdUtil.getTraceId(),
+                TraceIdUtil.getRemoteIp(),
+                resolveBizOrderNo(request),
+                request.getMethod(),
+                request.getRequestURI(),
+                ErrorCodes.YUNKA_UPSTREAM_TIMEOUT,
+                message);
+        return Result.failure(ErrorCodes.YUNKA_UPSTREAM_TIMEOUT, message);
+    }
+
     @ExceptionHandler(Exception.class)
     public Result<Void> handleUnexpected(Exception exception, HttpServletRequest request) {
         log.error("traceId={} remoteIp={} bizOrderNo={} method={} path={} errorNo={} errorMsg={}",

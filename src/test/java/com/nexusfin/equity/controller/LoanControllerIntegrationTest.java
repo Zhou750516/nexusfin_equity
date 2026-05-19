@@ -6,6 +6,8 @@ import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.entity.MemberReceivingAccount;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.enums.MemberStatusEnum;
+import com.nexusfin.equity.exception.ErrorCodes;
+import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.repository.ContractArchiveRepository;
 import com.nexusfin.equity.repository.IdempotencyRecordRepository;
@@ -136,6 +138,22 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(jsonPath("$.data.bindCardMessage").value("请到科技平台绑卡后重试"))
                 .andExpect(jsonPath("$.data.receivingAccount").isEmpty())
                 .andExpect(jsonPath("$.data.amountRange.default").value(3000));
+    }
+
+    @Test
+    void shouldReturnYunkaTimeoutWhenCalculatorConfigUserCardsQueryTimesOut() throws Exception {
+        MemberInfo memberInfo = createMember("mem-loan-config-timeout", "user-loan-config-timeout");
+        when(xiaohuaGatewayService.queryUserCards(any(), eq("calculator-config"), any()))
+                .thenThrow(new UpstreamTimeoutException("Yunka gateway timeout"));
+
+        mockMvc.perform(get("/api/loan/calculator-config")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(-1))
+                .andExpect(jsonPath("$.message").value(
+                        ErrorCodes.YUNKA_UPSTREAM_TIMEOUT + ":Yunka gateway timeout"
+                ));
     }
 
     @Test
