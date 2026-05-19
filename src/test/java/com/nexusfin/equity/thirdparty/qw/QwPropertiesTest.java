@@ -1,7 +1,11 @@
 package com.nexusfin.equity.thirdparty.qw;
 
 import com.nexusfin.equity.config.QwProperties;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.ConfigurationPropertySource;
+import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -36,5 +40,21 @@ class QwPropertiesTest {
         assertThat(properties.getDirect().getPkcs12Path()).contains("user-rsa.p12");
         assertThat(properties.getDirect().getVerifyCertPath()).contains("public-rsa.cer");
         assertThat(properties.getDirect().getDeductionNotifyServiceCode()).isEqualTo("DEDUCT_NOTIFY001");
+    }
+
+    @Test
+    void shouldBindHttpPlaintextPayloadLogSwitch() {
+        QwProperties properties = bind(Map.of(
+                "nexusfin.third-party.qw.http.log-plaintext-payload", "true"
+        ));
+
+        assertThat(properties.getHttp().isLogPlaintextPayload()).isTrue();
+    }
+
+    private QwProperties bind(Map<String, String> values) {
+        ConfigurationPropertySource source = new MapConfigurationPropertySource(values);
+        return new Binder(new ConfigurationPropertySource[]{source})
+                .bind("nexusfin.third-party.qw", QwProperties.class)
+                .orElseThrow(IllegalStateException::new);
     }
 }

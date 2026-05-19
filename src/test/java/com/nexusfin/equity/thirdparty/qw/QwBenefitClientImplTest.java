@@ -397,6 +397,7 @@ class QwBenefitClientImplTest {
         ));
 
         assertThat(response.userSignId()).isEqualTo(2605194897536L);
+        String successLine = logLine(output, "qw gateway request success");
         assertThat(output).contains("qw gateway request begin");
         assertThat(output).contains("qw gateway request success");
         assertThat(output).contains("traceId=TRACE-QW-SUCCESS-001");
@@ -410,6 +411,8 @@ class QwBenefitClientImplTest {
         assertThat(output).contains("qwCode=200");
         assertThat(output).contains("requestEnvelopeJson=");
         assertThat(output).contains("responseBodyJson=");
+        assertThat(successLine).contains("requestEnvelopeJson=");
+        assertThat(successLine).contains("responseBodyJson=");
         assertThat(output).contains("[ENCRYPTED_REDACTED]");
         assertThat(output).contains("\"dataLength\":");
         assertThat(output).contains("\"dataHash\":");
@@ -418,6 +421,8 @@ class QwBenefitClientImplTest {
         assertThat(output).doesNotContain("13800138000");
         assertThat(output).doesNotContain("6222020202021234");
         assertThat(output).doesNotContain("110101199003071234");
+        assertThat(output).doesNotContain("requestPlaintextJson");
+        assertThat(output).doesNotContain("responsePlaintextJson");
         assertThat(output).doesNotContain(capturedRequests.get(0).requestBody());
         assertThat(output).doesNotContain(responseCiphertext);
         server.verify();
@@ -443,6 +448,7 @@ class QwBenefitClientImplTest {
                 .extracting(error -> ((BizException) error).getErrorNo())
                 .isEqualTo("QW_UPSTREAM_REJECTED");
 
+        String rejectedLine = logLine(output, "qw gateway request rejected");
         assertThat(output).contains("qw gateway request begin");
         assertThat(output).contains("qw gateway request rejected");
         assertThat(output).contains("traceId=TRACE-QW-REJECTED-001");
@@ -452,6 +458,8 @@ class QwBenefitClientImplTest {
         assertThat(output).contains("errorNo=QW_UPSTREAM_REJECTED");
         assertThat(output).contains("errorMsg=用户未签约");
         assertThat(output).contains("responseBodyJson=");
+        assertThat(rejectedLine).contains("requestEnvelopeJson=");
+        assertThat(rejectedLine).contains("responseBodyJson=");
         assertThat(output).contains("[ENCRYPTED_REDACTED]");
         assertThat(output).doesNotContain("unit-test-sign-key-not-secret");
         assertThat(output).doesNotContain("unit-test-aes-16");
@@ -474,6 +482,7 @@ class QwBenefitClientImplTest {
                 .isInstanceOf(UpstreamTimeoutException.class)
                 .hasMessageContaining("QW upstream timeout");
 
+        String timeoutLine = logLine(output, "qw gateway request timeout");
         assertThat(output).contains("qw gateway request begin");
         assertThat(output).contains("qw gateway request timeout");
         assertThat(output).contains("traceId=TRACE-QW-TIMEOUT-001");
@@ -483,6 +492,8 @@ class QwBenefitClientImplTest {
         assertThat(output).contains("errorMsg=QW upstream timeout");
         assertThat(output).contains("requestEnvelopeJson=");
         assertThat(output).contains("responseBodyJson=null");
+        assertThat(timeoutLine).contains("requestEnvelopeJson=");
+        assertThat(timeoutLine).contains("responseBodyJson=null");
         assertThat(output).doesNotContain("unit-test-sign-key-not-secret");
         assertThat(output).doesNotContain("unit-test-aes-16");
         server.verify();
@@ -503,6 +514,7 @@ class QwBenefitClientImplTest {
                 .extracting(error -> ((BizException) error).getErrorNo())
                 .isEqualTo("QW_UPSTREAM_FAILED");
 
+        String failedLine = logLine(output, "qw gateway request failed");
         assertThat(output).contains("qw gateway request begin");
         assertThat(output).contains("qw gateway request failed");
         assertThat(output).contains("traceId=TRACE-QW-FAILED-001");
@@ -512,8 +524,61 @@ class QwBenefitClientImplTest {
         assertThat(output).contains("errorMsg=Connection reset");
         assertThat(output).contains("requestEnvelopeJson=");
         assertThat(output).contains("responseBodyJson=null");
+        assertThat(failedLine).contains("requestEnvelopeJson=");
+        assertThat(failedLine).contains("responseBodyJson=null");
         assertThat(output).doesNotContain("unit-test-sign-key-not-secret");
         assertThat(output).doesNotContain("unit-test-aes-16");
+        server.verify();
+    }
+
+    @Test
+    void shouldLogSanitizedPlaintextPayloadWhenExplicitlyEnabled(CapturedOutput output) throws Exception {
+        TraceIdUtil.bindTraceId("TRACE-QW-PLAINTEXT-001");
+        List<CapturedQwRequest> capturedRequests = new ArrayList<>();
+        String responseCiphertext = encryptHex(
+                "unit-test-aes-16",
+                "{\"userSignId\":2605194897536,\"applyTime\":\"2026-05-19 20:00:00\"}"
+        );
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        server.expect(requestTo("https://t-api.test.qweimobile.com/api/abs/method"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(request -> captureRequest(request, capturedRequests))
+                .andRespond(withSuccess(
+                        "{\"code\":200,\"msg\":\"success\",\"data\":\"" + responseCiphertext + "\"}",
+                        MediaType.APPLICATION_JSON
+                ));
+        QwProperties properties = qwProperties();
+        properties.getHttp().setLogPlaintextPayload(true);
+        QwBenefitClientImpl client = new QwBenefitClientImpl(properties, objectMapper, restClientBuilder.build());
+
+        QwSignApplyResponse response = client.applySign(new QwSignApplyRequest(
+                "200000000007804",
+                "13800138000",
+                "测试用户",
+                "6222020202021234",
+                "110101199003071234"
+        ));
+
+        assertThat(response.userSignId()).isEqualTo(2605194897536L);
+        String successLine = logLine(output, "qw gateway request success");
+        assertThat(successLine).contains("requestEnvelopeJson=");
+        assertThat(successLine).contains("responseBodyJson=");
+        assertThat(output).contains("requestPlaintextJson");
+        assertThat(output).contains("responsePlaintextJson");
+        assertThat(output).contains("merchantId");
+        assertThat(output).contains("userSignId");
+        assertThat(output).contains("2605194897536");
+        assertThat(output).contains("138****8000");
+        assertThat(output).contains("622202********1234");
+        assertThat(output).contains("110101********1234");
+        assertThat(output).doesNotContain("unit-test-sign-key-not-secret");
+        assertThat(output).doesNotContain("unit-test-aes-16");
+        assertThat(output).doesNotContain("13800138000");
+        assertThat(output).doesNotContain("6222020202021234");
+        assertThat(output).doesNotContain("110101199003071234");
+        assertThat(output).doesNotContain(capturedRequests.get(0).requestBody());
+        assertThat(output).doesNotContain(responseCiphertext);
         server.verify();
     }
 
@@ -601,6 +666,14 @@ class QwBenefitClientImplTest {
         } catch (Exception exception) {
             throw new IOException(exception);
         }
+    }
+
+    private String logLine(CapturedOutput output, String marker) {
+        return output.getOut()
+                .lines()
+                .filter(line -> line.contains(marker))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Missing log line: " + marker));
     }
 
     private record CapturedQwRequest(

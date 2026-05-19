@@ -175,6 +175,7 @@ nexusfin:
       sign-key: ${QW_SIGN_KEY:abs-secret-key}
       connect-timeout-ms: ${QW_CONNECT_TIMEOUT_MS:2000}
       read-timeout-ms: ${QW_READ_TIMEOUT_MS:3000}
+      log-plaintext-payload: ${QW_HTTP_LOG_PLAINTEXT_PAYLOAD:false}
       aes-key: ${QW_AES_KEY:0123456789abcdef}
       aes-key-base64: ${QW_AES_KEY_BASE64:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
       aes-key-encoding: ${QW_AES_KEY_ENCODING:RAW}

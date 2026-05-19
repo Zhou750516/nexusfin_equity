@@ -6,6 +6,7 @@ public class QwHttpProperties {
     private String methodPath = "/api/abs/method";
     private int connectTimeoutMs = 2000;
     private int readTimeoutMs = 3000;
+    private boolean logPlaintextPayload = false;
     private String mockExerciseBaseUrl = "https://mock-qw.local/exercise";
 
     public String getBaseUrl() {
@@ -38,6 +39,14 @@ public class QwHttpProperties {
 
     public void setReadTimeoutMs(int readTimeoutMs) {
         this.readTimeoutMs = readTimeoutMs;
+    }
+
+    public boolean isLogPlaintextPayload() {
+        return logPlaintextPayload;
+    }
+
+    public void setLogPlaintextPayload(boolean logPlaintextPayload) {
+        this.logPlaintextPayload = logPlaintextPayload;
     }
 
     public String getMockExerciseBaseUrl() {
