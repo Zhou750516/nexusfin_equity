@@ -7,13 +7,18 @@ import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.util.TraceIdUtil;
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.mock.http.client.MockClientHttpRequest;
@@ -25,11 +30,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+@ExtendWith(OutputCaptureExtension.class)
 class QwBenefitClientImplTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @AfterEach
+    void tearDown() {
+        TraceIdUtil.clear();
+    }
 
     @Test
     void shouldSendHexEncryptedRequestBodyForQweimobileProtocol() throws Exception {
@@ -354,6 +366,154 @@ class QwBenefitClientImplTest {
                 .allSatisfy(request -> assertThat(request.rawBody())
                         .doesNotContain("unit-test-sign-key-not-secret")
                         .doesNotContain("unit-test-aes-16"));
+        server.verify();
+    }
+
+    @Test
+    void shouldLogQwHttpBeginAndSuccessWithSanitizedEnvelope(CapturedOutput output) throws Exception {
+        TraceIdUtil.bindTraceId("TRACE-QW-SUCCESS-001");
+        List<CapturedQwRequest> capturedRequests = new ArrayList<>();
+        String responseCiphertext = encryptHex(
+                "unit-test-aes-16",
+                "{\"userSignId\":2605194897536,\"applyTime\":\"2026-05-19 20:00:00\"}"
+        );
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        server.expect(requestTo("https://t-api.test.qweimobile.com/api/abs/method"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(request -> captureRequest(request, capturedRequests))
+                .andRespond(withSuccess(
+                        "{\"code\":200,\"msg\":\"success\",\"data\":\"" + responseCiphertext + "\"}",
+                        MediaType.APPLICATION_JSON
+                ));
+        QwBenefitClientImpl client = new QwBenefitClientImpl(qwProperties(), objectMapper, restClientBuilder.build());
+
+        QwSignApplyResponse response = client.applySign(new QwSignApplyRequest(
+                "200000000007804",
+                "13800138000",
+                "测试用户",
+                "6222020202021234",
+                "110101199003071234"
+        ));
+
+        assertThat(response.userSignId()).isEqualTo(2605194897536L);
+        assertThat(output).contains("qw gateway request begin");
+        assertThat(output).contains("qw gateway request success");
+        assertThat(output).contains("traceId=TRACE-QW-SUCCESS-001");
+        assertThat(output).contains("qw_method=abs.sign.apply");
+        assertThat(output).contains("qw_target_uri=https://t-api.test.qweimobile.com/api/abs/method");
+        assertThat(output).contains("qw_partner_no=abs");
+        assertThat(output).contains("qw_version=v1.0");
+        assertThat(output).contains("qw_timestamp=");
+        assertThat(output).contains("signPrefix=");
+        assertThat(output).contains("elapsedMs=");
+        assertThat(output).contains("qwCode=200");
+        assertThat(output).contains("requestEnvelopeJson=");
+        assertThat(output).contains("responseBodyJson=");
+        assertThat(output).contains("[ENCRYPTED_REDACTED]");
+        assertThat(output).contains("\"dataLength\":");
+        assertThat(output).contains("\"dataHash\":");
+        assertThat(output).doesNotContain("unit-test-sign-key-not-secret");
+        assertThat(output).doesNotContain("unit-test-aes-16");
+        assertThat(output).doesNotContain("13800138000");
+        assertThat(output).doesNotContain("6222020202021234");
+        assertThat(output).doesNotContain("110101199003071234");
+        assertThat(output).doesNotContain(capturedRequests.get(0).requestBody());
+        assertThat(output).doesNotContain(responseCiphertext);
+        server.verify();
+    }
+
+    @Test
+    void shouldLogQwHttpRejectedWhenQwCodeIsNotSuccess(CapturedOutput output) {
+        TraceIdUtil.bindTraceId("TRACE-QW-REJECTED-001");
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        server.expect(requestTo("https://t-api.test.qweimobile.com/api/abs/method"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{\"code\":500,\"msg\":\"用户未签约\",\"data\":\"\"}", MediaType.APPLICATION_JSON));
+        QwBenefitClientImpl client = new QwBenefitClientImpl(qwProperties(), objectMapper, restClientBuilder.build());
+
+        assertThatThrownBy(() -> client.querySignStatus(new QwSignStatusRequest(
+                "200000000007804",
+                "13800138000",
+                "测试用户",
+                "6222020202021234"
+        ))).isInstanceOf(BizException.class)
+                .hasMessageContaining("用户未签约")
+                .extracting(error -> ((BizException) error).getErrorNo())
+                .isEqualTo("QW_UPSTREAM_REJECTED");
+
+        assertThat(output).contains("qw gateway request begin");
+        assertThat(output).contains("qw gateway request rejected");
+        assertThat(output).contains("traceId=TRACE-QW-REJECTED-001");
+        assertThat(output).contains("qw_method=abs.sign.query");
+        assertThat(output).contains("elapsedMs=");
+        assertThat(output).contains("qwCode=500");
+        assertThat(output).contains("errorNo=QW_UPSTREAM_REJECTED");
+        assertThat(output).contains("errorMsg=用户未签约");
+        assertThat(output).contains("responseBodyJson=");
+        assertThat(output).contains("[ENCRYPTED_REDACTED]");
+        assertThat(output).doesNotContain("unit-test-sign-key-not-secret");
+        assertThat(output).doesNotContain("unit-test-aes-16");
+        assertThat(output).doesNotContain("13800138000");
+        assertThat(output).doesNotContain("6222020202021234");
+        server.verify();
+    }
+
+    @Test
+    void shouldLogQwHttpTimeout(CapturedOutput output) {
+        TraceIdUtil.bindTraceId("TRACE-QW-TIMEOUT-001");
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        server.expect(requestTo("https://t-api.test.qweimobile.com/api/abs/method"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withException(new SocketTimeoutException("Read timed out")));
+        QwBenefitClientImpl client = new QwBenefitClientImpl(qwProperties(), objectMapper, restClientBuilder.build());
+
+        assertThatThrownBy(() -> client.queryDeduction(new QwDeductionQueryRequest("user-1", "ord-1")))
+                .isInstanceOf(UpstreamTimeoutException.class)
+                .hasMessageContaining("QW upstream timeout");
+
+        assertThat(output).contains("qw gateway request begin");
+        assertThat(output).contains("qw gateway request timeout");
+        assertThat(output).contains("traceId=TRACE-QW-TIMEOUT-001");
+        assertThat(output).contains("qw_method=abs.deduction.query");
+        assertThat(output).contains("elapsedMs=");
+        assertThat(output).contains("errorNo=QW_UPSTREAM_TIMEOUT");
+        assertThat(output).contains("errorMsg=QW upstream timeout");
+        assertThat(output).contains("requestEnvelopeJson=");
+        assertThat(output).contains("responseBodyJson=null");
+        assertThat(output).doesNotContain("unit-test-sign-key-not-secret");
+        assertThat(output).doesNotContain("unit-test-aes-16");
+        server.verify();
+    }
+
+    @Test
+    void shouldLogQwHttpFailedForNonTimeoutRestClientException(CapturedOutput output) {
+        TraceIdUtil.bindTraceId("TRACE-QW-FAILED-001");
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        server.expect(requestTo("https://t-api.test.qweimobile.com/api/abs/method"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withException(new IOException("Connection reset")));
+        QwBenefitClientImpl client = new QwBenefitClientImpl(qwProperties(), objectMapper, restClientBuilder.build());
+
+        assertThatThrownBy(() -> client.cancelOrder(new QwOrderCancelRequest("ord-1")))
+                .isInstanceOf(BizException.class)
+                .extracting(error -> ((BizException) error).getErrorNo())
+                .isEqualTo("QW_UPSTREAM_FAILED");
+
+        assertThat(output).contains("qw gateway request begin");
+        assertThat(output).contains("qw gateway request failed");
+        assertThat(output).contains("traceId=TRACE-QW-FAILED-001");
+        assertThat(output).contains("qw_method=abs.order.cancel");
+        assertThat(output).contains("elapsedMs=");
+        assertThat(output).contains("errorNo=QW_UPSTREAM_FAILED");
+        assertThat(output).contains("errorMsg=Connection reset");
+        assertThat(output).contains("requestEnvelopeJson=");
+        assertThat(output).contains("responseBodyJson=null");
+        assertThat(output).doesNotContain("unit-test-sign-key-not-secret");
+        assertThat(output).doesNotContain("unit-test-aes-16");
         server.verify();
     }
 

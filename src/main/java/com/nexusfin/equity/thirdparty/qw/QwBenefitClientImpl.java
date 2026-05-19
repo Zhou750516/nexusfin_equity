@@ -18,6 +18,9 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.crypto.Cipher;
@@ -40,6 +43,8 @@ public class QwBenefitClientImpl implements QwBenefitClient {
     private static final Logger log = LoggerFactory.getLogger(QwBenefitClientImpl.class);
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final String QW_UPSTREAM_REJECTED = "QW_UPSTREAM_REJECTED";
+    private static final String QW_UPSTREAM_TIMEOUT = "QW_UPSTREAM_TIMEOUT";
+    private static final String QW_UPSTREAM_FAILED = "QW_UPSTREAM_FAILED";
     private static final String DEFAULT_SIGN_KEY_PLACEHOLDER = "abs-secret-key";
     private static final String DEFAULT_AES_KEY_PLACEHOLDER = "0123456789abcdef";
     private static final String DEFAULT_AES_KEY_BASE64_PLACEHOLDER = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
@@ -144,13 +149,10 @@ public class QwBenefitClientImpl implements QwBenefitClient {
     }
 
     private <T> T invoke(String method, Object businessRequest, Class<T> responseType) {
+        long startNanos = System.nanoTime();
         long timestamp = System.currentTimeMillis();
+        String traceId = TraceIdUtil.getTraceId();
         URI targetUri = URI.create(qwProperties.getHttp().getBaseUrl() + qwProperties.getHttp().getMethodPath());
-        log.info("qw http request prepared qw_mode={} qw_target_uri={} qw_method={} qw_partner_no={}",
-                qwProperties.getMode(),
-                targetUri,
-                method,
-                qwProperties.getPartnerNo());
         QwEnvelopeRequest request = new QwEnvelopeRequest(
                 new QwRequestHead(
                         qwProperties.getPartnerNo(),
@@ -161,6 +163,16 @@ public class QwBenefitClientImpl implements QwBenefitClient {
                 ),
                 encodeBusinessData(businessRequest)
         );
+        String requestEnvelopeJson = requestEnvelopeSummary(request);
+        log.info("traceId={} qw_method={} qw_target_uri={} qw_partner_no={} qw_version={} qw_timestamp={} signPrefix={} requestEnvelopeJson={} qw gateway request begin",
+                traceId,
+                method,
+                targetUri,
+                qwProperties.getPartnerNo(),
+                qwProperties.getVersion(),
+                timestamp,
+                signPrefix(request.requestHead().sign()),
+                requestEnvelopeJson);
         try {
             String rawResponse = restClient.post()
                     .uri(targetUri)
@@ -168,13 +180,150 @@ public class QwBenefitClientImpl implements QwBenefitClient {
                     .body(request)
                     .retrieve()
                     .body(String.class);
-            return parseResponse(rawResponse, responseType);
+            String responseBodyJson = responseBodySummary(rawResponse);
+            try {
+                T response = parseResponse(rawResponse, responseType);
+                log.info("traceId={} qw_method={} qw_target_uri={} qw_partner_no={} elapsedMs={} qwCode={} responseBodyJson={} qw gateway request success",
+                        traceId,
+                        method,
+                        targetUri,
+                        qwProperties.getPartnerNo(),
+                        elapsedMs(startNanos),
+                        qwCode(rawResponse),
+                        responseBodyJson);
+                return response;
+            } catch (BizException exception) {
+                if (QW_UPSTREAM_REJECTED.equals(exception.getErrorNo())) {
+                    log.warn("traceId={} qw_method={} qw_target_uri={} qw_partner_no={} elapsedMs={} qwCode={} errorNo={} errorMsg={} responseBodyJson={} qw gateway request rejected",
+                            traceId,
+                            method,
+                            targetUri,
+                            qwProperties.getPartnerNo(),
+                            elapsedMs(startNanos),
+                            qwCode(rawResponse),
+                            QW_UPSTREAM_REJECTED,
+                            exception.getErrorMsg(),
+                            responseBodyJson);
+                }
+                throw exception;
+            }
         } catch (RestClientException exception) {
             if (UpstreamTimeoutDetector.isTimeout(exception)) {
+                log.error("traceId={} qw_method={} qw_target_uri={} qw_partner_no={} elapsedMs={} errorNo={} errorMsg={} requestEnvelopeJson={} responseBodyJson=null qw gateway request timeout",
+                        traceId,
+                        method,
+                        targetUri,
+                        qwProperties.getPartnerNo(),
+                        elapsedMs(startNanos),
+                        QW_UPSTREAM_TIMEOUT,
+                        "QW upstream timeout",
+                        requestEnvelopeJson);
                 throw new UpstreamTimeoutException("QW upstream timeout", exception);
             }
-            throw new BizException("QW_UPSTREAM_FAILED", "Failed to call QW upstream service");
+            log.error("traceId={} qw_method={} qw_target_uri={} qw_partner_no={} elapsedMs={} errorNo={} errorMsg={} requestEnvelopeJson={} responseBodyJson=null qw gateway request failed",
+                    traceId,
+                    method,
+                    targetUri,
+                    qwProperties.getPartnerNo(),
+                    elapsedMs(startNanos),
+                    QW_UPSTREAM_FAILED,
+                    safeExceptionMessage(exception),
+                    requestEnvelopeJson);
+            throw new BizException(QW_UPSTREAM_FAILED, "Failed to call QW upstream service");
         }
+    }
+
+    private long elapsedMs(long startNanos) {
+        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+    }
+
+    private String requestEnvelopeSummary(QwEnvelopeRequest request) {
+        Map<String, Object> root = new LinkedHashMap<>();
+        Map<String, Object> head = new LinkedHashMap<>();
+        head.put("partnerNo", request.requestHead().partnerNo());
+        head.put("timestamp", request.requestHead().timestamp());
+        head.put("method", request.requestHead().method());
+        head.put("version", request.requestHead().version());
+        head.put("signPrefix", signPrefix(request.requestHead().sign()));
+        root.put("requestHead", head);
+        root.put("requestBody", encryptedDataSummary(request.requestBody()));
+        return toJson(root);
+    }
+
+    private String responseBodySummary(String rawResponse) {
+        if (rawResponse == null || rawResponse.isBlank()) {
+            return "null";
+        }
+        try {
+            JsonNode root = objectMapper.readTree(rawResponse);
+            Map<String, Object> summary = new LinkedHashMap<>();
+            summary.put("code", root.path("code").asInt(500));
+            summary.put("msg", root.path("msg").asText(""));
+            JsonNode data = root.get("data");
+            summary.put("data", data == null || data.isNull()
+                    ? encryptedDataSummary(null)
+                    : encryptedDataSummary(data.asText()));
+            return toJson(summary);
+        } catch (Exception exception) {
+            return "\"SUMMARY_FAILED\"";
+        }
+    }
+
+    private int qwCode(String rawResponse) {
+        if (rawResponse == null || rawResponse.isBlank()) {
+            return 500;
+        }
+        try {
+            return objectMapper.readTree(rawResponse).path("code").asInt(500);
+        } catch (JsonProcessingException exception) {
+            return 500;
+        }
+    }
+
+    private Map<String, Object> encryptedDataSummary(String ciphertext) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        String value = ciphertext == null ? "" : ciphertext;
+        summary.put("data", "[ENCRYPTED_REDACTED]");
+        summary.put("dataLength", value.length());
+        summary.put("dataHash", hashPrefix(value));
+        return summary;
+    }
+
+    private String hashPrefix(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest((value == null ? "" : value).getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest).substring(0, 12);
+        } catch (GeneralSecurityException exception) {
+            return "HASH_FAILED";
+        }
+    }
+
+    private String signPrefix(String sign) {
+        if (sign == null || sign.isBlank()) {
+            return "-";
+        }
+        return sign.substring(0, Math.min(sign.length(), 8));
+    }
+
+    private String toJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException exception) {
+            return "\"SERIALIZE_FAILED\"";
+        }
+    }
+
+    private String safeExceptionMessage(Exception exception) {
+        Throwable current = exception;
+        while (current.getCause() != null) {
+            current = current.getCause();
+        }
+        String message = current.getMessage();
+        if (message == null || message.isBlank()) {
+            return current.getClass().getSimpleName();
+        }
+        return message;
     }
 
     private void validateHttpModeConfiguration() {
