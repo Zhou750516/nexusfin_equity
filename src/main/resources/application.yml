@@ -69,6 +69,7 @@ nexusfin:
     benefits:
       product-code: ${H5_BENEFITS_PRODUCT_CODE:abs001}
       protocol-link-required: ${H5_BENEFITS_PROTOCOL_LINK_REQUIRED:true}
+      use-local-receiving-account: ${H5_BENEFITS_USE_LOCAL_RECEIVING_ACCOUNT:false}
       activate:
         default-loan-amount: 300000
         supported-card-type: huixuan_card

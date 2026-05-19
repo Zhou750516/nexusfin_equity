@@ -8,6 +8,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record H5BenefitsProperties(
         String productCode,
         @DefaultValue("true") boolean protocolLinkRequired,
+        @DefaultValue("false") boolean useLocalReceivingAccount,
         Activate activate,
         Detail detail
 ) {

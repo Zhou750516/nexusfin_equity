@@ -9,8 +9,10 @@ import com.nexusfin.equity.dto.response.BenefitsActivateResponse;
 import com.nexusfin.equity.dto.response.BenefitsCardDetailResponse;
 import com.nexusfin.equity.dto.response.CreateBenefitOrderResponse;
 import com.nexusfin.equity.entity.BenefitProduct;
+import com.nexusfin.equity.entity.MemberReceivingAccount;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.repository.BenefitProductRepository;
+import com.nexusfin.equity.repository.MemberReceivingAccountRepository;
 import com.nexusfin.equity.service.BenefitOrderService;
 import com.nexusfin.equity.service.BenefitRedirectUrlService;
 import com.nexusfin.equity.service.BenefitsService;
@@ -19,7 +21,9 @@ import com.nexusfin.equity.service.XiaohuaGatewayService;
 import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncRequest;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserCardListRequest;
+import com.nexusfin.equity.thirdparty.yunka.UserCardListResponse;
 import com.nexusfin.equity.util.TraceIdUtil;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.IntStream;
@@ -35,6 +39,7 @@ public class BenefitsServiceImpl implements BenefitsService {
     private final H5BenefitsProperties h5BenefitsProperties;
     private final H5LoanProperties h5LoanProperties;
     private final BenefitProductRepository benefitProductRepository;
+    private final MemberReceivingAccountRepository memberReceivingAccountRepository;
     private final BenefitOrderService benefitOrderService;
     private final H5I18nService h5I18nService;
     private final XiaohuaGatewayService xiaohuaGatewayService;
@@ -44,6 +49,7 @@ public class BenefitsServiceImpl implements BenefitsService {
             H5BenefitsProperties h5BenefitsProperties,
             H5LoanProperties h5LoanProperties,
             BenefitProductRepository benefitProductRepository,
+            MemberReceivingAccountRepository memberReceivingAccountRepository,
             BenefitOrderService benefitOrderService,
             H5I18nService h5I18nService,
             XiaohuaGatewayService xiaohuaGatewayService,
@@ -52,6 +58,7 @@ public class BenefitsServiceImpl implements BenefitsService {
         this.h5BenefitsProperties = h5BenefitsProperties;
         this.h5LoanProperties = h5LoanProperties;
         this.benefitProductRepository = benefitProductRepository;
+        this.memberReceivingAccountRepository = memberReceivingAccountRepository;
         this.benefitOrderService = benefitOrderService;
         this.h5I18nService = h5I18nService;
         this.xiaohuaGatewayService = xiaohuaGatewayService;
@@ -74,23 +81,11 @@ public class BenefitsServiceImpl implements BenefitsService {
                         h5LoanProperties.termOptions().isEmpty() ? 0 : h5LoanProperties.termOptions().get(0).value()
                 )
         );
-        var cardResponse = xiaohuaGatewayService.queryUserCards(
-                "BENEFITS-CARD-" + memberId,
-                "benefits-card-detail",
-                new UserCardListRequest(memberId)
-        );
         List<com.nexusfin.equity.thirdparty.yunka.ProtocolLink> dynamicProtocols = protocolResponse.list() == null
                 ? List.of()
                 : protocolResponse.list();
         List<BenefitsCardDetailResponse.ProtocolLink> protocols = mergeProtocols(detail.protocols(), dynamicProtocols);
-        List<BenefitsCardDetailResponse.UserCard> userCards = cardResponse.cards().stream()
-                .map(card -> new BenefitsCardDetailResponse.UserCard(
-                        card.cardId(),
-                        card.bankName(),
-                        card.cardLastFour(),
-                        Integer.valueOf(1).equals(card.isDefault())
-                ))
-                .toList();
+        List<BenefitsCardDetailResponse.UserCard> userCards = resolveUserCards(memberId);
         return new BenefitsCardDetailResponse(
                 h5I18nService.text("benefits.cardName", detail.cardName()),
                 detail.price(),
@@ -102,6 +97,49 @@ public class BenefitsServiceImpl implements BenefitsService {
                 userCards,
                 isProtocolReady(dynamicProtocols)
         );
+    }
+
+    private List<BenefitsCardDetailResponse.UserCard> resolveUserCards(String memberId) {
+        if (h5BenefitsProperties.useLocalReceivingAccount()) {
+            List<BenefitsCardDetailResponse.UserCard> localCards = localReceivingAccountCards(memberId);
+            if (!localCards.isEmpty()) {
+                return localCards;
+            }
+        }
+        UserCardListResponse cardResponse = xiaohuaGatewayService.queryUserCards(
+                "BENEFITS-CARD-" + memberId,
+                "benefits-card-detail",
+                new UserCardListRequest(memberId)
+        );
+        return cardResponse.cards().stream()
+                .map(card -> new BenefitsCardDetailResponse.UserCard(
+                        card.cardId(),
+                        card.bankName(),
+                        card.cardLastFour(),
+                        Integer.valueOf(1).equals(card.isDefault())
+                ))
+                .toList();
+    }
+
+    private List<BenefitsCardDetailResponse.UserCard> localReceivingAccountCards(String memberId) {
+        List<MemberReceivingAccount> accounts = memberReceivingAccountRepository.selectActiveByMemberId(memberId);
+        if (accounts == null || accounts.isEmpty()) {
+            return List.of();
+        }
+        return accounts.stream()
+                .filter(Objects::nonNull)
+                .sorted(Comparator
+                        .comparing((MemberReceivingAccount account) -> Integer.valueOf(1).equals(account.getIsDefault()))
+                        .reversed()
+                        .thenComparing(account -> account.getSourceIndex() == null ? Integer.MAX_VALUE : account.getSourceIndex())
+                        .thenComparing(account -> account.getId() == null ? Long.MAX_VALUE : account.getId()))
+                .map(account -> new BenefitsCardDetailResponse.UserCard(
+                        account.getAccountId(),
+                        account.getBankName(),
+                        account.getLastFour(),
+                        Integer.valueOf(1).equals(account.getIsDefault())
+                ))
+                .toList();
     }
 
     @Override

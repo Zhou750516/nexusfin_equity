@@ -8,8 +8,10 @@ import com.nexusfin.equity.dto.response.BenefitsActivateResponse;
 import com.nexusfin.equity.dto.response.BenefitsCardDetailResponse;
 import com.nexusfin.equity.dto.response.CreateBenefitOrderResponse;
 import com.nexusfin.equity.entity.BenefitProduct;
+import com.nexusfin.equity.entity.MemberReceivingAccount;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.repository.BenefitProductRepository;
+import com.nexusfin.equity.repository.MemberReceivingAccountRepository;
 import com.nexusfin.equity.service.impl.BenefitsServiceImpl;
 import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncRequest;
 import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncResponse;
@@ -43,6 +45,9 @@ class BenefitsServiceTest {
     private BenefitProductRepository benefitProductRepository;
 
     @Mock
+    private MemberReceivingAccountRepository memberReceivingAccountRepository;
+
+    @Mock
     private BenefitOrderService benefitOrderService;
 
     @Mock
@@ -63,6 +68,7 @@ class BenefitsServiceTest {
                 h5BenefitsProperties(),
                 h5LoanProperties(),
                 benefitProductRepository,
+                memberReceivingAccountRepository,
                 benefitOrderService,
                 h5I18nService,
                 xiaohuaGatewayService,
@@ -98,6 +104,53 @@ class BenefitsServiceTest {
         verify(xiaohuaGatewayService).queryUserCards(any(), eq("benefits-card-detail"), cardCaptor.capture());
         assertThat(cardCaptor.getValue().userId()).isEqualTo("mem-test-001");
         assertThat(cardCaptor.getValue().userId()).isNotEqualTo("cid-test-001");
+        verify(memberReceivingAccountRepository, never()).selectActiveByMemberId(any());
+    }
+
+    @Test
+    void shouldUseLocalReceivingAccountsForCardDetailWhenEnabled() {
+        BenefitsService localCardService = benefitsServiceWithLocalReceivingAccount(true);
+        when(benefitProductRepository.selectById("HUXUAN_CARD")).thenReturn(activeProduct());
+        when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(dynamicProtocolResponse());
+        when(memberReceivingAccountRepository.selectActiveByMemberId("mem-local-card"))
+                .thenReturn(List.of(
+                        receivingAccount("mem-local-card", "old-card-001", "旧用户卡", "7568", 0),
+                        receivingAccount("mem-local-card", "622908328976881119", "齐为联调测试卡", "8119", 1)
+                ));
+
+        BenefitsCardDetailResponse response = localCardService.getCardDetail("mem-local-card", "cid-local-card");
+
+        assertThat(response.userCards()).hasSize(2);
+        assertThat(response.userCards().get(0).cardId()).isEqualTo("622908328976881119");
+        assertThat(response.userCards().get(0).bankName()).isEqualTo("齐为联调测试卡");
+        assertThat(response.userCards().get(0).cardLastFour()).isEqualTo("8119");
+        assertThat(response.userCards().get(0).defaultCard()).isTrue();
+        assertThat(response.userCards().get(1).cardLastFour()).isEqualTo("7568");
+        verify(xiaohuaGatewayService, never()).queryUserCards(any(), any(), any());
+        assertThat(response.protocolReady()).isTrue();
+    }
+
+    @Test
+    void shouldFallbackToXiaohuaCardsWhenLocalReceivingAccountEnabledButEmpty() {
+        BenefitsService localCardService = benefitsServiceWithLocalReceivingAccount(true);
+        when(benefitProductRepository.selectById("HUXUAN_CARD")).thenReturn(activeProduct());
+        when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(dynamicProtocolResponse());
+        when(memberReceivingAccountRepository.selectActiveByMemberId("mem-local-empty"))
+                .thenReturn(List.of());
+        when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(new UserCardListResponse(List.of(
+                        new UserCardSummary("card-remote-001", "招商银行", "7568", 1)
+                )));
+
+        BenefitsCardDetailResponse response = localCardService.getCardDetail("mem-local-empty", "cid-local-empty");
+
+        assertThat(response.userCards()).hasSize(1);
+        assertThat(response.userCards().get(0).cardId()).isEqualTo("card-remote-001");
+        assertThat(response.userCards().get(0).cardLastFour()).isEqualTo("7568");
+        assertThat(response.userCards().get(0).defaultCard()).isTrue();
+        verify(xiaohuaGatewayService).queryUserCards(any(), eq("benefits-card-detail"), any());
     }
 
     @Test
@@ -269,6 +322,20 @@ class BenefitsServiceTest {
                 h5BenefitsProperties(protocolLinkRequired),
                 h5LoanProperties(),
                 benefitProductRepository,
+                memberReceivingAccountRepository,
+                benefitOrderService,
+                h5I18nService,
+                xiaohuaGatewayService,
+                benefitRedirectUrlService
+        );
+    }
+
+    private BenefitsService benefitsServiceWithLocalReceivingAccount(boolean useLocalReceivingAccount) {
+        return new BenefitsServiceImpl(
+                h5BenefitsProperties(true, useLocalReceivingAccount),
+                h5LoanProperties(),
+                benefitProductRepository,
+                memberReceivingAccountRepository,
                 benefitOrderService,
                 h5I18nService,
                 xiaohuaGatewayService,
@@ -300,9 +367,17 @@ class BenefitsServiceTest {
     }
 
     private H5BenefitsProperties h5BenefitsProperties(boolean protocolLinkRequired) {
+        return h5BenefitsProperties(protocolLinkRequired, false);
+    }
+
+    private H5BenefitsProperties h5BenefitsProperties(
+            boolean protocolLinkRequired,
+            boolean useLocalReceivingAccount
+    ) {
         return new H5BenefitsProperties(
                 "HUXUAN_CARD",
                 protocolLinkRequired,
+                useLocalReceivingAccount,
                 new H5BenefitsProperties.Activate(30000L, "huixuan_card", "惠选卡开通成功"),
                 new H5BenefitsProperties.Detail(
                         "惠选卡",
@@ -318,6 +393,23 @@ class BenefitsServiceTest {
                         List.of(new H5BenefitsProperties.ProtocolLink("用户服务协议", "/protocols/user-service"))
                 )
         );
+    }
+
+    private MemberReceivingAccount receivingAccount(
+            String memberId,
+            String accountId,
+            String bankName,
+            String lastFour,
+            Integer isDefault
+    ) {
+        MemberReceivingAccount account = new MemberReceivingAccount();
+        account.setMemberId(memberId);
+        account.setAccountId(accountId);
+        account.setBankName(bankName);
+        account.setLastFour(lastFour);
+        account.setAccountStatus("ACTIVE");
+        account.setIsDefault(isDefault);
+        return account;
     }
 
     private H5LoanProperties h5LoanProperties() {
