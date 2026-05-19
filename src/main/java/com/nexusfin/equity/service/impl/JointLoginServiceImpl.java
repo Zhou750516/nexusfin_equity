@@ -264,12 +264,16 @@ public class JointLoginServiceImpl implements JointLoginService {
 
     private void logIdCardStatus(String requestId, String scene, String absUserId, JointIdentity identity) {
         if (identity.idCard() == null || identity.idCard().isBlank()) {
-            log.warn("traceId={} requestId={} absUserId={} cid={} scene={} temporarily allowing joint login without id card",
+            log.warn("traceId={} bizOrderNo={} requestId={} absUserId={} cid={} scene={} errorNo={} errorMsg={} "
+                            + "temporarily allowing joint login without id card",
                     TraceIdUtil.getTraceId(),
+                    "SYSTEM",
                     requestId,
                     absUserId,
                     identity.cid(),
-                    scene);
+                    scene,
+                    "JOINT_LOGIN_ID_CARD_MISSING_ALLOWED",
+                    "Joint login id card is missing and temporarily allowed");
             return;
         }
         log.info("traceId={} requestId={} absUserId={} cid={} scene={} idCardField={} joint login id card resolved",

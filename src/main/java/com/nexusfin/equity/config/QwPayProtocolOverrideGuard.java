@@ -45,7 +45,9 @@ public class QwPayProtocolOverrideGuard {
                             + "activeProfiles=" + activeProfiles + ", allowedProfiles=" + allowedProfiles
             );
         }
-        log.warn("traceId=SYSTEM bizOrderNo=SYSTEM qw payProtocolNo override enabled; profile={} allowedProfiles={}",
+        log.warn("traceId=SYSTEM bizOrderNo=SYSTEM errorNo=QW_PAY_PROTOCOL_OVERRIDE_ENABLED "
+                        + "errorMsg=QW payProtocolNo override is enabled; profile={} allowedProfiles={} "
+                        + "qw payProtocolNo override enabled",
                 activeProfiles.stream().filter(allowedProfiles::contains).findFirst().orElse("unknown"),
                 allowedProfiles);
     }

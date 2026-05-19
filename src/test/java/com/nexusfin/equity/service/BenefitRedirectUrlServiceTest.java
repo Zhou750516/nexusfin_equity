@@ -2,6 +2,7 @@ package com.nexusfin.equity.service;
 
 import com.nexusfin.equity.dto.request.BenefitRedirectUrlRequest;
 import com.nexusfin.equity.exception.BizException;
+import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.service.impl.BenefitRedirectUrlServiceImpl;
 import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
 import com.nexusfin.equity.thirdparty.qw.QwExerciseUrlRequest;
@@ -11,6 +12,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -18,7 +21,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class BenefitRedirectUrlServiceTest {
 
     @Mock
@@ -69,7 +72,7 @@ class BenefitRedirectUrlServiceTest {
     }
 
     @Test
-    void shouldTranslateQwFailureToControlledBusinessError() {
+    void shouldTranslateQwFailureToControlledBusinessError(CapturedOutput output) {
         BenefitRedirectUrlServiceImpl service = new BenefitRedirectUrlServiceImpl(jointLoginService, qwBenefitClient);
         when(jointLoginService.login(any())).thenReturn(new JointLoginService.JointLoginResult(
                 "jwt-joint-token",
@@ -86,5 +89,31 @@ class BenefitRedirectUrlServiceTest {
                 .isInstanceOf(BizException.class)
                 .extracting(ex -> ((BizException) ex).getErrorNo())
                 .isEqualTo("REDRECT_BENEFIT_URL_UPSTREAM_FAILED");
+        assertThat(output).contains("benefit redirect qw exercise redirect url failed");
+        assertThat(output).contains("errorNo=QW_UPSTREAM_REJECTED");
+        assertThat(output).contains("errorMsg=member card inactive");
+    }
+
+    @Test
+    void shouldLogErrorFieldsWhenQwExerciseRedirectTimesOut(CapturedOutput output) {
+        BenefitRedirectUrlServiceImpl service = new BenefitRedirectUrlServiceImpl(jointLoginService, qwBenefitClient);
+        when(jointLoginService.login(any())).thenReturn(new JointLoginService.JointLoginResult(
+                "jwt-joint-token",
+                "exercise",
+                "joint-dispatch",
+                "BEN-REDIRECT-004",
+                "xh-cid-redirect-004",
+                true
+        ));
+        when(qwBenefitClient.getExerciseUrl(any()))
+                .thenThrow(new UpstreamTimeoutException("QW gateway timeout"));
+
+        assertThatThrownBy(() -> service.generate(new BenefitRedirectUrlRequest("joint-token-redirect-004", "BEN-REDIRECT-004")))
+                .isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo("REDRECT_BENEFIT_URL_UPSTREAM_TIMEOUT");
+        assertThat(output).contains("benefit redirect qw exercise redirect url timed out");
+        assertThat(output).contains("errorNo=REDRECT_BENEFIT_URL_UPSTREAM_TIMEOUT");
+        assertThat(output).contains("errorMsg=QW gateway timeout");
     }
 }

@@ -1,6 +1,8 @@
 package com.nexusfin.equity.schedule;
 
 import com.nexusfin.equity.service.AsyncCompensationSchedulerCoordinator;
+import com.nexusfin.equity.util.ErrorLogFields;
+import com.nexusfin.equity.util.TraceIdUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -28,7 +30,12 @@ public class AsyncCompensationSupervisorScheduler {
         try {
             coordinator.runSupervisorTick();
         } catch (RuntimeException exception) {
-            log.error("async compensation supervisor scheduler tick failed", exception);
+            log.error("traceId={} bizOrderNo=SYSTEM errorNo={} errorMsg={} "
+                            + "async compensation supervisor scheduler tick failed",
+                    TraceIdUtil.getTraceId(),
+                    ErrorLogFields.errorNo(exception, null),
+                    ErrorLogFields.errorMsg(exception, null),
+                    exception);
         }
     }
 }

@@ -80,8 +80,38 @@ class TechPlatformUserClientImplTest {
         assertThatThrownBy(() -> client.getCurrentUser("tech-token"))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("UPSTREAM_AUTH_FAILED");
-        assertThat(output).contains("techPlatformPath=/api/users/me attempt=1/2 upstream verification failed");
-        assertThat(output).contains("techPlatformPath=/api/users/me attempt=2/2 upstream verification failed");
+        assertThat(output).contains("techPlatformPath=/api/users/me attempt=1/2");
+        assertThat(output).contains("techPlatformPath=/api/users/me attempt=2/2");
+        assertThat(output).contains("upstream verification failed");
+        assertThat(output).contains("errorNo=UPSTREAM_AUTH_FAILED");
+        assertThat(output).contains("errorMsg=");
+        server.verify();
+    }
+
+    @Test
+    void shouldLogErrorFieldsWhenTechPlatformResponseIsRejected(CapturedOutput output) {
+        AuthProperties authProperties = authProperties();
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+
+        server.expect(requestTo("https://tech-platform.test/api/users/me"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {
+                          "data": {
+                            "phone": "13800138000"
+                          }
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        TechPlatformUserClientImpl client = new TechPlatformUserClientImpl(authProperties, objectMapper, restClientBuilder.build());
+
+        assertThatThrownBy(() -> client.getCurrentUser("tech-token"))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("UPSTREAM_AUTH_INVALID");
+        assertThat(output).contains("upstream verification rejected");
+        assertThat(output).contains("errorNo=UPSTREAM_AUTH_INVALID");
+        assertThat(output).contains("errorMsg=Tech platform userId is missing");
         server.verify();
     }
 

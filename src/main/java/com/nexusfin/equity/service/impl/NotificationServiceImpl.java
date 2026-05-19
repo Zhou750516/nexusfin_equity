@@ -22,6 +22,7 @@ import com.nexusfin.equity.service.IdempotencyService;
 import com.nexusfin.equity.service.NotificationService;
 import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
 import com.nexusfin.equity.thirdparty.qw.QwDeductionNotifyRequest;
+import com.nexusfin.equity.util.ErrorLogFields;
 import com.nexusfin.equity.util.OrderStateMachine;
 import com.nexusfin.equity.util.RequestIdUtil;
 import com.nexusfin.equity.util.TraceIdUtil;
@@ -79,8 +80,12 @@ public class NotificationServiceImpl implements NotificationService {
         );
         BenefitOrder order = findBenefitOrder(request.resolvedBenefitOrderNo(), request.loanOrderNo());
         if (order == null) {
-            log.warn("traceId={} bizOrderNo={} requestId={} loan result callback order missing",
-                    TraceIdUtil.getTraceId(), bizOrderNo, request.requestId());
+            log.warn("traceId={} bizOrderNo={} requestId={} errorNo={} errorMsg={} loan result callback order missing",
+                    TraceIdUtil.getTraceId(),
+                    bizOrderNo,
+                    request.requestId(),
+                    "BENEFIT_ORDER_NOT_FOUND",
+                    "Benefit order not found for loan result callback");
             markNotification(notificationLog, NotificationProcessStatusEnum.FAILED);
             return;
         }
@@ -115,8 +120,12 @@ public class NotificationServiceImpl implements NotificationService {
             log.info("traceId={} bizOrderNo={} requestId={} loan result callback processed localStatus={}",
                     TraceIdUtil.getTraceId(), order.getBenefitOrderNo(), request.requestId(), order.getGrantStatus());
         } catch (RuntimeException ex) {
-            log.error("traceId={} bizOrderNo={} requestId={} loan result callback failed errorMsg={}",
-                    TraceIdUtil.getTraceId(), bizOrderNo, request.requestId(), ex.getMessage());
+            log.error("traceId={} bizOrderNo={} requestId={} errorNo={} errorMsg={} loan result callback failed",
+                    TraceIdUtil.getTraceId(),
+                    bizOrderNo,
+                    request.requestId(),
+                    ErrorLogFields.errorNo(ex, null),
+                    ErrorLogFields.errorMsg(ex, null));
             markNotification(notificationLog, NotificationProcessStatusEnum.FAILED);
             throw ex;
         }
@@ -141,8 +150,12 @@ public class NotificationServiceImpl implements NotificationService {
         );
         BenefitOrder order = findBenefitOrder(request.resolvedBenefitOrderNo(), request.loanOrderNo());
         if (order == null) {
-            log.warn("traceId={} bizOrderNo={} requestId={} repayment result callback order missing",
-                    TraceIdUtil.getTraceId(), bizOrderNo, request.requestId());
+            log.warn("traceId={} bizOrderNo={} requestId={} errorNo={} errorMsg={} repayment result callback order missing",
+                    TraceIdUtil.getTraceId(),
+                    bizOrderNo,
+                    request.requestId(),
+                    "BENEFIT_ORDER_NOT_FOUND",
+                    "Benefit order not found for repayment result callback");
             markNotification(notificationLog, NotificationProcessStatusEnum.FAILED);
             return;
         }

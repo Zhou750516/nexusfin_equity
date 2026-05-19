@@ -77,8 +77,12 @@ public class AsyncCompensationSupervisorServiceImpl implements AsyncCompensation
             update.setNextRetryTs(now.plusSeconds(properties.getRetryInitialDelaySeconds()));
             update.setUpdatedTs(now);
             taskRepository.updateById(update);
-            log.warn("traceId={} bizOrderNo={} recycle expired async compensation lease taskId={}",
-                    TraceIdUtil.getTraceId(), task.getBizOrderNo(), task.getTaskId());
+            log.warn("traceId={} bizOrderNo={} errorNo={} errorMsg={} recycle expired async compensation lease taskId={}",
+                    TraceIdUtil.getTraceId(),
+                    task.getBizOrderNo(),
+                    "ASYNC_COMPENSATION_LEASE_EXPIRED",
+                    "Async compensation lease expired and was recycled",
+                    task.getTaskId());
         }
         return expiredTasks.size();
     }

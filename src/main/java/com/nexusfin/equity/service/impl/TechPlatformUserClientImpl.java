@@ -6,6 +6,7 @@ import com.nexusfin.equity.config.AuthProperties;
 import com.nexusfin.equity.dto.response.TechPlatformUserProfileResponse;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.service.TechPlatformUserClient;
+import com.nexusfin.equity.util.ErrorLogFields;
 import com.nexusfin.equity.util.TraceIdUtil;
 import java.net.URI;
 import org.slf4j.Logger;
@@ -60,19 +61,22 @@ public class TechPlatformUserClientImpl implements TechPlatformUserClient {
                         TraceIdUtil.getTraceId(), path, attempt, maxAttempts, profile.userId());
                 return profile;
             } catch (RestClientException exception) {
-                log.warn("traceId={} techPlatformPath={} attempt={}/{} upstream verification failed cause={}:{}",
+                log.warn("traceId={} bizOrderNo=SYSTEM techPlatformPath={} attempt={}/{} errorNo={} errorMsg={} upstream verification failed",
                         TraceIdUtil.getTraceId(),
                         path,
                         attempt,
                         maxAttempts,
-                        exception.getClass().getSimpleName(),
-                        exception.getMessage());
+                        ErrorLogFields.errorNo(exception, "UPSTREAM_AUTH_FAILED"),
+                        ErrorLogFields.errorMsg(exception, "Failed to verify tech platform token"));
                 if (attempt == maxAttempts) {
                     throw new BizException("UPSTREAM_AUTH_FAILED", "Failed to verify tech platform token");
                 }
             } catch (BizException exception) {
-                log.warn("traceId={} techPlatformPath={} upstream verification rejected message={}",
-                        TraceIdUtil.getTraceId(), path, exception.getMessage());
+                log.warn("traceId={} bizOrderNo=SYSTEM techPlatformPath={} errorNo={} errorMsg={} upstream verification rejected",
+                        TraceIdUtil.getTraceId(),
+                        path,
+                        ErrorLogFields.errorNo(exception, null),
+                        ErrorLogFields.errorMsg(exception, null));
                 throw exception;
             }
         }

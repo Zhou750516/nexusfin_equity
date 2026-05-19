@@ -22,6 +22,7 @@ import com.nexusfin.equity.thirdparty.qw.QwSignConfirmRequest;
 import com.nexusfin.equity.thirdparty.qw.QwSignConfirmResponse;
 import com.nexusfin.equity.thirdparty.qw.QwSignStatusRequest;
 import com.nexusfin.equity.thirdparty.qw.QwSignStatusResponse;
+import com.nexusfin.equity.util.ErrorLogFields;
 import com.nexusfin.equity.util.RequestIdUtil;
 import com.nexusfin.equity.util.SensitiveDataCipher;
 import com.nexusfin.equity.util.TraceIdUtil;
@@ -238,23 +239,9 @@ public class BankCardSignServiceImpl implements BankCardSignService {
                 requestId,
                 memberId,
                 elapsedMs(startNanos),
-                errorNo(exception),
-                errorMsg(exception),
+                ErrorLogFields.errorNo(exception, QW_SIGN_UPSTREAM_FAILED),
+                ErrorLogFields.errorMsg(exception, "QW sign upstream failed"),
                 message);
-    }
-
-    private String errorNo(RuntimeException exception) {
-        if (exception instanceof BizException bizException) {
-            return bizException.getErrorNo();
-        }
-        return QW_SIGN_UPSTREAM_FAILED;
-    }
-
-    private String errorMsg(RuntimeException exception) {
-        if (exception instanceof BizException bizException) {
-            return bizException.getErrorMsg();
-        }
-        return firstNonBlank(exception.getMessage(), "QW sign upstream failed");
     }
 
     private boolean isQwUserUnsigned(BizException exception) {

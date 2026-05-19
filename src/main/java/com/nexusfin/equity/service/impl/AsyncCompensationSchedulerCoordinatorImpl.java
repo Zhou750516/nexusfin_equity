@@ -4,6 +4,8 @@ import com.nexusfin.equity.config.AsyncCompensationProperties;
 import com.nexusfin.equity.service.AsyncCompensationSchedulerCoordinator;
 import com.nexusfin.equity.service.AsyncCompensationSupervisorService;
 import com.nexusfin.equity.service.AsyncCompensationWorkerService;
+import com.nexusfin.equity.util.ErrorLogFields;
+import com.nexusfin.equity.util.TraceIdUtil;
 import jakarta.annotation.PostConstruct;
 import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
@@ -116,7 +118,12 @@ public class AsyncCompensationSchedulerCoordinatorImpl implements AsyncCompensat
         try {
             return InetAddress.getLocalHost().getHostName();
         } catch (UnknownHostException exception) {
-            log.warn("resolve async compensation worker host name failed, fallback to unknown-host", exception);
+            log.warn("traceId={} bizOrderNo=SYSTEM errorNo={} errorMsg={} "
+                            + "resolve async compensation worker host name failed, fallback to unknown-host",
+                    TraceIdUtil.getTraceId(),
+                    ErrorLogFields.errorNo(exception, "ASYNC_COMPENSATION_HOSTNAME_RESOLVE_FAILED"),
+                    ErrorLogFields.errorMsg(exception, "Failed to resolve async compensation worker host name"),
+                    exception);
             return "unknown-host";
         }
     }

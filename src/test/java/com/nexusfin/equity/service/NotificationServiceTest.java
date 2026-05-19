@@ -22,14 +22,17 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class NotificationServiceTest {
 
     @Mock
@@ -157,6 +160,30 @@ class NotificationServiceTest {
         verify(notificationReceiveLogRepository).updateById(captor.capture());
         assertThat(captor.getValue().getProcessStatus()).isEqualTo("FAILED");
         verify(idempotencyService, never()).markProcessed(any(), any(), any(), any());
+    }
+
+    @Test
+    void shouldLogErrorFieldsWhenLoanCallbackFails(CapturedOutput output) {
+        BenefitOrder order = new BenefitOrder();
+        order.setBenefitOrderNo("ord-log");
+        order.setOrderStatus("FIRST_DEDUCT_SUCCESS");
+        order.setExternalUserId("user-log");
+        order.setQwUserSignIdSnapshot(99887764L);
+        when(idempotencyService.isProcessed("req-log")).thenReturn(false);
+        when(benefitOrderRepository.selectById("ord-log")).thenReturn(order);
+        when(notificationReceiveLogRepository.selectOne(any())).thenReturn(null);
+        when(paymentRecordRepository.selectOne(any()))
+                .thenThrow(new IllegalStateException("first deduct record missing"));
+
+        assertThatThrownBy(() -> notificationService.handleGrant(new LoanResultCallbackRequest(
+                "req-log", "user-log", null, "ord-log", "ord-log", "loan-log",
+                7001, null, 680000L, 710000L, 1711197120L, null, null, null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("first deduct record missing");
+
+        assertThat(output).contains("loan result callback failed");
+        assertThat(output).contains("errorNo=IllegalStateException");
+        assertThat(output).contains("errorMsg=first deduct record missing");
     }
 
     @Test

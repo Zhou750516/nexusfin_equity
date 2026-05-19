@@ -8,6 +8,7 @@ import com.nexusfin.equity.service.JointLoginService;
 import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
 import com.nexusfin.equity.thirdparty.qw.QwExerciseUrlRequest;
 import com.nexusfin.equity.thirdparty.qw.QwExerciseUrlResponse;
+import com.nexusfin.equity.util.ErrorLogFields;
 import com.nexusfin.equity.util.TraceIdUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,10 +66,11 @@ public class BenefitRedirectUrlServiceImpl implements BenefitRedirectUrlService 
                     request.benefitOrderNo());
             return new BenefitRedirectUrlResult(response.redirectUrl());
         } catch (UpstreamTimeoutException exception) {
-            log.error("traceId={} bizOrderNo={} benefit redirect qw exercise redirect url timed out errorMsg={}",
+            log.error("traceId={} bizOrderNo={} benefit redirect qw exercise redirect url timed out errorNo={} errorMsg={}",
                     TraceIdUtil.getTraceId(),
                     request.benefitOrderNo(),
-                    exception.getMessage());
+                    "REDRECT_BENEFIT_URL_UPSTREAM_TIMEOUT",
+                    ErrorLogFields.errorMsg(exception, "Benefit redirect url temporarily unavailable"));
             throw new BizException("REDRECT_BENEFIT_URL_UPSTREAM_TIMEOUT", "Benefit redirect url temporarily unavailable");
         } catch (BizException exception) {
             log.warn("traceId={} bizOrderNo={} benefit redirect qw exercise redirect url failed errorNo={} errorMsg={}",

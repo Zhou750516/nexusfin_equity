@@ -10,6 +10,7 @@ import com.nexusfin.equity.repository.AsyncCompensationAttemptRepository;
 import com.nexusfin.equity.repository.AsyncCompensationTaskRepository;
 import com.nexusfin.equity.service.AsyncCompensationExecutor;
 import com.nexusfin.equity.service.AsyncCompensationWorkerService;
+import com.nexusfin.equity.util.ErrorLogFields;
 import com.nexusfin.equity.util.RequestIdUtil;
 import com.nexusfin.equity.util.TraceIdUtil;
 import java.time.LocalDateTime;
@@ -97,7 +98,11 @@ public class AsyncCompensationWorkerServiceImpl implements AsyncCompensationWork
             boolean dead = nextRetryCount >= task.getMaxRetryCount();
             taskRepository.updateById(buildFailureUpdate(task.getTaskId(), nextRetryCount, dead, finishedTs, exception));
             attemptRepository.insert(buildAttempt(task, workerId, attemptNo, null,
-                    "FAILED", resolveErrorNo(exception), resolveErrorMsg(exception), startedTs, finishedTs));
+                    "FAILED",
+                    ErrorLogFields.errorNo(exception, null),
+                    ErrorLogFields.errorMsg(exception, null),
+                    startedTs,
+                    finishedTs));
             logFailure(task, workerId, dead, exception);
             return WorkerProcessResult.handled(task.getTaskId());
         }
@@ -147,8 +152,8 @@ public class AsyncCompensationWorkerServiceImpl implements AsyncCompensationWork
         update.setNextRetryTs(dead ? null : now.plusSeconds(properties.nextRetryDelaySeconds(retryCount)));
         update.setLeaseOwner(null);
         update.setLeaseExpireTs(null);
-        update.setLastErrorCode(resolveErrorNo(exception));
-        update.setLastErrorMessage(resolveErrorMsg(exception));
+        update.setLastErrorCode(ErrorLogFields.errorNo(exception, null));
+        update.setLastErrorMessage(ErrorLogFields.errorMsg(exception, null));
         update.setUpdatedTs(now);
         return update;
     }
@@ -192,8 +197,8 @@ public class AsyncCompensationWorkerServiceImpl implements AsyncCompensationWork
                     task.getPartitionNo(),
                     workerId,
                     task.getRequestPath(),
-                    resolveErrorNo(exception),
-                    resolveErrorMsg(exception),
+                    ErrorLogFields.errorNo(exception, null),
+                    ErrorLogFields.errorMsg(exception, null),
                     true);
             return;
         }
@@ -206,23 +211,8 @@ public class AsyncCompensationWorkerServiceImpl implements AsyncCompensationWork
                 task.getPartitionNo(),
                 workerId,
                 task.getRequestPath(),
-                resolveErrorNo(exception),
-                resolveErrorMsg(exception),
+                ErrorLogFields.errorNo(exception, null),
+                ErrorLogFields.errorMsg(exception, null),
                 false);
-    }
-
-    private String resolveErrorNo(RuntimeException exception) {
-        if (exception instanceof BizException bizException) {
-            return bizException.getErrorNo();
-        }
-        return exception.getClass().getSimpleName();
-    }
-
-    private String resolveErrorMsg(RuntimeException exception) {
-        if (exception instanceof BizException bizException) {
-            return bizException.getErrorMsg();
-        }
-        String message = exception.getMessage();
-        return message == null || message.isBlank() ? exception.getClass().getSimpleName() : message;
     }
 }

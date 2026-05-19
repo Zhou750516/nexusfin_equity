@@ -1,6 +1,8 @@
 package com.nexusfin.equity.schedule;
 
 import com.nexusfin.equity.service.AsyncCompensationSchedulerCoordinator;
+import com.nexusfin.equity.util.ErrorLogFields;
+import com.nexusfin.equity.util.TraceIdUtil;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,8 +36,13 @@ public class AsyncCompensationWorkerScheduler {
             try {
                 coordinator.runWorkerTick(partitionNo);
             } catch (RuntimeException exception) {
-                log.error("async compensation worker scheduler tick failed partitionNo={}",
-                        partitionNo, exception);
+                log.error("traceId={} bizOrderNo=SYSTEM partitionNo={} errorNo={} errorMsg={} "
+                                + "async compensation worker scheduler tick failed",
+                        TraceIdUtil.getTraceId(),
+                        partitionNo,
+                        ErrorLogFields.errorNo(exception, null),
+                        ErrorLogFields.errorMsg(exception, null),
+                        exception);
             }
         }
     }

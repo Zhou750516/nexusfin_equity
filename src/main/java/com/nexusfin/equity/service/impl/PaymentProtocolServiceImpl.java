@@ -89,9 +89,11 @@ public class PaymentProtocolServiceImpl implements PaymentProtocolService {
                     SOURCE_QW_SIGN
             );
         }
-        log.warn("traceId={} bizOrderNo={} active qw sign reference missing",
+        log.warn("traceId={} bizOrderNo={} errorNo={} errorMsg={} active qw sign reference missing",
                 TraceIdUtil.getTraceId(),
-                order.getBenefitOrderNo());
+                order.getBenefitOrderNo(),
+                "QW_SIGN_REQUIRED",
+                "QW sign confirmation required before benefit order");
         throw new BizException("QW_SIGN_REQUIRED", "QW sign confirmation required before benefit order");
     }
 }

@@ -7,7 +7,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
@@ -16,7 +19,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class AsyncCompensationWorkerSchedulerTest {
 
     @Mock
@@ -80,7 +83,7 @@ class AsyncCompensationWorkerSchedulerTest {
     }
 
     @Test
-    void shouldContinueWhenSinglePartitionFails() {
+    void shouldContinueWhenSinglePartitionFails(CapturedOutput output) {
         when(coordinator.isSchedulingEnabled()).thenReturn(true);
         when(coordinator.isWorkerEnabled()).thenReturn(true);
         when(coordinator.getOwnedPartitions()).thenReturn(List.of(0, 1, 2));
@@ -103,5 +106,8 @@ class AsyncCompensationWorkerSchedulerTest {
         inOrder.verify(coordinator).runWorkerTick(1);
         inOrder.verify(coordinator).runWorkerTick(2);
         verifyNoMoreInteractions(coordinator);
+        assertThat(output).contains("async compensation worker scheduler tick failed");
+        assertThat(output).contains("errorNo=IllegalStateException");
+        assertThat(output).contains("errorMsg=partition-1 failed");
     }
 }
