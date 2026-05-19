@@ -171,6 +171,30 @@ describe("benefits card page logic", () => {
     expect(activate).toHaveBeenCalledTimes(1);
   });
 
+  it("treats activation success as complete without requiring a benefitUrl", async () => {
+    const confirmSign = vi.fn().mockResolvedValue({
+      userSignId: 88001234,
+      agreementNo: "AGRM-001",
+      signed: true,
+      status: "SIGNED",
+    });
+    const activate = vi.fn().mockResolvedValue({
+      activationId: "ord-001",
+      status: "activated",
+      message: "惠选卡开通成功",
+    });
+
+    const result = await confirmBenefitsSignAndActivate({
+      userSignId: 88001234,
+      verificationCode: "123456",
+      confirmSign,
+      activate,
+    });
+
+    expect(result.type).toBe("activated");
+    expect(activate).toHaveBeenCalledTimes(1);
+  });
+
   it("does not activate when sign confirm fails", async () => {
     const confirmSign = vi.fn().mockRejectedValue(new Error("验证码错误"));
     const activate = vi.fn();

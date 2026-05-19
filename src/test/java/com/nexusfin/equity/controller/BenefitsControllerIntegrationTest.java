@@ -42,6 +42,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -165,8 +166,6 @@ class BenefitsControllerIntegrationTest {
                 .thenReturn(new UserCardListResponse(List.of(
                         new UserCardSummary("card-001", "招商银行", "8648", 1)
                 )));
-        when(benefitRedirectUrlService.generate(any()))
-                .thenReturn(new BenefitRedirectUrlService.BenefitRedirectUrlResult("https://redirect.test/exercise"));
         when(xiaohuaGatewayService.syncBenefitOrder(any(), any(), any()))
                 .thenReturn(new BenefitOrderSyncResponse("SUCCESS", "ok"));
 
@@ -187,7 +186,8 @@ class BenefitsControllerIntegrationTest {
         assertThat(benefitOrderRepository.selectCount(Wrappers.emptyWrapper())).isEqualTo(1);
         ArgumentCaptor<BenefitOrderSyncRequest> syncCaptor = ArgumentCaptor.forClass(BenefitOrderSyncRequest.class);
         verify(xiaohuaGatewayService).syncBenefitOrder(any(), any(), syncCaptor.capture());
-        assertThat(syncCaptor.getValue().benefitUrl()).isEqualTo("https://redirect.test/exercise");
+        assertThat(syncCaptor.getValue().benefitUrl()).isNull();
+        verify(benefitRedirectUrlService, never()).generate(any());
     }
 
     private BenefitProduct createProduct() {

@@ -2,7 +2,6 @@ package com.nexusfin.equity.service.impl;
 
 import com.nexusfin.equity.config.H5BenefitsProperties;
 import com.nexusfin.equity.config.H5LoanProperties;
-import com.nexusfin.equity.dto.request.BenefitRedirectUrlRequest;
 import com.nexusfin.equity.dto.request.BenefitsActivateRequest;
 import com.nexusfin.equity.dto.request.CreateBenefitOrderRequest;
 import com.nexusfin.equity.dto.response.BenefitsActivateResponse;
@@ -158,17 +157,11 @@ public class BenefitsServiceImpl implements BenefitsService {
                 activate.defaultLoanAmount(),
                 Boolean.TRUE
         ));
-        String benefitUrl = benefitRedirectUrlService.generate(new BenefitRedirectUrlRequest(
-                request.token(),
-                response.benefitOrderNo()
-        )).redirectUrl();
-        // Current benefit sync wiring intentionally reuses the runtime exercise redirect URL source.
-        // This satisfies today's outbound benefiturl contract without claiming a future generic redirect model.
-        log.info("traceId={} bizOrderNo={} benefits sync benefiturl generated from current qw exercise runtime source applicationId={} benefitUrlPresent={}",
+        log.info("traceId={} bizOrderNo={} applicationId={} reason=benefits_activate_skip_redirect_url "
+                        + "benefits activate skips redirect url before yunka sync",
                 TraceIdUtil.getTraceId(),
                 response.benefitOrderNo(),
-                request.applicationId(),
-                !benefitUrl.isBlank());
+                request.applicationId());
         var syncResponse = xiaohuaGatewayService.syncBenefitOrder(
                 "BENEFITS-SYNC-" + request.applicationId(),
                 response.benefitOrderNo(),
@@ -177,7 +170,7 @@ public class BenefitsServiceImpl implements BenefitsService {
                         request.applicationId(),
                         "ACTIVE",
                         activate.defaultLoanAmount(),
-                        benefitUrl
+                        null
                 )
         );
         if (syncResponse != null && !isBenefitSyncAccepted(syncResponse.status())) {

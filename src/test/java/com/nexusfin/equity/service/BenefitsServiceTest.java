@@ -171,7 +171,7 @@ class BenefitsServiceTest {
     }
 
     @Test
-    void shouldSyncBenefitOrderAfterActivation() {
+    void shouldSyncBenefitOrderAfterActivationWithoutRedirectUrl() {
         when(benefitProductRepository.selectById("HUXUAN_CARD")).thenReturn(activeProduct());
         when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(new ProtocolQueryResponse(List.of(
@@ -183,8 +183,6 @@ class BenefitsServiceTest {
                 )));
         when(benefitOrderService.createOrder(eq("mem-test-001"), any(CreateBenefitOrderRequest.class)))
                 .thenReturn(new CreateBenefitOrderResponse("ord-001", "FIRST_DEDUCT_PENDING", "/h5/equity/orders/ord-001"));
-        when(benefitRedirectUrlService.generate(any()))
-                .thenReturn(new BenefitRedirectUrlService.BenefitRedirectUrlResult("https://redirect.test/exercise"));
         when(xiaohuaGatewayService.syncBenefitOrder(any(), eq("ord-001"), any()))
                 .thenReturn(new BenefitOrderSyncResponse("SUCCESS", "ok"));
 
@@ -202,11 +200,12 @@ class BenefitsServiceTest {
         verify(xiaohuaGatewayService).syncBenefitOrder(any(), eq("ord-001"), syncCaptor.capture());
         assertThat(syncCaptor.getValue().userId()).isEqualTo("mem-test-001");
         assertThat(syncCaptor.getValue().userId()).isNotEqualTo("cid-test-001");
-        assertThat(syncCaptor.getValue().benefitUrl()).isEqualTo("https://redirect.test/exercise");
+        assertThat(syncCaptor.getValue().benefitUrl()).isNull();
+        verify(benefitRedirectUrlService, never()).generate(any());
     }
 
     @Test
-    void shouldFailActivationWhenBenefitRedirectUrlGenerationFails() {
+    void shouldNotCallBenefitRedirectUrlGenerationDuringActivation() {
         when(benefitProductRepository.selectById("HUXUAN_CARD")).thenReturn(activeProduct());
         when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(new ProtocolQueryResponse(List.of(
@@ -218,18 +217,39 @@ class BenefitsServiceTest {
                 )));
         when(benefitOrderService.createOrder(eq("mem-test-001"), any(CreateBenefitOrderRequest.class)))
                 .thenReturn(new CreateBenefitOrderResponse("ord-001", "FIRST_DEDUCT_PENDING", "/h5/equity/orders/ord-001"));
-        when(benefitRedirectUrlService.generate(any()))
-                .thenThrow(new BizException("REDRECT_BENEFIT_URL_UPSTREAM_FAILED", "Benefit redirect url is unavailable"));
+        when(xiaohuaGatewayService.syncBenefitOrder(any(), eq("ord-001"), any()))
+                .thenReturn(new BenefitOrderSyncResponse("SUCCESS", "ok"));
+
+        BenefitsActivateResponse response = benefitsService.activate(
+                "mem-test-001",
+                "cid-test-001",
+                new BenefitsActivateRequest("APP-001", "huixuan_card", "joint-token-benefits-002")
+        );
+
+        assertThat(response.status()).isEqualTo("activated");
+        verify(benefitRedirectUrlService, never()).generate(any());
+        verify(xiaohuaGatewayService).syncBenefitOrder(any(), eq("ord-001"), any());
+    }
+
+    @Test
+    void shouldNotSyncYunkaWhenQwSignIsRequiredBeforeCreateOrder() {
+        when(benefitProductRepository.selectById("HUXUAN_CARD")).thenReturn(activeProduct());
+        when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(dynamicProtocolResponse());
+        when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(userCardResponse());
+        when(benefitOrderService.createOrder(eq("mem-test-001"), any(CreateBenefitOrderRequest.class)))
+                .thenThrow(new BizException("QW_SIGN_REQUIRED", "QW sign confirmation required before benefit order"));
 
         assertThatThrownBy(() -> benefitsService.activate(
                 "mem-test-001",
                 "cid-test-001",
-                new BenefitsActivateRequest("APP-001", "huixuan_card", "joint-token-benefits-002")
+                new BenefitsActivateRequest("APP-001", "huixuan_card", "joint-token-benefits-sign-required")
         )).isInstanceOf(BizException.class)
                 .extracting(ex -> ((BizException) ex).getErrorNo())
-                .isEqualTo("REDRECT_BENEFIT_URL_UPSTREAM_FAILED");
+                .isEqualTo("QW_SIGN_REQUIRED");
 
-        verify(benefitRedirectUrlService).generate(any());
+        verify(benefitRedirectUrlService, never()).generate(any());
         verify(xiaohuaGatewayService, never()).syncBenefitOrder(any(), any(), any());
     }
 

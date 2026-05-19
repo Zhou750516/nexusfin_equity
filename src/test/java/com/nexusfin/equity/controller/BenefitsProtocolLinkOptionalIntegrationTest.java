@@ -16,6 +16,7 @@ import com.nexusfin.equity.repository.SignTaskRepository;
 import com.nexusfin.equity.service.AsyncCompensationEnqueueService;
 import com.nexusfin.equity.service.BenefitRedirectUrlService;
 import com.nexusfin.equity.service.XiaohuaGatewayService;
+import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncRequest;
 import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncResponse;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryResponse;
 import com.nexusfin.equity.thirdparty.yunka.UserCardListResponse;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -38,6 +40,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -139,8 +143,6 @@ class BenefitsProtocolLinkOptionalIntegrationTest {
                 .thenReturn(new UserCardListResponse(List.of(
                         new UserCardSummary("card-001", "招商银行", "8648", 1)
                 )));
-        when(benefitRedirectUrlService.generate(any()))
-                .thenReturn(new BenefitRedirectUrlService.BenefitRedirectUrlResult("https://redirect.test/exercise"));
         when(xiaohuaGatewayService.syncBenefitOrder(any(), any(), any()))
                 .thenReturn(new BenefitOrderSyncResponse("SUCCESS", "ok"));
 
@@ -163,6 +165,10 @@ class BenefitsProtocolLinkOptionalIntegrationTest {
         assertThat(order.getPayProtocolNoSnapshot()).isEqualTo("QW-" + memberInfo.getMemberId());
         assertThat(order.getPayProtocolSource()).isEqualTo("QW_SIGN");
         assertThat(order.getQwUserSignIdSnapshot()).isEqualTo(1234L);
+        ArgumentCaptor<BenefitOrderSyncRequest> syncCaptor = ArgumentCaptor.forClass(BenefitOrderSyncRequest.class);
+        verify(xiaohuaGatewayService).syncBenefitOrder(any(), any(), syncCaptor.capture());
+        assertThat(syncCaptor.getValue().benefitUrl()).isNull();
+        verify(benefitRedirectUrlService, never()).generate(any());
     }
 
     @Test
