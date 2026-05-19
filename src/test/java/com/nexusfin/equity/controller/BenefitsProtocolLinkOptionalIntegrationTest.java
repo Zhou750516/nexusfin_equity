@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.nexusfin.equity.entity.BenefitProduct;
 import com.nexusfin.equity.entity.MemberChannel;
 import com.nexusfin.equity.entity.MemberInfo;
-import com.nexusfin.equity.entity.MemberPaymentProtocol;
 import com.nexusfin.equity.enums.MemberStatusEnum;
 import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.repository.BenefitProductRepository;
@@ -103,10 +102,9 @@ class BenefitsProtocolLinkOptionalIntegrationTest {
     }
 
     @Test
-    void shouldActivateWhenProtocolLinksAreMissingButQwSignIsActive() throws Exception {
+    void shouldActivateWhenProtocolLinksAreMissingWithoutQwSign() throws Exception {
         MemberInfo memberInfo = createMember("mem-benefits-link-optional", "user-benefits-link-optional");
         createProduct();
-        insertQwSign(memberInfo);
         when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(new ProtocolQueryResponse(List.of()));
         when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
@@ -136,31 +134,40 @@ class BenefitsProtocolLinkOptionalIntegrationTest {
     }
 
     @Test
-    void shouldRejectActivationWhenProtocolLinksAreOptionalButQwSignIsMissing() throws Exception {
-        MemberInfo memberInfo = createMember("mem-benefits-no-qw-sign", "user-benefits-no-qw-sign");
+    void shouldActivateWhenProtocolLinksAreOptionalAndQwSignExistsWithoutForwardingSignSnapshot() throws Exception {
+        MemberInfo memberInfo = createMember("mem-benefits-old-qw-sign", "user-benefits-old-qw-sign");
         createProduct();
+        insertLegacyQwSign(memberInfo);
         when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(new ProtocolQueryResponse(List.of()));
         when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(new UserCardListResponse(List.of(
                         new UserCardSummary("card-001", "招商银行", "8648", 1)
                 )));
+        when(benefitRedirectUrlService.generate(any()))
+                .thenReturn(new BenefitRedirectUrlService.BenefitRedirectUrlResult("https://redirect.test/exercise"));
+        when(xiaohuaGatewayService.syncBenefitOrder(any(), any(), any()))
+                .thenReturn(new BenefitOrderSyncResponse("SUCCESS", "ok"));
 
         mockMvc.perform(post("/api/benefits/activate")
                         .cookie(authCookie(memberInfo))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "applicationId": "APP-benefits-no-qw-sign",
+                                  "applicationId": "APP-benefits-old-qw-sign",
                                   "cardType": "huixuan_card",
-                                  "token": "joint-token-benefits-no-qw-sign"
+                                  "token": "joint-token-benefits-old-qw-sign"
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(-1))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("BENEFITS_PROTOCOL_NOT_READY")));
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.status").value("activated"));
 
-        assertThat(benefitOrderRepository.selectCount(Wrappers.emptyWrapper())).isZero();
+        assertThat(benefitOrderRepository.selectCount(Wrappers.emptyWrapper())).isEqualTo(1);
+        var order = benefitOrderRepository.selectOne(Wrappers.emptyWrapper());
+        assertThat(order.getPayProtocolNoSnapshot()).isNull();
+        assertThat(order.getPayProtocolSource()).isNull();
+        assertThat(order.getQwUserSignIdSnapshot()).isNull();
     }
 
     private BenefitProduct createProduct() {
@@ -201,8 +208,8 @@ class BenefitsProtocolLinkOptionalIntegrationTest {
         return memberInfo;
     }
 
-    private void insertQwSign(MemberInfo memberInfo) {
-        MemberPaymentProtocol protocol = new MemberPaymentProtocol();
+    private void insertLegacyQwSign(MemberInfo memberInfo) {
+        com.nexusfin.equity.entity.MemberPaymentProtocol protocol = new com.nexusfin.equity.entity.MemberPaymentProtocol();
         protocol.setMemberId(memberInfo.getMemberId());
         protocol.setExternalUserId(memberInfo.getExternalUserId());
         protocol.setProviderCode("QW_SIGN");

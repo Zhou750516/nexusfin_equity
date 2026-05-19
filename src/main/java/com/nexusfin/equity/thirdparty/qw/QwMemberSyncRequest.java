@@ -1,5 +1,8 @@
 package com.nexusfin.equity.thirdparty.qw;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record QwMemberSyncRequest(
         String uniqueId,
         String partnerOrderNo,

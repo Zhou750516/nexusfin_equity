@@ -8,10 +8,8 @@ import com.nexusfin.equity.dto.response.BenefitsActivateResponse;
 import com.nexusfin.equity.dto.response.BenefitsCardDetailResponse;
 import com.nexusfin.equity.dto.response.CreateBenefitOrderResponse;
 import com.nexusfin.equity.entity.BenefitProduct;
-import com.nexusfin.equity.entity.MemberPaymentProtocol;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.repository.BenefitProductRepository;
-import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.service.impl.BenefitsServiceImpl;
 import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncRequest;
 import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncResponse;
@@ -34,7 +32,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -44,9 +41,6 @@ class BenefitsServiceTest {
 
     @Mock
     private BenefitProductRepository benefitProductRepository;
-
-    @Mock
-    private MemberPaymentProtocolRepository memberPaymentProtocolRepository;
 
     @Mock
     private BenefitOrderService benefitOrderService;
@@ -69,7 +63,6 @@ class BenefitsServiceTest {
                 h5BenefitsProperties(),
                 h5LoanProperties(),
                 benefitProductRepository,
-                memberPaymentProtocolRepository,
                 benefitOrderService,
                 h5I18nService,
                 xiaohuaGatewayService,
@@ -88,9 +81,6 @@ class BenefitsServiceTest {
                 .thenReturn(new UserCardListResponse(List.of(
                         new UserCardSummary("card-001", "招商银行", "8648", 1)
                 )));
-        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-test-001", "QW_SIGN"))
-                .thenReturn(activeProtocol("QW_SIGN"));
-
         BenefitsCardDetailResponse response = benefitsService.getCardDetail("mem-test-001", "cid-test-001");
 
         assertThat(response.protocols()).extracting(BenefitsCardDetailResponse.ProtocolLink::url)
@@ -138,8 +128,6 @@ class BenefitsServiceTest {
                 .thenReturn(new UserCardListResponse(List.of(
                         new UserCardSummary("card-001", "招商银行", "8648", 1)
                 )));
-        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-test-001", "QW_SIGN"))
-                .thenReturn(activeProtocol("QW_SIGN"));
         when(benefitOrderService.createOrder(eq("mem-test-001"), any(CreateBenefitOrderRequest.class)))
                 .thenReturn(new CreateBenefitOrderResponse("ord-001", "FIRST_DEDUCT_PENDING", "/h5/equity/orders/ord-001"));
         when(benefitRedirectUrlService.generate(any()))
@@ -175,8 +163,6 @@ class BenefitsServiceTest {
                 .thenReturn(new UserCardListResponse(List.of(
                         new UserCardSummary("card-001", "招商银行", "8648", 1)
                 )));
-        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-test-001", "QW_SIGN"))
-                .thenReturn(activeProtocol("QW_SIGN"));
         when(benefitOrderService.createOrder(eq("mem-test-001"), any(CreateBenefitOrderRequest.class)))
                 .thenReturn(new CreateBenefitOrderResponse("ord-001", "FIRST_DEDUCT_PENDING", "/h5/equity/orders/ord-001"));
         when(benefitRedirectUrlService.generate(any()))
@@ -195,14 +181,12 @@ class BenefitsServiceTest {
     }
 
     @Test
-    void shouldTreatActiveQwSignAsProtocolReady() {
+    void shouldTreatProtocolLinksAsProtocolReadyBeforeQwSign() {
         when(benefitProductRepository.selectById("HUXUAN_CARD")).thenReturn(activeProduct());
         when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(dynamicProtocolResponse());
         when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(userCardResponse());
-        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-qw-ready", "QW_SIGN"))
-                .thenReturn(activeProtocol("QW_SIGN"));
 
         BenefitsCardDetailResponse response = benefitsService.getCardDetail("mem-qw-ready", "cid-qw-ready");
 
@@ -210,16 +194,12 @@ class BenefitsServiceTest {
     }
 
     @Test
-    void shouldKeepAllinpayProtocolReadyCompatibility() {
+    void shouldNotRequireAllinpayProtocolForProtocolReady() {
         when(benefitProductRepository.selectById("HUXUAN_CARD")).thenReturn(activeProduct());
         when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(dynamicProtocolResponse());
         when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(userCardResponse());
-        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-allinpay-ready", "QW_SIGN"))
-                .thenReturn(null);
-        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-allinpay-ready", "ALLINPAY"))
-                .thenReturn(activeProtocol("ALLINPAY"));
 
         BenefitsCardDetailResponse response = benefitsService.getCardDetail("mem-allinpay-ready", "cid-allinpay-ready");
 
@@ -227,7 +207,7 @@ class BenefitsServiceTest {
     }
 
     @Test
-    void shouldReturnProtocolNotReadyWhenNoSupportedActiveProtocolExists() {
+    void shouldReturnProtocolReadyWhenLinksExistWithoutLocalSignedProtocol() {
         when(benefitProductRepository.selectById("HUXUAN_CARD")).thenReturn(activeProduct());
         when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(dynamicProtocolResponse());
@@ -236,7 +216,7 @@ class BenefitsServiceTest {
 
         BenefitsCardDetailResponse response = benefitsService.getCardDetail("mem-no-protocol", "cid-no-protocol");
 
-        assertThat(response.protocolReady()).isFalse();
+        assertThat(response.protocolReady()).isTrue();
     }
 
     @Test
@@ -246,25 +226,19 @@ class BenefitsServiceTest {
                 .thenReturn(new ProtocolQueryResponse(List.of()));
         when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(userCardResponse());
-        lenient().when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-empty-protocols", "QW_SIGN"))
-                .thenReturn(activeProtocol("QW_SIGN"));
-
         BenefitsCardDetailResponse response = benefitsService.getCardDetail("mem-empty-protocols", "cid-empty-protocols");
 
         assertThat(response.protocolReady()).isFalse();
     }
 
     @Test
-    void shouldAllowEmptyDynamicProtocolsWhenProtocolLinkRequirementIsDisabledAndQwSignIsActive() {
+    void shouldAllowEmptyDynamicProtocolsWhenProtocolLinkRequirementIsDisabled() {
         BenefitsService protocolLinkOptionalService = benefitsServiceWithProtocolLinkRequired(false);
         when(benefitProductRepository.selectById("HUXUAN_CARD")).thenReturn(activeProduct());
         when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(new ProtocolQueryResponse(List.of()));
         when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(userCardResponse());
-        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-optional-qw", "QW_SIGN"))
-                .thenReturn(activeProtocol("QW_SIGN"));
-
         BenefitsCardDetailResponse response = protocolLinkOptionalService.getCardDetail(
                 "mem-optional-qw",
                 "cid-optional-qw"
@@ -274,7 +248,7 @@ class BenefitsServiceTest {
     }
 
     @Test
-    void shouldStillRequireActivePaymentProtocolWhenProtocolLinkRequirementIsDisabled() {
+    void shouldAllowMissingActivePaymentProtocolWhenProtocolLinkRequirementIsDisabled() {
         BenefitsService protocolLinkOptionalService = benefitsServiceWithProtocolLinkRequired(false);
         when(benefitProductRepository.selectById("HUXUAN_CARD")).thenReturn(activeProduct());
         when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
@@ -287,7 +261,7 @@ class BenefitsServiceTest {
                 "cid-optional-no-sign"
         );
 
-        assertThat(response.protocolReady()).isFalse();
+        assertThat(response.protocolReady()).isTrue();
     }
 
     private BenefitsService benefitsServiceWithProtocolLinkRequired(boolean protocolLinkRequired) {
@@ -295,7 +269,6 @@ class BenefitsServiceTest {
                 h5BenefitsProperties(protocolLinkRequired),
                 h5LoanProperties(),
                 benefitProductRepository,
-                memberPaymentProtocolRepository,
                 benefitOrderService,
                 h5I18nService,
                 xiaohuaGatewayService,
@@ -308,14 +281,6 @@ class BenefitsServiceTest {
         product.setProductCode("HUXUAN_CARD");
         product.setStatus("ACTIVE");
         return product;
-    }
-
-    private MemberPaymentProtocol activeProtocol(String providerCode) {
-        MemberPaymentProtocol protocol = new MemberPaymentProtocol();
-        protocol.setProtocolNo("AIP-001");
-        protocol.setProviderCode(providerCode);
-        protocol.setProtocolStatus("ACTIVE");
-        return protocol;
     }
 
     private ProtocolQueryResponse dynamicProtocolResponse() {

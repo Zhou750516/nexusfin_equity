@@ -264,6 +264,30 @@ class QwBenefitClientImplTest {
     }
 
     @Test
+    void shouldOmitNullUserSignIdFromMemberSyncRequest() throws Exception {
+        QwBenefitClientImpl client = new QwBenefitClientImpl(qwProperties(), objectMapper);
+
+        String ciphertext = (String) invoke(client, "encodeBusinessData", new Class<?>[]{Object.class},
+                new QwMemberSyncRequest(
+                        "user-1",
+                        "ord-1",
+                        680000L,
+                        "abs001",
+                        "艾博生月卡",
+                        null,
+                        null,
+                        0,
+                        null,
+                        null,
+                        null,
+                        null
+                ));
+
+        assertThat(decryptHex("unit-test-aes-16", ciphertext))
+                .isEqualTo("{\"uniqueId\":\"user-1\",\"partnerOrderNo\":\"ord-1\",\"payAmount\":680000,\"productCode\":\"abs001\",\"productName\":\"艾博生月卡\",\"shareFlag\":0}");
+    }
+
+    @Test
     void shouldReturnMockDeductionQueryStatusForMockMode() {
         QwProperties properties = qwProperties();
         properties.setMode(QwProperties.Mode.MOCK);

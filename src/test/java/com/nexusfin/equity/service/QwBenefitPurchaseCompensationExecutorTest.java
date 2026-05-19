@@ -43,8 +43,7 @@ class QwBenefitPurchaseCompensationExecutorTest {
                   "externalUserId": "user-001",
                   "benefitOrderNo": "ord-001",
                   "productCode": "HUXUAN_CARD",
-                  "loanAmount": 300000,
-                  "userSignId": 998877
+                  "loanAmount": 300000
                 }
                 """);
         BenefitOrder benefitOrder = new BenefitOrder();
@@ -73,7 +72,7 @@ class QwBenefitPurchaseCompensationExecutorTest {
         assertThat(requestCaptor.getValue().partnerOrderNo()).isEqualTo("ord-001");
         assertThat(requestCaptor.getValue().productCode()).isEqualTo("HUXUAN_CARD");
         assertThat(requestCaptor.getValue().payAmount()).isEqualTo(300000L);
-        assertThat(requestCaptor.getValue().userSignId()).isEqualTo(998877L);
+        assertThat(requestCaptor.getValue().userSignId()).isNull();
         assertThat(result.responsePayload()).contains("qw-order-001");
         ArgumentCaptor<BenefitOrder> orderCaptor = ArgumentCaptor.forClass(BenefitOrder.class);
         verify(benefitOrderRepository).updateById(orderCaptor.capture());
@@ -82,7 +81,7 @@ class QwBenefitPurchaseCompensationExecutorTest {
     }
 
     @Test
-    void shouldUseUserSignIdFromPayloadEvenWhenBenefitOrderStateChanges() {
+    void shouldIgnoreUserSignIdFromLegacyPayloadWhenRetryingMemberSync() {
         QwBenefitPurchaseCompensationExecutor executor =
                 new QwBenefitPurchaseCompensationExecutor(qwBenefitClient, benefitOrderRepository, new ObjectMapper());
         AsyncCompensationTask task = new AsyncCompensationTask();
@@ -120,7 +119,7 @@ class QwBenefitPurchaseCompensationExecutorTest {
 
         ArgumentCaptor<QwMemberSyncRequest> requestCaptor = ArgumentCaptor.forClass(QwMemberSyncRequest.class);
         verify(qwBenefitClient).syncMemberOrder(requestCaptor.capture());
-        assertThat(requestCaptor.getValue().userSignId()).isEqualTo(11223344L);
+        assertThat(requestCaptor.getValue().userSignId()).isNull();
     }
 
     @Test

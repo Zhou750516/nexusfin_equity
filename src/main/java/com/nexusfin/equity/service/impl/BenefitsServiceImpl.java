@@ -11,7 +11,6 @@ import com.nexusfin.equity.dto.response.CreateBenefitOrderResponse;
 import com.nexusfin.equity.entity.BenefitProduct;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.repository.BenefitProductRepository;
-import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.service.BenefitOrderService;
 import com.nexusfin.equity.service.BenefitRedirectUrlService;
 import com.nexusfin.equity.service.BenefitsService;
@@ -32,13 +31,10 @@ import org.springframework.stereotype.Service;
 public class BenefitsServiceImpl implements BenefitsService {
 
     private static final Logger log = LoggerFactory.getLogger(BenefitsServiceImpl.class);
-    private static final String PROVIDER_QW_SIGN = "QW_SIGN";
-    private static final String PROVIDER_ALLINPAY = "ALLINPAY";
 
     private final H5BenefitsProperties h5BenefitsProperties;
     private final H5LoanProperties h5LoanProperties;
     private final BenefitProductRepository benefitProductRepository;
-    private final MemberPaymentProtocolRepository memberPaymentProtocolRepository;
     private final BenefitOrderService benefitOrderService;
     private final H5I18nService h5I18nService;
     private final XiaohuaGatewayService xiaohuaGatewayService;
@@ -48,7 +44,6 @@ public class BenefitsServiceImpl implements BenefitsService {
             H5BenefitsProperties h5BenefitsProperties,
             H5LoanProperties h5LoanProperties,
             BenefitProductRepository benefitProductRepository,
-            MemberPaymentProtocolRepository memberPaymentProtocolRepository,
             BenefitOrderService benefitOrderService,
             H5I18nService h5I18nService,
             XiaohuaGatewayService xiaohuaGatewayService,
@@ -57,7 +52,6 @@ public class BenefitsServiceImpl implements BenefitsService {
         this.h5BenefitsProperties = h5BenefitsProperties;
         this.h5LoanProperties = h5LoanProperties;
         this.benefitProductRepository = benefitProductRepository;
-        this.memberPaymentProtocolRepository = memberPaymentProtocolRepository;
         this.benefitOrderService = benefitOrderService;
         this.h5I18nService = h5I18nService;
         this.xiaohuaGatewayService = xiaohuaGatewayService;
@@ -106,7 +100,7 @@ public class BenefitsServiceImpl implements BenefitsService {
                 mapTips(detail.tips()),
                 protocols,
                 userCards,
-                isProtocolReady(memberId, dynamicProtocols)
+                isProtocolReady(dynamicProtocols)
         );
     }
 
@@ -240,13 +234,9 @@ public class BenefitsServiceImpl implements BenefitsService {
                 .toList();
     }
 
-    private boolean isProtocolReady(String memberId, List<com.nexusfin.equity.thirdparty.yunka.ProtocolLink> protocols) {
+    private boolean isProtocolReady(List<com.nexusfin.equity.thirdparty.yunka.ProtocolLink> protocols) {
         boolean hasProtocolLinks = protocols != null && !protocols.isEmpty();
-        if (h5BenefitsProperties.protocolLinkRequired() && !hasProtocolLinks) {
-            return false;
-        }
-        return memberPaymentProtocolRepository.selectActiveByMemberId(memberId, PROVIDER_QW_SIGN) != null
-                || memberPaymentProtocolRepository.selectActiveByMemberId(memberId, PROVIDER_ALLINPAY) != null;
+        return !h5BenefitsProperties.protocolLinkRequired() || hasProtocolLinks;
     }
 
     private boolean isBenefitSyncAccepted(String status) {
