@@ -68,6 +68,7 @@ nexusfin:
       lender: XX商业银行
     benefits:
       product-code: ${H5_BENEFITS_PRODUCT_CODE:abs001}
+      protocol-link-required: ${H5_BENEFITS_PROTOCOL_LINK_REQUIRED:true}
       activate:
         default-loan-amount: 300000
         supported-card-type: huixuan_card

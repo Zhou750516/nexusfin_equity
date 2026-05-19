@@ -236,6 +236,7 @@ class LoanApprovalQueryServiceTest {
     private H5BenefitsProperties h5BenefitsProperties() {
         return new H5BenefitsProperties(
                 "HUXUAN_CARD",
+                true,
                 new H5BenefitsProperties.Activate(30000L, "huixuan_card", "惠选卡开通成功"),
                 new H5BenefitsProperties.Detail(
                         "惠选卡",

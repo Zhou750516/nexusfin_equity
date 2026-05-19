@@ -24,7 +24,6 @@ import com.nexusfin.equity.util.TraceIdUtil;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.IntStream;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -33,6 +32,8 @@ import org.springframework.stereotype.Service;
 public class BenefitsServiceImpl implements BenefitsService {
 
     private static final Logger log = LoggerFactory.getLogger(BenefitsServiceImpl.class);
+    private static final String PROVIDER_QW_SIGN = "QW_SIGN";
+    private static final String PROVIDER_ALLINPAY = "ALLINPAY";
 
     private final H5BenefitsProperties h5BenefitsProperties;
     private final H5LoanProperties h5LoanProperties;
@@ -240,15 +241,12 @@ public class BenefitsServiceImpl implements BenefitsService {
     }
 
     private boolean isProtocolReady(String memberId, List<com.nexusfin.equity.thirdparty.yunka.ProtocolLink> protocols) {
-        if (protocols == null || protocols.isEmpty()) {
+        boolean hasProtocolLinks = protocols != null && !protocols.isEmpty();
+        if (h5BenefitsProperties.protocolLinkRequired() && !hasProtocolLinks) {
             return false;
         }
-        return memberPaymentProtocolRepository.selectOne(Wrappers.lambdaQuery(
-                new com.nexusfin.equity.entity.MemberPaymentProtocol()
-        ).eq(com.nexusfin.equity.entity.MemberPaymentProtocol::getMemberId, memberId)
-                .eq(com.nexusfin.equity.entity.MemberPaymentProtocol::getProviderCode, "ALLINPAY")
-                .eq(com.nexusfin.equity.entity.MemberPaymentProtocol::getProtocolStatus, "ACTIVE")
-                .last("limit 1")) != null;
+        return memberPaymentProtocolRepository.selectActiveByMemberId(memberId, PROVIDER_QW_SIGN) != null
+                || memberPaymentProtocolRepository.selectActiveByMemberId(memberId, PROVIDER_ALLINPAY) != null;
     }
 
     private boolean isBenefitSyncAccepted(String status) {
