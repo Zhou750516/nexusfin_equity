@@ -51,6 +51,19 @@ class QwPropertiesTest {
         assertThat(properties.getHttp().isLogPlaintextPayload()).isTrue();
     }
 
+    @Test
+    void shouldBindHttpFullPlaintextPayloadLogSwitchAndAllowedProfiles() {
+        QwProperties properties = bind(Map.of(
+                "nexusfin.third-party.qw.http.log-full-plaintext-payload", "true",
+                "nexusfin.third-party.qw.http.log-full-plaintext-payload-allowed-profiles",
+                "local,test,aliyun-test"
+        ));
+
+        assertThat(properties.getHttp().isLogFullPlaintextPayload()).isTrue();
+        assertThat(properties.getHttp().getLogFullPlaintextPayloadAllowedProfiles())
+                .containsExactly("local", "test", "aliyun-test");
+    }
+
     private QwProperties bind(Map<String, String> values) {
         ConfigurationPropertySource source = new MapConfigurationPropertySource(values);
         return new Binder(new ConfigurationPropertySource[]{source})

@@ -51,6 +51,12 @@ public class QwBenefitClientImpl implements QwBenefitClient {
     private static final Pattern REJECT_PATTERN = Pattern.compile(".*_FAULT_REJECT_(\\d+)$");
     private static final Pattern DELAY_PATTERN = Pattern.compile(".*_FAULT_DELAY_(\\d+)$");
 
+    private enum PlaintextPayloadLogMode {
+        OFF,
+        MASKED,
+        FULL
+    }
+
     private final QwProperties qwProperties;
     private final ObjectMapper objectMapper;
     private final SecureRandom secureRandom = new SecureRandom();
@@ -154,6 +160,7 @@ public class QwBenefitClientImpl implements QwBenefitClient {
         String traceId = TraceIdUtil.getTraceId();
         URI targetUri = URI.create(qwProperties.getHttp().getBaseUrl() + qwProperties.getHttp().getMethodPath());
         String requestPlaintextJson = toJson(businessRequest);
+        PlaintextPayloadLogMode plaintextPayloadLogMode = plaintextPayloadLogMode();
         QwEnvelopeRequest request = new QwEnvelopeRequest(
                 new QwRequestHead(
                         qwProperties.getPartnerNo(),
@@ -164,14 +171,15 @@ public class QwBenefitClientImpl implements QwBenefitClient {
                 ),
                 encodeBusinessData(businessRequest)
         );
-        String requestEnvelopeJson = requestEnvelopeSummary(request, requestPlaintextJson);
-        log.info("traceId={} qw_method={} qw_target_uri={} qw_partner_no={} qw_version={} qw_timestamp={} signPrefix={} requestEnvelopeJson={} qw gateway request begin",
+        String requestEnvelopeJson = requestEnvelopeSummary(request, requestPlaintextJson, plaintextPayloadLogMode);
+        log.info("traceId={} qw_method={} qw_target_uri={} qw_partner_no={} qw_version={} qw_timestamp={} plaintextPayloadLogMode={} signPrefix={} requestEnvelopeJson={} qw gateway request begin",
                 traceId,
                 method,
                 targetUri,
                 qwProperties.getPartnerNo(),
                 qwProperties.getVersion(),
                 timestamp,
+                plaintextPayloadLogMode,
                 signPrefix(request.requestHead().sign()),
                 requestEnvelopeJson);
         try {
@@ -183,21 +191,22 @@ public class QwBenefitClientImpl implements QwBenefitClient {
                     .body(String.class);
             try {
                 ParsedQwResponse<T> parsed = parseResponseWithPlaintext(rawResponse, responseType);
-                String responseBodyJson = responseBodySummary(rawResponse, parsed.plaintextJson());
-                log.info("traceId={} qw_method={} qw_target_uri={} qw_partner_no={} elapsedMs={} qwCode={} requestEnvelopeJson={} responseBodyJson={} qw gateway request success",
+                String responseBodyJson = responseBodySummary(rawResponse, parsed.plaintextJson(), plaintextPayloadLogMode);
+                log.info("traceId={} qw_method={} qw_target_uri={} qw_partner_no={} elapsedMs={} qwCode={} plaintextPayloadLogMode={} requestEnvelopeJson={} responseBodyJson={} qw gateway request success",
                         traceId,
                         method,
                         targetUri,
                         qwProperties.getPartnerNo(),
                         elapsedMs(startNanos),
                         qwCode(rawResponse),
+                        plaintextPayloadLogMode,
                         requestEnvelopeJson,
                         responseBodyJson);
                 return parsed.body();
             } catch (BizException exception) {
                 if (QW_UPSTREAM_REJECTED.equals(exception.getErrorNo())) {
-                    String responseBodyJson = responseBodySummary(rawResponse, null);
-                    log.warn("traceId={} qw_method={} qw_target_uri={} qw_partner_no={} elapsedMs={} qwCode={} errorNo={} errorMsg={} requestEnvelopeJson={} responseBodyJson={} qw gateway request rejected",
+                    String responseBodyJson = responseBodySummary(rawResponse, null, plaintextPayloadLogMode);
+                    log.warn("traceId={} qw_method={} qw_target_uri={} qw_partner_no={} elapsedMs={} qwCode={} errorNo={} errorMsg={} plaintextPayloadLogMode={} requestEnvelopeJson={} responseBodyJson={} qw gateway request rejected",
                             traceId,
                             method,
                             targetUri,
@@ -206,6 +215,7 @@ public class QwBenefitClientImpl implements QwBenefitClient {
                             qwCode(rawResponse),
                             QW_UPSTREAM_REJECTED,
                             exception.getErrorMsg(),
+                            plaintextPayloadLogMode,
                             requestEnvelopeJson,
                             responseBodyJson);
                 }
@@ -213,7 +223,7 @@ public class QwBenefitClientImpl implements QwBenefitClient {
             }
         } catch (RestClientException exception) {
             if (UpstreamTimeoutDetector.isTimeout(exception)) {
-                log.error("traceId={} qw_method={} qw_target_uri={} qw_partner_no={} elapsedMs={} errorNo={} errorMsg={} requestEnvelopeJson={} responseBodyJson=null qw gateway request timeout",
+                log.error("traceId={} qw_method={} qw_target_uri={} qw_partner_no={} elapsedMs={} errorNo={} errorMsg={} plaintextPayloadLogMode={} requestEnvelopeJson={} responseBodyJson=null qw gateway request timeout",
                         traceId,
                         method,
                         targetUri,
@@ -221,10 +231,11 @@ public class QwBenefitClientImpl implements QwBenefitClient {
                         elapsedMs(startNanos),
                         QW_UPSTREAM_TIMEOUT,
                         "QW upstream timeout",
+                        plaintextPayloadLogMode,
                         requestEnvelopeJson);
                 throw new UpstreamTimeoutException("QW upstream timeout", exception);
             }
-            log.error("traceId={} qw_method={} qw_target_uri={} qw_partner_no={} elapsedMs={} errorNo={} errorMsg={} requestEnvelopeJson={} responseBodyJson=null qw gateway request failed",
+            log.error("traceId={} qw_method={} qw_target_uri={} qw_partner_no={} elapsedMs={} errorNo={} errorMsg={} plaintextPayloadLogMode={} requestEnvelopeJson={} responseBodyJson=null qw gateway request failed",
                     traceId,
                     method,
                     targetUri,
@@ -232,6 +243,7 @@ public class QwBenefitClientImpl implements QwBenefitClient {
                     elapsedMs(startNanos),
                     QW_UPSTREAM_FAILED,
                     safeExceptionMessage(exception),
+                    plaintextPayloadLogMode,
                     requestEnvelopeJson);
             throw new BizException(QW_UPSTREAM_FAILED, "Failed to call QW upstream service");
         }
@@ -241,7 +253,8 @@ public class QwBenefitClientImpl implements QwBenefitClient {
         return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
     }
 
-    private String requestEnvelopeSummary(QwEnvelopeRequest request, String requestPlaintextJson) {
+    private String requestEnvelopeSummary(QwEnvelopeRequest request, String requestPlaintextJson,
+                                          PlaintextPayloadLogMode plaintextPayloadLogMode) {
         Map<String, Object> root = new LinkedHashMap<>();
         Map<String, Object> head = new LinkedHashMap<>();
         head.put("partnerNo", request.requestHead().partnerNo());
@@ -251,13 +264,16 @@ public class QwBenefitClientImpl implements QwBenefitClient {
         head.put("signPrefix", signPrefix(request.requestHead().sign()));
         root.put("requestHead", head);
         root.put("requestBody", encryptedDataSummary(request.requestBody()));
-        if (qwProperties.getHttp().isLogPlaintextPayload()) {
-            root.put("requestPlaintextJson", sanitizePlaintextJson(requestPlaintextJson));
+        root.put("plaintextPayloadLogMode", plaintextPayloadLogMode);
+        String plaintextSummary = plaintextSummary(requestPlaintextJson, plaintextPayloadLogMode);
+        if (plaintextSummary != null) {
+            root.put("requestPlaintextJson", plaintextSummary);
         }
         return toJson(root);
     }
 
-    private String responseBodySummary(String rawResponse, String responsePlaintextJson) {
+    private String responseBodySummary(String rawResponse, String responsePlaintextJson,
+                                       PlaintextPayloadLogMode plaintextPayloadLogMode) {
         if (rawResponse == null || rawResponse.isBlank()) {
             return "null";
         }
@@ -270,13 +286,25 @@ public class QwBenefitClientImpl implements QwBenefitClient {
             summary.put("data", data == null || data.isNull()
                     ? encryptedDataSummary(null)
                     : encryptedDataSummary(data.asText()));
-            if (qwProperties.getHttp().isLogPlaintextPayload() && responsePlaintextJson != null) {
-                summary.put("responsePlaintextJson", sanitizePlaintextJson(responsePlaintextJson));
+            summary.put("plaintextPayloadLogMode", plaintextPayloadLogMode);
+            String plaintextSummary = plaintextSummary(responsePlaintextJson, plaintextPayloadLogMode);
+            if (plaintextSummary != null) {
+                summary.put("responsePlaintextJson", plaintextSummary);
             }
             return toJson(summary);
         } catch (Exception exception) {
             return "\"SUMMARY_FAILED\"";
         }
+    }
+
+    private PlaintextPayloadLogMode plaintextPayloadLogMode() {
+        if (!qwProperties.getHttp().isLogPlaintextPayload()) {
+            return PlaintextPayloadLogMode.OFF;
+        }
+        if (qwProperties.getHttp().isLogFullPlaintextPayload()) {
+            return PlaintextPayloadLogMode.FULL;
+        }
+        return PlaintextPayloadLogMode.MASKED;
     }
 
     private int qwCode(String rawResponse) {
@@ -324,19 +352,22 @@ public class QwBenefitClientImpl implements QwBenefitClient {
         }
     }
 
-    private String sanitizePlaintextJson(String plaintextJson) {
+    private String plaintextSummary(String plaintextJson, PlaintextPayloadLogMode plaintextPayloadLogMode) {
+        if (plaintextPayloadLogMode == PlaintextPayloadLogMode.OFF) {
+            return null;
+        }
         if (plaintextJson == null || plaintextJson.isBlank()) {
             return plaintextJson;
         }
         try {
             JsonNode root = objectMapper.readTree(plaintextJson);
-            return toJson(sanitizePlaintextNode(root));
+            return toJson(sanitizePlaintextNode(root, plaintextPayloadLogMode == PlaintextPayloadLogMode.FULL));
         } catch (Exception exception) {
             return "\"PLAINTEXT_SUMMARY_FAILED\"";
         }
     }
 
-    private Object sanitizePlaintextNode(JsonNode node) {
+    private Object sanitizePlaintextNode(JsonNode node, boolean fullPlaintext) {
         if (node == null || node.isNull()) {
             return null;
         }
@@ -344,13 +375,13 @@ public class QwBenefitClientImpl implements QwBenefitClient {
             Map<String, Object> sanitized = new LinkedHashMap<>();
             node.fields().forEachRemaining(entry -> sanitized.put(
                     entry.getKey(),
-                    sanitizePlaintextField(entry.getKey(), entry.getValue())
+                    sanitizePlaintextField(entry.getKey(), entry.getValue(), fullPlaintext)
             ));
             return sanitized;
         }
         if (node.isArray()) {
             java.util.List<Object> sanitized = new java.util.ArrayList<>();
-            node.forEach(item -> sanitized.add(sanitizePlaintextNode(item)));
+            node.forEach(item -> sanitized.add(sanitizePlaintextNode(item, fullPlaintext)));
             return sanitized;
         }
         if (node.isTextual()) {
@@ -365,12 +396,18 @@ public class QwBenefitClientImpl implements QwBenefitClient {
         return node.asText();
     }
 
-    private Object sanitizePlaintextField(String fieldName, JsonNode value) {
+    private Object sanitizePlaintextField(String fieldName, JsonNode value, boolean fullPlaintext) {
+        String normalized = fieldName == null ? "" : fieldName.toLowerCase(java.util.Locale.ROOT);
+        if (isTokenLikeField(normalized)) {
+            return "[TOKEN_REDACTED]";
+        }
         if (!value.isTextual()) {
-            return sanitizePlaintextNode(value);
+            return sanitizePlaintextNode(value, fullPlaintext);
         }
         String text = value.asText();
-        String normalized = fieldName == null ? "" : fieldName.toLowerCase(java.util.Locale.ROOT);
+        if (fullPlaintext) {
+            return text;
+        }
         if (normalized.contains("phone") || normalized.contains("mobile")) {
             return maskMobile(text);
         }
@@ -380,10 +417,13 @@ public class QwBenefitClientImpl implements QwBenefitClient {
         if (normalized.contains("idno") || normalized.contains("idcard") || normalized.contains("id_card")) {
             return maskLongNumber(text);
         }
-        if (normalized.contains("token")) {
-            return "[TOKEN_REDACTED]";
-        }
         return text;
+    }
+
+    private boolean isTokenLikeField(String normalizedFieldName) {
+        return normalizedFieldName.contains("token")
+                || normalizedFieldName.contains("jwt")
+                || normalizedFieldName.contains("authorization");
     }
 
     private String maskMobile(String value) {

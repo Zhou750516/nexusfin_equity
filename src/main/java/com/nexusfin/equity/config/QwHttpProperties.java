@@ -1,5 +1,8 @@
 package com.nexusfin.equity.config;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class QwHttpProperties {
 
     private String baseUrl = "https://t-api.test.qweimobile.com";
@@ -7,6 +10,8 @@ public class QwHttpProperties {
     private int connectTimeoutMs = 2000;
     private int readTimeoutMs = 3000;
     private boolean logPlaintextPayload = false;
+    private boolean logFullPlaintextPayload = false;
+    private List<String> logFullPlaintextPayloadAllowedProfiles = new ArrayList<>(List.of("test", "mysql-it", "local"));
     private String mockExerciseBaseUrl = "https://mock-qw.local/exercise";
 
     public String getBaseUrl() {
@@ -47,6 +52,22 @@ public class QwHttpProperties {
 
     public void setLogPlaintextPayload(boolean logPlaintextPayload) {
         this.logPlaintextPayload = logPlaintextPayload;
+    }
+
+    public boolean isLogFullPlaintextPayload() {
+        return logFullPlaintextPayload;
+    }
+
+    public void setLogFullPlaintextPayload(boolean logFullPlaintextPayload) {
+        this.logFullPlaintextPayload = logFullPlaintextPayload;
+    }
+
+    public List<String> getLogFullPlaintextPayloadAllowedProfiles() {
+        return logFullPlaintextPayloadAllowedProfiles;
+    }
+
+    public void setLogFullPlaintextPayloadAllowedProfiles(List<String> logFullPlaintextPayloadAllowedProfiles) {
+        this.logFullPlaintextPayloadAllowedProfiles = logFullPlaintextPayloadAllowedProfiles;
     }
 
     public String getMockExerciseBaseUrl() {

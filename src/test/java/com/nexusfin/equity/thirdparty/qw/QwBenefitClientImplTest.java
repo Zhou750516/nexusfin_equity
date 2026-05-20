@@ -11,7 +11,9 @@ import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.AfterEach;
@@ -411,6 +413,8 @@ class QwBenefitClientImplTest {
         assertThat(output).contains("qwCode=200");
         assertThat(output).contains("requestEnvelopeJson=");
         assertThat(output).contains("responseBodyJson=");
+        assertThat(output).contains("plaintextPayloadLogMode");
+        assertThat(output).contains("OFF");
         assertThat(successLine).contains("requestEnvelopeJson=");
         assertThat(successLine).contains("responseBodyJson=");
         assertThat(output).contains("[ENCRYPTED_REDACTED]");
@@ -566,6 +570,8 @@ class QwBenefitClientImplTest {
         assertThat(successLine).contains("responseBodyJson=");
         assertThat(output).contains("requestPlaintextJson");
         assertThat(output).contains("responsePlaintextJson");
+        assertThat(output).contains("plaintextPayloadLogMode");
+        assertThat(output).contains("MASKED");
         assertThat(output).contains("merchantId");
         assertThat(output).contains("userSignId");
         assertThat(output).contains("2605194897536");
@@ -579,6 +585,81 @@ class QwBenefitClientImplTest {
         assertThat(output).doesNotContain("110101199003071234");
         assertThat(output).doesNotContain(capturedRequests.get(0).requestBody());
         assertThat(output).doesNotContain(responseCiphertext);
+        server.verify();
+    }
+
+    @Test
+    void shouldLogFullPlaintextPayloadWhenExplicitlyEnabled(CapturedOutput output) throws Exception {
+        TraceIdUtil.bindTraceId("TRACE-QW-FULL-PLAINTEXT-001");
+        List<CapturedQwRequest> capturedRequests = new ArrayList<>();
+        Map<String, Object> businessRequest = new LinkedHashMap<>();
+        businessRequest.put("merchantId", "46186385");
+        businessRequest.put("phone", "19912345678");
+        businessRequest.put("name", "完整测试用户");
+        businessRequest.put("accountNo", "6222020202021234");
+        businessRequest.put("idNo", "110101199003071234");
+        businessRequest.put("token", "request-token-secret");
+        businessRequest.put("accessToken", "request-access-token-secret");
+        businessRequest.put("jwt", "request-jwt-secret");
+        String responsePlaintext = "{\"userSignId\":2605194897536,\"phone\":\"19912345678\","
+                + "\"name\":\"完整测试用户\",\"accountNo\":\"6222020202021234\","
+                + "\"idNo\":\"110101199003071234\",\"token\":\"response-token-secret\","
+                + "\"accessToken\":\"response-access-token-secret\",\"jwt\":\"response-jwt-secret\"}";
+        String responseCiphertext = encryptHex("unit-test-aes-16", responsePlaintext);
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        server.expect(requestTo("https://t-api.test.qweimobile.com/api/abs/method"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(request -> captureRequest(request, capturedRequests))
+                .andRespond(withSuccess(
+                        "{\"code\":200,\"msg\":\"success\",\"data\":\"" + responseCiphertext + "\"}",
+                        MediaType.APPLICATION_JSON
+                ));
+        QwProperties properties = qwProperties();
+        properties.getHttp().setLogPlaintextPayload(true);
+        properties.getHttp().setLogFullPlaintextPayload(true);
+        QwBenefitClientImpl client = new QwBenefitClientImpl(properties, objectMapper, restClientBuilder.build());
+
+        Object response = invoke(client, "invoke", new Class<?>[]{String.class, Object.class, Class.class},
+                "abs.sign.apply", businessRequest, Map.class);
+
+        assertThat(response).isInstanceOf(Map.class);
+        assertThat(((Map<?, ?>) response).get("userSignId")).isEqualTo(2605194897536L);
+        String successLine = logLine(output, "qw gateway request success");
+        assertThat(successLine).contains("requestEnvelopeJson=");
+        assertThat(successLine).contains("responseBodyJson=");
+        assertThat(output).contains("plaintextPayloadLogMode");
+        assertThat(output).contains("FULL");
+        assertThat(output).contains("requestPlaintextJson");
+        assertThat(output).contains("responsePlaintextJson");
+        assertThat(output).contains("46186385");
+        assertThat(output).contains("19912345678");
+        assertThat(output).contains("完整测试用户");
+        assertThat(output).contains("6222020202021234");
+        assertThat(output).contains("110101199003071234");
+        assertThat(output).contains("2605194897536");
+        assertThat(output).contains("[TOKEN_REDACTED]");
+        assertThat(output).doesNotContain("request-token-secret");
+        assertThat(output).doesNotContain("request-access-token-secret");
+        assertThat(output).doesNotContain("request-jwt-secret");
+        assertThat(output).doesNotContain("response-token-secret");
+        assertThat(output).doesNotContain("response-access-token-secret");
+        assertThat(output).doesNotContain("response-jwt-secret");
+        assertThat(output).doesNotContain("unit-test-sign-key-not-secret");
+        assertThat(output).doesNotContain("unit-test-aes-16");
+        assertThat(output).doesNotContain(capturedRequests.get(0).requestBody());
+        assertThat(output).doesNotContain(responseCiphertext);
+        assertThat(capturedRequests.get(0).requestBody()).matches("[0-9a-f]+");
+        assertThat(capturedRequests.get(0).rawBody())
+                .doesNotContain("19912345678")
+                .doesNotContain("完整测试用户")
+                .doesNotContain("6222020202021234")
+                .doesNotContain("110101199003071234");
+        assertThat(decryptHex("unit-test-aes-16", capturedRequests.get(0).requestBody()))
+                .contains("\"phone\":\"19912345678\"")
+                .contains("\"name\":\"完整测试用户\"")
+                .contains("\"accountNo\":\"6222020202021234\"")
+                .contains("\"idNo\":\"110101199003071234\"");
         server.verify();
     }
 
