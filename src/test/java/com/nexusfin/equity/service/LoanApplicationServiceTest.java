@@ -107,6 +107,7 @@ class LoanApplicationServiceTest {
                 ArgumentCaptor.forClass(com.nexusfin.equity.dto.request.CreateBenefitOrderRequest.class);
         verify(benefitOrderService).createLocalOrder(eq("mem-test-001"), benefitOrderCaptor.capture());
         assertThat(benefitOrderCaptor.getValue().loanAmount()).isEqualTo(29900L);
+        assertThat(benefitOrderCaptor.getValue().benefitAmount()).isNull();
         verify(benefitOrderService, never()).createOrder(any(), any());
 
         ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> yunkaCaptor =
@@ -352,7 +353,7 @@ class LoanApplicationServiceTest {
                 "HUXUAN_CARD",
                 true,
                 false,
-                new H5BenefitsProperties.Activate(30000L, "huixuan_card", "惠选卡开通成功"),
+                new H5BenefitsProperties.Activate(300000L, 30000L, "huixuan_card", "惠选卡开通成功"),
                 new H5BenefitsProperties.Detail(
                         "惠选卡",
                         300L,

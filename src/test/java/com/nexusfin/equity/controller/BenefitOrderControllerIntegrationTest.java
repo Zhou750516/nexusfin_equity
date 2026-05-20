@@ -139,6 +139,7 @@ class BenefitOrderControllerIntegrationTest {
                                   "requestId": "req-order-create-001",
                                   "productCode": "%s",
                                   "loanAmount": 800000,
+                                  "benefitAmount": 30000,
                                   "agreementSigned": true
                                 }
                                 """.formatted(product.getProductCode())))
@@ -180,6 +181,7 @@ class BenefitOrderControllerIntegrationTest {
                   "requestId": "req-order-create-duplicate",
                   "productCode": "%s",
                   "loanAmount": 800000,
+                  "benefitAmount": 30000,
                   "agreementSigned": true
                 }
                 """.formatted(product.getProductCode());
@@ -283,6 +285,7 @@ class BenefitOrderControllerIntegrationTest {
                                   "requestId": "req-order-compensation-001",
                                   "productCode": "%s",
                                   "loanAmount": 800000,
+                                  "benefitAmount": 30000,
                                   "agreementSigned": true
                                 }
                                 """.formatted(product.getProductCode())))
@@ -301,6 +304,8 @@ class BenefitOrderControllerIntegrationTest {
                 .last("limit 1"));
         assertThat(task).isNotNull();
         assertThat(task.getBizKey()).isEqualTo("BENEFIT_PURCHASE:" + order.getBenefitOrderNo());
+        assertThat(task.getRequestPayload()).contains("\"loanAmount\":800000");
+        assertThat(task.getRequestPayload()).contains("\"benefitAmount\":30000");
         assertThat(task.getTaskStatus()).isEqualTo("INIT");
         assertThat(task.getPartitionNo()).isEqualTo(asyncCompensationPartitioner.partitionOf(task.getBizKey()));
     }
@@ -321,6 +326,7 @@ class BenefitOrderControllerIntegrationTest {
                                   "requestId": "req-order-compensation-002",
                                   "productCode": "%s",
                                   "loanAmount": 800000,
+                                  "benefitAmount": 30000,
                                   "agreementSigned": true
                                 }
                                 """.formatted(product.getProductCode())))
@@ -350,6 +356,7 @@ class BenefitOrderControllerIntegrationTest {
                                   "requestId": "req-order-compensation-003",
                                   "productCode": "%s",
                                   "loanAmount": 800000,
+                                  "benefitAmount": 30000,
                                   "agreementSigned": true
                                 }
                                 """.formatted(product.getProductCode())))

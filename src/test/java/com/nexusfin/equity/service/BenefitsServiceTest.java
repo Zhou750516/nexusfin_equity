@@ -196,10 +196,13 @@ class BenefitsServiceTest {
         ArgumentCaptor<CreateBenefitOrderRequest> orderCaptor = ArgumentCaptor.forClass(CreateBenefitOrderRequest.class);
         verify(benefitOrderService).createOrder(eq("mem-test-001"), orderCaptor.capture());
         assertThat(orderCaptor.getValue().requestId()).isEqualTo("activate-APP-001");
+        assertThat(orderCaptor.getValue().loanAmount()).isEqualTo(300000L);
+        assertThat(orderCaptor.getValue().benefitAmount()).isEqualTo(30000L);
         ArgumentCaptor<BenefitOrderSyncRequest> syncCaptor = ArgumentCaptor.forClass(BenefitOrderSyncRequest.class);
         verify(xiaohuaGatewayService).syncBenefitOrder(any(), eq("ord-001"), syncCaptor.capture());
         assertThat(syncCaptor.getValue().userId()).isEqualTo("mem-test-001");
         assertThat(syncCaptor.getValue().userId()).isNotEqualTo("cid-test-001");
+        assertThat(syncCaptor.getValue().benefitAmount()).isEqualTo(30000L);
         assertThat(syncCaptor.getValue().benefitUrl()).isNull();
         verify(benefitRedirectUrlService, never()).generate(any());
     }
@@ -398,7 +401,7 @@ class BenefitsServiceTest {
                 "HUXUAN_CARD",
                 protocolLinkRequired,
                 useLocalReceivingAccount,
-                new H5BenefitsProperties.Activate(30000L, "huixuan_card", "惠选卡开通成功"),
+                new H5BenefitsProperties.Activate(300000L, 30000L, "huixuan_card", "惠选卡开通成功"),
                 new H5BenefitsProperties.Detail(
                         "惠选卡",
                         300L,

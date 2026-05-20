@@ -188,15 +188,19 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
                     benefitOrder.getSyncStatus());
             return buildCreateOrderResponse(benefitOrder);
         }
+        Long benefitAmount = requireBenefitAmount(request);
         QwMemberSyncResponse syncResponse;
         try {
-            log.info("traceId={} bizOrderNo={} externalUserId={} productCode={} userSignId={} qw member sync requested",
+            log.info("traceId={} bizOrderNo={} externalUserId={} productCode={} loanAmount={} benefitAmount={} payAmount={} userSignId={} qw member sync requested",
                     com.nexusfin.equity.util.TraceIdUtil.getTraceId(),
                     benefitOrder.getBenefitOrderNo(),
                     benefitOrder.getExternalUserId(),
                     product.getProductCode(),
+                    benefitOrder.getLoanAmount(),
+                    benefitAmount,
+                    benefitAmount,
                     userSignId);
-            syncResponse = qwBenefitClient.syncMemberOrder(buildQwMemberSyncRequest(benefitOrder, product, userSignId));
+            syncResponse = qwBenefitClient.syncMemberOrder(buildQwMemberSyncRequest(benefitOrder, product, benefitAmount, userSignId));
             benefitOrder.setSyncStatus(BenefitOrderStatusEnum.SYNC_SUCCESS.name());
             benefitOrder.setUpdatedTs(LocalDateTime.now());
             benefitOrderRepository.updateById(benefitOrder);
@@ -217,6 +221,7 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
                             benefitOrder.getBenefitOrderNo(),
                             product.getProductCode(),
                             benefitOrder.getLoanAmount(),
+                            benefitAmount,
                             userSignId
                     )
             ));
@@ -282,12 +287,13 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
     private QwMemberSyncRequest buildQwMemberSyncRequest(
             BenefitOrder order,
             BenefitProduct product,
+            Long benefitAmount,
             Long userSignId
     ) {
         return new QwMemberSyncRequest(
                 order.getExternalUserId(),
                 order.getBenefitOrderNo(),
-                order.getLoanAmount(),
+                benefitAmount,
                 product.getProductCode(),
                 product.getProductName(),
                 userSignId,
@@ -298,6 +304,13 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
                 null,
                 null
         );
+    }
+
+    private Long requireBenefitAmount(CreateBenefitOrderRequest request) {
+        if (request.benefitAmount() == null || request.benefitAmount() <= 0) {
+            throw new BizException("BENEFIT_AMOUNT_REQUIRED", "Benefit amount is required for QW member sync");
+        }
+        return request.benefitAmount();
     }
 
     private Long parseUserSignId(String signRequestNo) {

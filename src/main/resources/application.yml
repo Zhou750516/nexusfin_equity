@@ -71,7 +71,10 @@ nexusfin:
       protocol-link-required: ${H5_BENEFITS_PROTOCOL_LINK_REQUIRED:true}
       use-local-receiving-account: ${H5_BENEFITS_USE_LOCAL_RECEIVING_ACCOUNT:false}
       activate:
-        default-loan-amount: 300000
+        # 内部金额单位为分；300000 = 3000 元，用信金额。
+        default-loan-amount: ${H5_BENEFITS_ACTIVATE_DEFAULT_LOAN_AMOUNT:300000}
+        # 内部金额单位为分；30000 = 300 元，权益费用。
+        default-benefit-amount: ${H5_BENEFITS_ACTIVATE_DEFAULT_BENEFIT_AMOUNT:30000}
         supported-card-type: huixuan_card
         success-message: 惠选卡开通成功
       detail:

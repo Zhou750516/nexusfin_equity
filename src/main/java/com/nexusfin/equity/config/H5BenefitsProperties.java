@@ -15,6 +15,7 @@ public record H5BenefitsProperties(
 
     public record Activate(
             Long defaultLoanAmount,
+            Long defaultBenefitAmount,
             String supportedCardType,
             String successMessage
     ) {

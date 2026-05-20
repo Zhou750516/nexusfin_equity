@@ -155,13 +155,16 @@ public class BenefitsServiceImpl implements BenefitsService {
                 "activate-" + request.applicationId(),
                 h5BenefitsProperties.productCode(),
                 activate.defaultLoanAmount(),
+                activate.defaultBenefitAmount(),
                 Boolean.TRUE
         ));
-        log.info("traceId={} bizOrderNo={} applicationId={} reason=benefits_activate_skip_redirect_url "
+        log.info("traceId={} bizOrderNo={} applicationId={} loanAmount={} benefitAmount={} reason=benefits_activate_skip_redirect_url "
                         + "benefits activate skips redirect url before yunka sync",
                 TraceIdUtil.getTraceId(),
                 response.benefitOrderNo(),
-                request.applicationId());
+                request.applicationId(),
+                activate.defaultLoanAmount(),
+                activate.defaultBenefitAmount());
         var syncResponse = xiaohuaGatewayService.syncBenefitOrder(
                 "BENEFITS-SYNC-" + request.applicationId(),
                 response.benefitOrderNo(),
@@ -169,7 +172,7 @@ public class BenefitsServiceImpl implements BenefitsService {
                         memberId,
                         request.applicationId(),
                         "ACTIVE",
-                        activate.defaultLoanAmount(),
+                        activate.defaultBenefitAmount(),
                         null
                 )
         );

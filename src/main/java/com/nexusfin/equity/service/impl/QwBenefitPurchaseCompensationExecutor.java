@@ -50,7 +50,7 @@ public class QwBenefitPurchaseCompensationExecutor implements AsyncCompensationE
         QwMemberSyncResponse response = qwBenefitClient.syncMemberOrder(new QwMemberSyncRequest(
                 payload.externalUserId(),
                 payload.benefitOrderNo(),
-                payload.loanAmount(),
+                requireBenefitAmount(payload.benefitAmount()),
                 payload.productCode(),
                 payload.productCode(),
                 requireUserSignId(payload.userSignId()),
@@ -77,6 +77,13 @@ public class QwBenefitPurchaseCompensationExecutor implements AsyncCompensationE
         return userSignId;
     }
 
+    private Long requireBenefitAmount(Long benefitAmount) {
+        if (benefitAmount == null || benefitAmount <= 0) {
+            throw new BizException("BENEFIT_AMOUNT_REQUIRED", "Benefit amount is required for QW member sync compensation");
+        }
+        return benefitAmount;
+    }
+
     private QwBenefitPurchasePayload readPayload(AsyncCompensationTask task) {
         try {
             return objectMapper.readValue(task.getRequestPayload(), QwBenefitPurchasePayload.class);
@@ -100,6 +107,7 @@ public class QwBenefitPurchaseCompensationExecutor implements AsyncCompensationE
             String benefitOrderNo,
             String productCode,
             Long loanAmount,
+            Long benefitAmount,
             Long userSignId
     ) {
     }

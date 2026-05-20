@@ -110,7 +110,7 @@ class BenefitOrderServiceTest {
 
         CreateBenefitOrderResponse response = benefitOrderService.createOrder(
                 "mem-2",
-                new CreateBenefitOrderRequest("req-order-1", "P-2", 680000L, true)
+                new CreateBenefitOrderRequest("req-order-1", "P-2", 300000L, 30000L, true)
         );
 
         ArgumentCaptor<BenefitOrder> captor = ArgumentCaptor.forClass(BenefitOrder.class);
@@ -123,9 +123,11 @@ class BenefitOrderServiceTest {
         assertThat(captor.getValue().getProductCode()).isEqualTo("P-2");
         assertThat(captor.getValue().getMemberId()).isEqualTo("mem-2");
         assertThat(captor.getValue().getRequestId()).isEqualTo("req-order-1");
+        assertThat(captor.getValue().getLoanAmount()).isEqualTo(300000L);
         assertThat(captor.getValue().getPayProtocolNoSnapshot()).isEqualTo("AGRM-REAL-001");
         assertThat(captor.getValue().getPayProtocolSource()).isEqualTo("QW_SIGN");
         assertThat(captor.getValue().getQwUserSignIdSnapshot()).isEqualTo(10001L);
+        assertThat(syncRequestCaptor.getValue().payAmount()).isEqualTo(30000L);
         assertThat(syncRequestCaptor.getValue().userSignId()).isEqualTo(10001L);
         verify(idempotencyService).markProcessed("req-order-1", "CREATE_ORDER", captor.getValue().getBenefitOrderNo(), "FIRST_DEDUCT_PENDING");
     }
@@ -154,7 +156,7 @@ class BenefitOrderServiceTest {
 
         benefitOrderService.createOrder(
                 "mem-2",
-                new CreateBenefitOrderRequest("req-order-sign-ref", "P-2", 680000L, true)
+                new CreateBenefitOrderRequest("req-order-sign-ref", "P-2", 680000L, 30000L, true)
         );
 
         ArgumentCaptor<BenefitOrder> orderCaptor = ArgumentCaptor.forClass(BenefitOrder.class);
@@ -386,7 +388,7 @@ class BenefitOrderServiceTest {
 
         assertThatThrownBy(() -> benefitOrderService.createOrder(
                 "mem-4",
-                new CreateBenefitOrderRequest("req-order-timeout", "P-4", 680000L, true)
+                new CreateBenefitOrderRequest("req-order-timeout", "P-4", 680000L, 30000L, true)
         )).isInstanceOf(BizException.class)
                 .hasMessageContaining("QW_SYNC_TIMEOUT");
 
@@ -403,5 +405,6 @@ class BenefitOrderServiceTest {
         assertThat(payload.userSignId()).isEqualTo(10004L);
         assertThat(payload.productCode()).isEqualTo("P-4");
         assertThat(payload.loanAmount()).isEqualTo(680000L);
+        assertThat(payload.benefitAmount()).isEqualTo(30000L);
     }
 }

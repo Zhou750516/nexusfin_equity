@@ -44,6 +44,7 @@ class QwBenefitPurchaseCompensationExecutorTest {
                   "benefitOrderNo": "ord-001",
                   "productCode": "HUXUAN_CARD",
                   "loanAmount": 300000,
+                  "benefitAmount": 30000,
                   "userSignId": 998877
                 }
                 """);
@@ -72,7 +73,7 @@ class QwBenefitPurchaseCompensationExecutorTest {
         assertThat(requestCaptor.getValue().uniqueId()).isEqualTo("user-001");
         assertThat(requestCaptor.getValue().partnerOrderNo()).isEqualTo("ord-001");
         assertThat(requestCaptor.getValue().productCode()).isEqualTo("HUXUAN_CARD");
-        assertThat(requestCaptor.getValue().payAmount()).isEqualTo(300000L);
+        assertThat(requestCaptor.getValue().payAmount()).isEqualTo(30000L);
         assertThat(requestCaptor.getValue().userSignId()).isEqualTo(998877L);
         assertThat(result.responsePayload()).contains("qw-order-001");
         ArgumentCaptor<BenefitOrder> orderCaptor = ArgumentCaptor.forClass(BenefitOrder.class);
@@ -94,6 +95,7 @@ class QwBenefitPurchaseCompensationExecutorTest {
                   "benefitOrderNo": "ord-002",
                   "productCode": "HUXUAN_CARD",
                   "loanAmount": 500000,
+                  "benefitAmount": 30000,
                   "userSignId": 11223344
                 }
                 """);

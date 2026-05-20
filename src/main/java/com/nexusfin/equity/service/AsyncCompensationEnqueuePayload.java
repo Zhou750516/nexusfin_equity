@@ -24,6 +24,7 @@ public sealed interface AsyncCompensationEnqueuePayload
             String benefitOrderNo,
             String productCode,
             Long loanAmount,
+            Long benefitAmount,
             Long userSignId
     ) implements AsyncCompensationEnqueuePayload {
     }
