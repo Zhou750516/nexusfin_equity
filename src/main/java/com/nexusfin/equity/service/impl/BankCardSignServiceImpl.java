@@ -39,6 +39,7 @@ public class BankCardSignServiceImpl implements BankCardSignService {
     private static final String STATUS_SIGNED = "SIGNED";
     private static final String STATUS_UNSIGNED = "UNSIGNED";
     private static final String STATUS_SMS_SENT = "SMS_SENT";
+    private static final String STATUS_QW_SIGN_QUERY_REUSE = "QW_SIGN_QUERY_REUSE";
     private static final String PROVIDER_QW_SIGN = "QW_SIGN";
     private static final String QW_SIGN_UPSTREAM_FAILED = "QW_SIGN_UPSTREAM_FAILED";
     private static final String QW_SIGN_UPSTREAM_TIMEOUT = "QW_SIGN_UPSTREAM_TIMEOUT";
@@ -79,17 +80,47 @@ public class BankCardSignServiceImpl implements BankCardSignService {
                 TraceIdUtil.getTraceId(), bizOrderNo, requestId, memberId);
         try {
             MemberInfo memberInfo = resolveMember(memberId);
+            var currentProtocol = memberPaymentProtocolRepository.selectActiveByMemberId(memberInfo.getMemberId(), PROVIDER_QW_SIGN);
+            Long localUserSignId = parseUserSignId(currentProtocol == null ? null : currentProtocol.getSignRequestNo());
+            if (localUserSignId != null) {
+                log.info("traceId={} bizOrderNo={} requestId={} userSignId={} memberId={} elapsedMs={} status={} "
+                                + "bank-card sign status reused local active protocol",
+                        TraceIdUtil.getTraceId(),
+                        bizOrderNo,
+                        requestId,
+                        localUserSignId,
+                        memberId,
+                        elapsedMs(startNanos),
+                        STATUS_SIGNED);
+                return new BankCardSignStatusResponse(accountNo, true, STATUS_SIGNED, localUserSignId, false);
+            }
             QwSignStatusResponse response = qwBenefitClient.querySignStatus(new QwSignStatusRequest(
                     resolveMerchantId(),
                     decryptRequired(memberInfo.getMobileEncrypted(), "MEMBER_MOBILE_MISSING", "Member mobile is missing"),
                     decryptRequired(memberInfo.getRealNameEncrypted(), "MEMBER_NAME_MISSING", "Member real name is missing"),
                     accountNo
             ));
+            Long userSignId = response == null ? null : response.userSignId();
+            if (userSignId != null) {
+                String status = Integer.valueOf(1).equals(response.status()) ? STATUS_SIGNED : STATUS_QW_SIGN_QUERY_REUSE;
+                saveQueryReuseProtocol(memberInfo, userSignId);
+                log.info("traceId={} bizOrderNo={} requestId={} userSignId={} memberId={} elapsedMs={} status={} "
+                                + "reason=qw_sign_query_user_sign_id_reused bank-card sign status qw request success",
+                        TraceIdUtil.getTraceId(),
+                        bizOrderNo,
+                        requestId,
+                        userSignId,
+                        memberId,
+                        elapsedMs(startNanos),
+                        status);
+                return new BankCardSignStatusResponse(accountNo, true, status, userSignId, false);
+            }
             boolean signed = response != null && Integer.valueOf(1).equals(response.status());
             String status = signed ? STATUS_SIGNED : STATUS_UNSIGNED;
-            log.info("traceId={} bizOrderNo={} requestId={} memberId={} elapsedMs={} status={} bank-card sign status qw request success",
-                    TraceIdUtil.getTraceId(), bizOrderNo, requestId, memberId, elapsedMs(startNanos), status);
-            return new BankCardSignStatusResponse(accountNo, signed, status);
+            log.info("traceId={} bizOrderNo={} requestId={} memberId={} elapsedMs={} status={} canApplySign={} "
+                            + "bank-card sign status qw request success",
+                    TraceIdUtil.getTraceId(), bizOrderNo, requestId, memberId, elapsedMs(startNanos), status, !signed);
+            return new BankCardSignStatusResponse(accountNo, signed, status, null, !signed);
         } catch (UpstreamTimeoutException exception) {
             logFailure("bank-card sign status qw request failed", bizOrderNo, requestId, memberId, startNanos, exception);
             throw new BizException(QW_SIGN_UPSTREAM_TIMEOUT, "QW sign status temporarily unavailable");
@@ -97,7 +128,7 @@ public class BankCardSignServiceImpl implements BankCardSignService {
             if (isQwUserUnsigned(exception)) {
                 log.info("traceId={} bizOrderNo={} requestId={} memberId={} elapsedMs={} status={} bank-card sign status qw request unsigned",
                         TraceIdUtil.getTraceId(), bizOrderNo, requestId, memberId, elapsedMs(startNanos), STATUS_UNSIGNED);
-                return new BankCardSignStatusResponse(accountNo, false, STATUS_UNSIGNED);
+                return new BankCardSignStatusResponse(accountNo, false, STATUS_UNSIGNED, null, true);
             }
             logFailure("bank-card sign status qw request failed", bizOrderNo, requestId, memberId, startNanos, exception);
             throw exception;
@@ -223,6 +254,30 @@ public class BankCardSignServiceImpl implements BankCardSignService {
 
     private String firstNonBlank(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private void saveQueryReuseProtocol(MemberInfo memberInfo, Long userSignId) {
+        MemberChannel memberChannel = memberChannelRepository.selectLatestByMemberId(memberInfo.getMemberId());
+        paymentProtocolService.saveActiveProtocol(new PaymentProtocolService.SavePaymentProtocolCommand(
+                memberInfo.getMemberId(),
+                firstNonBlank(memberInfo.getExternalUserId(), memberInfo.getTechPlatformUserId()),
+                PROVIDER_QW_SIGN,
+                STATUS_QW_SIGN_QUERY_REUSE + "-" + userSignId,
+                String.valueOf(userSignId),
+                memberChannel == null ? null : memberChannel.getChannelCode(),
+                LocalDateTime.now()
+        ));
+    }
+
+    private Long parseUserSignId(String signRequestNo) {
+        if (signRequestNo == null || signRequestNo.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(signRequestNo);
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 
     private void logFailure(

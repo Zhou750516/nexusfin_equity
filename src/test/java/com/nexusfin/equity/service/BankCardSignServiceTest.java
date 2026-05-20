@@ -79,7 +79,7 @@ class BankCardSignServiceTest {
         when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户");
         when(qwProperties.getDirect()).thenReturn(qwDirectProperties);
         when(qwDirectProperties.getMerchantId()).thenReturn("200000000007804");
-        when(qwBenefitClient.querySignStatus(any())).thenReturn(new QwSignStatusResponse(1));
+        when(qwBenefitClient.querySignStatus(any())).thenReturn(new QwSignStatusResponse(1, 2605203409909L, "2026-05-20 11:30:27"));
 
         BankCardSignStatusResponse response = bankCardSignService.getSignStatus("mem-1", "6222020202020208");
 
@@ -92,10 +92,90 @@ class BankCardSignServiceTest {
         assertThat(response.signed()).isTrue();
         assertThat(response.status()).isEqualTo("SIGNED");
         assertThat(response.accountNo()).isEqualTo("6222020202020208");
+        assertThat(response.userSignId()).isEqualTo(2605203409909L);
+        assertThat(response.canApplySign()).isFalse();
         assertThat(output).contains("bank-card sign status qw request begin");
         assertThat(output).contains("bank-card sign status qw request success");
         assertThat(output).contains("bizOrderNo=bank-card-0208");
         assertThat(output).doesNotContain("6222020202020208");
+    }
+
+    @Test
+    void shouldReuseExistingQwUserSignIdWhenSignQueryReturnsFailedStatus(CapturedOutput output) {
+        MemberInfo memberInfo = buildMember();
+        MemberChannel memberChannel = new MemberChannel();
+        memberChannel.setMemberId("mem-1");
+        memberChannel.setChannelCode("KJ");
+        memberChannel.setExternalUserId("tech-user-1");
+        when(memberInfoRepository.selectById("mem-1")).thenReturn(memberInfo);
+        when(memberChannelRepository.selectLatestByMemberId("mem-1")).thenReturn(memberChannel);
+        when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("18518628442");
+        when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("张蒙");
+        when(qwProperties.getDirect()).thenReturn(qwDirectProperties);
+        when(qwDirectProperties.getMerchantId()).thenReturn("46186385");
+        when(qwBenefitClient.querySignStatus(any()))
+                .thenReturn(new QwSignStatusResponse(-1, 2605203409909L, "2026-05-20 11:30:27"));
+
+        BankCardSignStatusResponse response = bankCardSignService.getSignStatus("mem-1", "622908328976881119");
+
+        assertThat(response.accountNo()).isEqualTo("622908328976881119");
+        assertThat(response.signed()).isTrue();
+        assertThat(response.status()).isEqualTo("QW_SIGN_QUERY_REUSE");
+        assertThat(response.userSignId()).isEqualTo(2605203409909L);
+        assertThat(response.canApplySign()).isFalse();
+        ArgumentCaptor<PaymentProtocolService.SavePaymentProtocolCommand> protocolCaptor =
+                ArgumentCaptor.forClass(PaymentProtocolService.SavePaymentProtocolCommand.class);
+        verify(paymentProtocolService).saveActiveProtocol(protocolCaptor.capture());
+        assertThat(protocolCaptor.getValue().memberId()).isEqualTo("mem-1");
+        assertThat(protocolCaptor.getValue().externalUserId()).isEqualTo("tech-user-1");
+        assertThat(protocolCaptor.getValue().providerCode()).isEqualTo("QW_SIGN");
+        assertThat(protocolCaptor.getValue().protocolNo()).isEqualTo("QW_SIGN_QUERY_REUSE-2605203409909");
+        assertThat(protocolCaptor.getValue().signRequestNo()).isEqualTo("2605203409909");
+        assertThat(output).contains("status=QW_SIGN_QUERY_REUSE");
+        assertThat(output).contains("reason=qw_sign_query_user_sign_id_reused");
+        assertThat(output).doesNotContain("622908328976881119");
+        assertThat(output).doesNotContain("18518628442");
+        assertThat(output).doesNotContain("张蒙");
+    }
+
+    @Test
+    void shouldAllowSignApplyOnlyWhenSignQueryHasNoUserSignId() {
+        MemberInfo memberInfo = buildMember();
+        when(memberInfoRepository.selectById("mem-1")).thenReturn(memberInfo);
+        when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
+        when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户");
+        when(qwProperties.getDirect()).thenReturn(qwDirectProperties);
+        when(qwDirectProperties.getMerchantId()).thenReturn("200000000007804");
+        when(qwBenefitClient.querySignStatus(any())).thenReturn(new QwSignStatusResponse(0, null, null));
+
+        BankCardSignStatusResponse response = bankCardSignService.getSignStatus("mem-1", "6222020202021234");
+
+        assertThat(response.signed()).isFalse();
+        assertThat(response.status()).isEqualTo("UNSIGNED");
+        assertThat(response.userSignId()).isNull();
+        assertThat(response.canApplySign()).isTrue();
+        verify(paymentProtocolService, never()).saveActiveProtocol(any());
+    }
+
+    @Test
+    void shouldPreferLocalActiveQwSignProtocolForSignStatus() {
+        MemberInfo memberInfo = buildMember();
+        MemberPaymentProtocol existingProtocol = new MemberPaymentProtocol();
+        existingProtocol.setMemberId("mem-1");
+        existingProtocol.setProviderCode("QW_SIGN");
+        existingProtocol.setProtocolNo("AGRM-LOCAL-001");
+        existingProtocol.setSignRequestNo("11223344");
+        existingProtocol.setProtocolStatus("ACTIVE");
+        when(memberInfoRepository.selectById("mem-1")).thenReturn(memberInfo);
+        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-1", "QW_SIGN")).thenReturn(existingProtocol);
+
+        BankCardSignStatusResponse response = bankCardSignService.getSignStatus("mem-1", "6222020202021234");
+
+        assertThat(response.signed()).isTrue();
+        assertThat(response.status()).isEqualTo("SIGNED");
+        assertThat(response.userSignId()).isEqualTo(11223344L);
+        assertThat(response.canApplySign()).isFalse();
+        verify(qwBenefitClient, never()).querySignStatus(any());
     }
 
     @Test

@@ -106,6 +106,27 @@ class QwBenefitClientImplTest {
     }
 
     @Test
+    void shouldParseSignQueryUserSignIdAndSignStatusFrom0515Contract() throws Exception {
+        String responsePayload = encryptHex(
+                "unit-test-aes-16",
+                "{\"userSignId\":2605203409909,\"signStatus\":-1,\"applyTime\":\"2026-05-20 11:30:27\"}"
+        );
+        QwBenefitClientImpl client = new QwBenefitClientImpl(qwProperties(), objectMapper);
+
+        QwSignStatusResponse response = (QwSignStatusResponse) invoke(
+                client,
+                "parseResponse",
+                new Class<?>[]{String.class, Class.class},
+                "{\"code\":200,\"msg\":\"success\",\"data\":\"" + responsePayload + "\"}",
+                QwSignStatusResponse.class
+        );
+
+        assertThat(response.userSignId()).isEqualTo(2605203409909L);
+        assertThat(response.status()).isEqualTo(-1);
+        assertThat(response.applyTime()).isEqualTo("2026-05-20 11:30:27");
+    }
+
+    @Test
     void shouldReturnMockExerciseUrlForMockMode() {
         QwProperties properties = qwProperties();
         properties.setMode(QwProperties.Mode.MOCK);
@@ -469,6 +490,57 @@ class QwBenefitClientImplTest {
         assertThat(output).doesNotContain("unit-test-aes-16");
         assertThat(output).doesNotContain("13800138000");
         assertThat(output).doesNotContain("6222020202021234");
+        server.verify();
+    }
+
+    @Test
+    void shouldTreatPushOrderCode530AsIdempotentSuccess(CapturedOutput output) {
+        TraceIdUtil.bindTraceId("TRACE-QW-PUSH-ORDER-530");
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        server.expect(requestTo("https://t-api.test.qweimobile.com/api/abs/method"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{\"code\":530,\"msg\":\"订单已经存在\",\"data\":\"\"}", MediaType.APPLICATION_JSON));
+        QwBenefitClientImpl client = new QwBenefitClientImpl(qwProperties(), objectMapper, restClientBuilder.build());
+
+        QwMemberSyncResponse response = client.syncMemberOrder(new QwMemberSyncRequest(
+                "user-1",
+                "ord-1",
+                30000L,
+                "abs001",
+                "艾博生月卡",
+                2605203409909L,
+                null,
+                0,
+                null,
+                null,
+                null,
+                null
+        ));
+
+        assertThat(response.productCode()).isEqualTo("abs001");
+        String successLine = logLine(output, "qw gateway request success");
+        assertThat(successLine).contains("qw_method=abs.push.order");
+        assertThat(successLine).contains("qwCode=530");
+        assertThat(successLine).contains("reason=qw_member_order_already_exists");
+        assertThat(output).doesNotContain("errorNo=QW_UPSTREAM_REJECTED");
+        server.verify();
+    }
+
+    @Test
+    void shouldStillRejectCode530ForSignConfirm() {
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        server.expect(requestTo("https://t-api.test.qweimobile.com/api/abs/method"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{\"code\":530,\"msg\":\"订单已经存在\",\"data\":\"\"}", MediaType.APPLICATION_JSON));
+        QwBenefitClientImpl client = new QwBenefitClientImpl(qwProperties(), objectMapper, restClientBuilder.build());
+
+        assertThatThrownBy(() -> client.confirmSign(new QwSignConfirmRequest(2605203409909L, "123456")))
+                .isInstanceOf(BizException.class)
+                .extracting(error -> ((BizException) error).getCode(), error -> ((BizException) error).getErrorNo())
+                .containsExactly(530, "QW_UPSTREAM_REJECTED");
+
         server.verify();
     }
 

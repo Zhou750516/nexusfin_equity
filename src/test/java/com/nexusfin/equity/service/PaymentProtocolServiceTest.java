@@ -69,6 +69,25 @@ class PaymentProtocolServiceTest {
     }
 
     @Test
+    void shouldResolveQueryReuseProtocolSourceForBenefitOrder() {
+        BenefitOrder order = buildOrder();
+        MemberPaymentProtocol protocol = new MemberPaymentProtocol();
+        protocol.setMemberId("mem-1");
+        protocol.setExternalUserId("user-1");
+        protocol.setProviderCode("QW_SIGN");
+        protocol.setProtocolNo("QW_SIGN_QUERY_REUSE-2605203409909");
+        protocol.setSignRequestNo("2605203409909");
+        protocol.setProtocolStatus("ACTIVE");
+        when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-1", "QW_SIGN")).thenReturn(protocol);
+
+        PaymentProtocolService.ResolvedPaymentProtocol resolved = paymentProtocolService.resolveForBenefitOrder(order);
+
+        assertThat(resolved.protocolNo()).isEqualTo("QW_SIGN_QUERY_REUSE-2605203409909");
+        assertThat(resolved.signRequestNo()).isEqualTo("2605203409909");
+        assertThat(resolved.source()).isEqualTo("QW_SIGN_QUERY_REUSE");
+    }
+
+    @Test
     void shouldRejectWhenNoActiveQwSignReferenceExists() {
         BenefitOrder order = buildOrder();
         when(memberPaymentProtocolRepository.selectActiveByMemberId("mem-1", "QW_SIGN")).thenReturn(null);

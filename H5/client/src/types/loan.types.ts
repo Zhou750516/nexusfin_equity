@@ -157,6 +157,8 @@ export interface BankCardSignStatusResult {
   accountNo: string;
   signed: boolean;
   status: string;
+  userSignId?: number | null;
+  canApplySign?: boolean;
 }
 
 export interface BankCardSignApplyParams {

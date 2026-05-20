@@ -79,7 +79,8 @@ class BankCardSignControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.signed").value(true))
-                .andExpect(jsonPath("$.data.status").value("SIGNED"));
+                .andExpect(jsonPath("$.data.status").value("SIGNED"))
+                .andExpect(jsonPath("$.data.canApplySign").value(false));
     }
 
     @Test
@@ -93,7 +94,8 @@ class BankCardSignControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.signed").value(false))
-                .andExpect(jsonPath("$.data.status").value("UNSIGNED"));
+                .andExpect(jsonPath("$.data.status").value("UNSIGNED"))
+                .andExpect(jsonPath("$.data.canApplySign").value(true));
     }
 
     @Test

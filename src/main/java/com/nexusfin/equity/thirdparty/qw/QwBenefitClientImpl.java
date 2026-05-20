@@ -190,15 +190,19 @@ public class QwBenefitClientImpl implements QwBenefitClient {
                     .retrieve()
                     .body(String.class);
             try {
-                ParsedQwResponse<T> parsed = parseResponseWithPlaintext(rawResponse, responseType);
+                ParsedQwResponse<T> parsed = isQwMemberOrderAlreadyExists(method, rawResponse)
+                        ? idempotentPushOrderResponse(businessRequest, responseType)
+                        : parseResponseWithPlaintext(rawResponse, responseType);
                 String responseBodyJson = responseBodySummary(rawResponse, parsed.plaintextJson(), plaintextPayloadLogMode);
-                log.info("traceId={} qw_method={} qw_target_uri={} qw_partner_no={} elapsedMs={} qwCode={} plaintextPayloadLogMode={} requestEnvelopeJson={} responseBodyJson={} qw gateway request success",
+                String idempotentReason = idempotentSuccessReason(method, qwCode(rawResponse));
+                log.info("traceId={} qw_method={} qw_target_uri={} qw_partner_no={} elapsedMs={} qwCode={} reason={} plaintextPayloadLogMode={} requestEnvelopeJson={} responseBodyJson={} qw gateway request success",
                         traceId,
                         method,
                         targetUri,
                         qwProperties.getPartnerNo(),
                         elapsedMs(startNanos),
                         qwCode(rawResponse),
+                        idempotentReason,
                         plaintextPayloadLogMode,
                         requestEnvelopeJson,
                         responseBodyJson);
@@ -505,7 +509,7 @@ public class QwBenefitClientImpl implements QwBenefitClient {
             JsonNode root = objectMapper.readTree(rawResponse);
             int code = root.path("code").asInt(500);
             if (code != 200) {
-                throw new BizException("QW_UPSTREAM_REJECTED", root.path("msg").asText("QW upstream rejected request"));
+                throw new BizException(code, "QW_UPSTREAM_REJECTED", root.path("msg").asText("QW upstream rejected request"));
             }
             JsonNode data = root.get("data");
             if (data == null || data.isNull() || data.asText().isBlank()) {
@@ -677,6 +681,32 @@ public class QwBenefitClientImpl implements QwBenefitClient {
                 now,
                 DATE_TIME_FORMATTER.format(LocalDateTime.now().plusYears(1))
         );
+    }
+
+    private boolean isQwMemberOrderAlreadyExists(String method, String rawResponse) {
+        return "abs.push.order".equals(method) && qwCode(rawResponse) == 530;
+    }
+
+    private <T> ParsedQwResponse<T> idempotentPushOrderResponse(Object businessRequest, Class<T> responseType) {
+        if (!QwMemberSyncResponse.class.equals(responseType) || !(businessRequest instanceof QwMemberSyncRequest request)) {
+            throw new BizException(530, QW_UPSTREAM_REJECTED, "订单已经存在");
+        }
+        QwMemberSyncResponse response = new QwMemberSyncResponse(
+                null,
+                null,
+                null,
+                null,
+                request.productCode(),
+                request.productName(),
+                null,
+                null,
+                null
+        );
+        return new ParsedQwResponse<>(responseType.cast(response), null);
+    }
+
+    private String idempotentSuccessReason(String method, int code) {
+        return "abs.push.order".equals(method) && code == 530 ? "qw_member_order_already_exists" : "none";
     }
 
     private QwExerciseUrlResponse mockExerciseUrl(QwExerciseUrlRequest request) {

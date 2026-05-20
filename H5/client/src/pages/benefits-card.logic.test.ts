@@ -102,11 +102,36 @@ describe("benefits card page logic", () => {
     expect(getSignStatus).toHaveBeenCalledWith("card-001");
   });
 
+  it("allows direct activation when sign status reuses an existing QW userSignId", async () => {
+    const getSignStatus = vi.fn().mockResolvedValue({
+      accountNo: "card-001",
+      signed: false,
+      status: "QW_SIGN_QUERY_REUSE",
+      userSignId: 2605203409909,
+      canApplySign: false,
+    });
+
+    const result = await checkBenefitsActivationSignGate({
+      userCard: {
+        cardId: "card-001",
+        bankName: "兴业银行",
+        cardLastFour: "8119",
+        defaultCard: true,
+      },
+      getSignStatus,
+    });
+
+    expect(result).toEqual({ type: "activate" });
+    expect(getSignStatus).toHaveBeenCalledWith("card-001");
+  });
+
   it("opens the sign dialog without activating when the default card is not signed", async () => {
     const getSignStatus = vi.fn().mockResolvedValue({
       accountNo: "card-001",
       signed: false,
       status: "UNSIGNED",
+      userSignId: null,
+      canApplySign: true,
     });
 
     const result = await checkBenefitsActivationSignGate({

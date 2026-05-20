@@ -21,6 +21,8 @@ import com.nexusfin.equity.thirdparty.qw.QwMemberSyncResponse;
 import com.nexusfin.equity.thirdparty.qw.QwMemberSyncRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -33,7 +35,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class BenefitOrderServiceTest {
 
     @Mock
@@ -167,6 +169,81 @@ class BenefitOrderServiceTest {
         assertThat(orderCaptor.getValue().getPayProtocolSource()).isEqualTo("QW_SIGN");
         assertThat(orderCaptor.getValue().getQwUserSignIdSnapshot()).isEqualTo(778899L);
         assertThat(requestCaptor.getValue().userSignId()).isEqualTo(778899L);
+    }
+
+    @Test
+    void shouldTreatQwMemberSyncOrderAlreadyExistsAsIdempotentSuccess(CapturedOutput output) {
+        BenefitProduct product = new BenefitProduct();
+        product.setProductCode("abs001");
+        product.setProductName("艾博生月卡");
+        product.setStatus("ACTIVE");
+        MemberInfo memberInfo = new MemberInfo();
+        memberInfo.setMemberId("mem-qw-530");
+        MemberChannel memberChannel = new MemberChannel();
+        memberChannel.setChannelCode("KJ");
+        memberChannel.setExternalUserId("user-qw-530");
+        when(benefitProductRepository.selectById("abs001")).thenReturn(product);
+        when(memberInfoRepository.selectById("mem-qw-530")).thenReturn(memberInfo);
+        when(memberChannelRepository.selectOne(any())).thenReturn(memberChannel);
+        when(idempotencyService.isProcessed("req-qw-530")).thenReturn(false);
+        when(paymentProtocolService.resolveForBenefitOrder(any(BenefitOrder.class)))
+                .thenReturn(new PaymentProtocolService.ResolvedPaymentProtocol("QW_SIGN_QUERY_REUSE-2605203409909", "2605203409909", "QW_SIGN_QUERY_REUSE"));
+        when(qwBenefitClient.syncMemberOrder(any()))
+                .thenThrow(new BizException(530, "QW_UPSTREAM_REJECTED", "订单已经存在"));
+
+        CreateBenefitOrderResponse response = benefitOrderService.createOrder(
+                "mem-qw-530",
+                new CreateBenefitOrderRequest("req-qw-530", "abs001", 300000L, 30000L, true)
+        );
+
+        ArgumentCaptor<BenefitOrder> orderCaptor = ArgumentCaptor.forClass(BenefitOrder.class);
+        ArgumentCaptor<QwMemberSyncRequest> requestCaptor = ArgumentCaptor.forClass(QwMemberSyncRequest.class);
+        verify(benefitOrderRepository).insert(orderCaptor.capture());
+        verify(qwBenefitClient).syncMemberOrder(requestCaptor.capture());
+        verify(benefitOrderRepository).updateById(orderCaptor.getValue());
+        verify(idempotencyService).markProcessed(
+                "req-qw-530",
+                "CREATE_ORDER",
+                orderCaptor.getValue().getBenefitOrderNo(),
+                "FIRST_DEDUCT_PENDING"
+        );
+        assertThat(response.orderStatus()).isEqualTo("FIRST_DEDUCT_PENDING");
+        assertThat(orderCaptor.getValue().getSyncStatus()).isEqualTo(BenefitOrderStatusEnum.SYNC_SUCCESS.name());
+        assertThat(orderCaptor.getValue().getQwUserSignIdSnapshot()).isEqualTo(2605203409909L);
+        assertThat(requestCaptor.getValue().payAmount()).isEqualTo(30000L);
+        assertThat(output).contains("qwCode=530");
+        assertThat(output).contains("reason=qw_member_order_already_exists");
+        assertThat(output).contains("userSignId=2605203409909");
+    }
+
+    @Test
+    void shouldNotTreatOtherQwMemberSyncRejectionsAsIdempotentSuccess() {
+        BenefitProduct product = new BenefitProduct();
+        product.setProductCode("abs001");
+        product.setProductName("艾博生月卡");
+        product.setStatus("ACTIVE");
+        MemberInfo memberInfo = new MemberInfo();
+        memberInfo.setMemberId("mem-qw-525");
+        MemberChannel memberChannel = new MemberChannel();
+        memberChannel.setChannelCode("KJ");
+        memberChannel.setExternalUserId("user-qw-525");
+        when(benefitProductRepository.selectById("abs001")).thenReturn(product);
+        when(memberInfoRepository.selectById("mem-qw-525")).thenReturn(memberInfo);
+        when(memberChannelRepository.selectOne(any())).thenReturn(memberChannel);
+        when(idempotencyService.isProcessed("req-qw-525")).thenReturn(false);
+        when(paymentProtocolService.resolveForBenefitOrder(any(BenefitOrder.class)))
+                .thenReturn(new PaymentProtocolService.ResolvedPaymentProtocol("AGRM-REAL-525", "2605203409909", "QW_SIGN"));
+        when(qwBenefitClient.syncMemberOrder(any()))
+                .thenThrow(new BizException(525, "QW_UPSTREAM_REJECTED", "产品价格不一致"));
+
+        assertThatThrownBy(() -> benefitOrderService.createOrder(
+                "mem-qw-525",
+                new CreateBenefitOrderRequest("req-qw-525", "abs001", 300000L, 30000L, true)
+        )).isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getCode())
+                .isEqualTo(525);
+
+        verify(idempotencyService, never()).markProcessed(any(), any(), any(), any());
     }
 
     @Test

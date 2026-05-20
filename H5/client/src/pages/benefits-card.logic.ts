@@ -12,6 +12,8 @@ export interface BenefitsSignStatus {
   accountNo: string;
   signed: boolean;
   status: string;
+  userSignId?: number | null;
+  canApplySign?: boolean;
 }
 
 export interface BenefitsSignApplyParams {
@@ -84,7 +86,7 @@ export async function checkBenefitsActivationSignGate({
   }
 
   const signStatus = await getSignStatus(userCard.cardId);
-  if (isSigned(signStatus)) {
+  if (isSigned(signStatus) || canReuseExistingSign(signStatus)) {
     return { type: "activate" };
   }
 
@@ -127,6 +129,10 @@ export async function confirmBenefitsSignAndActivate({
 
 function isSigned(status: { signed: boolean; status: string }) {
   return status.signed || status.status.toUpperCase() === "SIGNED";
+}
+
+function canReuseExistingSign(status: BenefitsSignStatus) {
+  return Boolean(status.userSignId) && status.canApplySign === false;
 }
 
 function maskCardLastFour(cardLastFour: string) {

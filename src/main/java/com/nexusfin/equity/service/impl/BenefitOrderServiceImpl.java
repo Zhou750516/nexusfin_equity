@@ -226,6 +226,31 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
                     )
             ));
             throw new BenefitPurchaseSyncTimeoutCompensationException("QW_SYNC_TIMEOUT:" + exception.getMessage());
+        } catch (BizException exception) {
+            if (!isQwMemberOrderAlreadyExists(exception)) {
+                throw exception;
+            }
+            syncResponse = new QwMemberSyncResponse(
+                    null,
+                    null,
+                    null,
+                    null,
+                    product.getProductCode(),
+                    product.getProductName(),
+                    null,
+                    null,
+                    null
+            );
+            benefitOrder.setSyncStatus(BenefitOrderStatusEnum.SYNC_SUCCESS.name());
+            benefitOrder.setUpdatedTs(LocalDateTime.now());
+            benefitOrderRepository.updateById(benefitOrder);
+            log.info("traceId={} bizOrderNo={} productCode={} userSignId={} qwCode={} reason=qw_member_order_already_exists "
+                            + "qw member sync treated as idempotent success",
+                    com.nexusfin.equity.util.TraceIdUtil.getTraceId(),
+                    benefitOrder.getBenefitOrderNo(),
+                    product.getProductCode(),
+                    userSignId,
+                    exception.getCode());
         }
         idempotencyService.markProcessed(
                 request.requestId(),
@@ -311,6 +336,12 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
             throw new BizException("BENEFIT_AMOUNT_REQUIRED", "Benefit amount is required for QW member sync");
         }
         return request.benefitAmount();
+    }
+
+    private boolean isQwMemberOrderAlreadyExists(BizException exception) {
+        return exception != null
+                && exception.getCode() == 530
+                && "QW_UPSTREAM_REJECTED".equals(exception.getErrorNo());
     }
 
     private Long parseUserSignId(String signRequestNo) {

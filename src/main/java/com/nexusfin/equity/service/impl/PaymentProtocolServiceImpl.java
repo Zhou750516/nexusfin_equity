@@ -19,6 +19,7 @@ public class PaymentProtocolServiceImpl implements PaymentProtocolService {
     private static final String PROVIDER_QW_SIGN = "QW_SIGN";
     private static final String STATUS_ACTIVE = "ACTIVE";
     private static final String SOURCE_QW_SIGN = "QW_SIGN";
+    private static final String SOURCE_QW_SIGN_QUERY_REUSE = "QW_SIGN_QUERY_REUSE";
 
     private final MemberPaymentProtocolRepository memberPaymentProtocolRepository;
 
@@ -79,14 +80,17 @@ public class PaymentProtocolServiceImpl implements PaymentProtocolService {
                 && !activeProtocol.getProtocolNo().isBlank()
                 && activeProtocol.getSignRequestNo() != null
                 && !activeProtocol.getSignRequestNo().isBlank()) {
+            String source = activeProtocol.getProtocolNo().startsWith(SOURCE_QW_SIGN_QUERY_REUSE + "-")
+                    ? SOURCE_QW_SIGN_QUERY_REUSE
+                    : SOURCE_QW_SIGN;
             log.info("traceId={} bizOrderNo={} resolved active qw sign reference from {}",
                     TraceIdUtil.getTraceId(),
                     order.getBenefitOrderNo(),
-                    SOURCE_QW_SIGN);
+                    source);
             return new ResolvedPaymentProtocol(
                     activeProtocol.getProtocolNo(),
                     activeProtocol.getSignRequestNo(),
-                    SOURCE_QW_SIGN
+                    source
             );
         }
         log.warn("traceId={} bizOrderNo={} errorNo={} errorMsg={} active qw sign reference missing",
