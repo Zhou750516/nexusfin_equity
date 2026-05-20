@@ -236,6 +236,7 @@ class XiaohuaGatewayServiceTest {
         ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> captor =
                 ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
         verify(yunkaGatewayClient).proxy(captor.capture());
+        assertThat(captor.getValue().path()).isEqualTo("/huijuapi/vip/orderNotice");
         JsonNode forwarded = objectMapper.valueToTree(captor.getValue().data());
         assertThat(forwarded.path("benefiturl").asText()).isEqualTo("https://redirect.test/exercise");
         assertThat(forwarded.path("benefitAmount").decimalValue()).isEqualByComparingTo("300.00");
@@ -264,7 +265,7 @@ class XiaohuaGatewayServiceTest {
                         "/card/smsConfirm",
                         "/card/userCards",
                         "/credit/image/query",
-                        "/benefit/sync"
+                        "/huijuapi/vip/orderNotice"
                 ),
                 "ABS",
                 "ABS-YUNKA-TEST",

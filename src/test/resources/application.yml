@@ -114,7 +114,7 @@ nexusfin:
         card-sms-confirm: /card/smsConfirm
         card-user-cards: /card/userCards
         credit-image-query: /credit/image/query
-        benefit-sync: /benefit/sync
+        benefit-sync: /huijuapi/vip/orderNotice
     tech-platform:
       enabled: true
       mode: MOCK

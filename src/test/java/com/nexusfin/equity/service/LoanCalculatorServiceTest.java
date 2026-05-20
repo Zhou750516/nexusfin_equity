@@ -313,7 +313,7 @@ class LoanCalculatorServiceTest {
                         "/card/smsConfirm",
                         "/card/userCards",
                         "/credit/image/query",
-                        "/benefit/sync"
+                        "/huijuapi/vip/orderNotice"
                 ),
                 "ABS",
                 "ABS-YUNKA-TEST",

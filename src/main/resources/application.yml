@@ -148,7 +148,7 @@ nexusfin:
         card-sms-confirm: ${YUNKA_CARD_SMS_CONFIRM_PATH:/card/smsConfirm}
         card-user-cards: ${YUNKA_CARD_USER_CARDS_PATH:/card/userCards}
         credit-image-query: ${YUNKA_CREDIT_IMAGE_QUERY_PATH:/credit/image/query}
-        benefit-sync: ${YUNKA_BENEFIT_SYNC_PATH:/benefit/sync}
+        benefit-sync: ${YUNKA_BENEFIT_SYNC_PATH:/huijuapi/vip/orderNotice}
     tech-platform:
       enabled: ${TECH_PLATFORM_API_ENABLED:true}
       mode: ${TECH_PLATFORM_API_MODE:MOCK}
