@@ -17,6 +17,7 @@ public class AuthProperties {
     private List<String> redirectWhitelist = new ArrayList<>();
     private List<String> protectedPathPrefixes = new ArrayList<>();
     private List<String> excludedPathPrefixes = new ArrayList<>();
+    private JointLogin jointLogin = new JointLogin();
     private Jwt jwt = new Jwt();
 
     public String getTechPlatformBaseUrl() {
@@ -105,6 +106,27 @@ public class AuthProperties {
 
     public void setJwt(Jwt jwt) {
         this.jwt = jwt;
+    }
+
+    public JointLogin getJointLogin() {
+        return jointLogin;
+    }
+
+    public void setJointLogin(JointLogin jointLogin) {
+        this.jointLogin = jointLogin;
+    }
+
+    public static class JointLogin {
+
+        private boolean refreshExistingProfile = false;
+
+        public boolean isRefreshExistingProfile() {
+            return refreshExistingProfile;
+        }
+
+        public void setRefreshExistingProfile(boolean refreshExistingProfile) {
+            this.refreshExistingProfile = refreshExistingProfile;
+        }
     }
 
     public static class Jwt {

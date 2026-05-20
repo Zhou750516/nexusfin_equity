@@ -87,7 +87,7 @@ public class JointLoginServiceImpl implements JointLoginService {
         validateJointUserMapping(userQueryResponse.payload(), absUserId, cid);
         JointIdentity identity = mapToIdentity(tokenResponse, userQueryResponse);
         logIdCardStatus(requestId, normalizedScene, absUserId, identity);
-        MemberInfo memberInfo = findOrCreateMember(existingMember, absUserId, identity);
+        MemberInfo memberInfo = findOrCreateMember(existingMember, absUserId, identity, requestId);
         ensureChannelBinding(memberInfo, identity.cid(), resolveChannelCode(identity.channelCode()));
         log.info("traceId={} requestId={} scene={} absUserId={} cid={} joint login mapping bound",
                 TraceIdUtil.getTraceId(),
@@ -191,15 +191,15 @@ public class JointLoginServiceImpl implements JointLoginService {
         }
     }
 
-    private MemberInfo findOrCreateMember(MemberInfo existing, String memberId, JointIdentity identity) {
+    private MemberInfo findOrCreateMember(MemberInfo existing, String memberId, JointIdentity identity, String requestId) {
         if (existing != null) {
-            syncMemberInfo(existing, identity);
+            syncExistingMemberInfo(existing, identity, requestId);
             memberInfoRepository.updateById(existing);
             return existing;
         }
         MemberInfo memberInfo = new MemberInfo();
         memberInfo.setMemberId(memberId);
-        syncMemberInfo(memberInfo, identity);
+        syncNewMemberInfo(memberInfo, identity);
         memberInfo.setMemberStatus(MemberStatusEnum.ACTIVE.name());
         memberInfo.setCreatedTs(LocalDateTime.now());
         memberInfo.setUpdatedTs(LocalDateTime.now());
@@ -207,12 +207,57 @@ public class JointLoginServiceImpl implements JointLoginService {
         return memberInfo;
     }
 
-    private void syncMemberInfo(MemberInfo memberInfo, JointIdentity identity) {
-        boolean newMember = memberInfo.getCreatedTs() == null;
-        String channelCode = resolveChannelCode(identity.channelCode());
-        String phone = normalizePhone(identity.phone(), newMember);
+    private void syncNewMemberInfo(MemberInfo memberInfo, JointIdentity identity) {
+        syncMemberIdentity(memberInfo, identity, true);
+    }
+
+    private void syncExistingMemberInfo(MemberInfo memberInfo, JointIdentity identity, String requestId) {
+        memberInfo.setTechPlatformUserId(identity.cid());
+        memberInfo.setExternalUserId(identity.cid());
+        if (authProperties.getJointLogin().isRefreshExistingProfile()) {
+            syncMemberIdentity(memberInfo, identity, false);
+            return;
+        }
+        StringBuilder profilePatch = new StringBuilder();
+        // Existing verified profile is preserved by default, while blanks are patched for legacy rows.
+        if (isBlank(memberInfo.getMobileEncrypted()) || isBlank(memberInfo.getMobileHash())) {
+            String phone = normalizePhone(identity.phone(), false);
+            if (phone != null) {
+                memberInfo.setMobileEncrypted(sensitiveDataCipher.encrypt(phone));
+                memberInfo.setMobileHash(SensitiveDataUtil.sha256(phone));
+                appendPatch(profilePatch, "mobile");
+            }
+        }
+        if (isBlank(memberInfo.getIdCardEncrypted()) || isBlank(memberInfo.getIdCardHash())) {
+            String idCard = normalizeIdCard(identity.idCard(), false);
+            if (idCard != null) {
+                memberInfo.setIdCardEncrypted(sensitiveDataCipher.encrypt(idCard));
+                memberInfo.setIdCardHash(SensitiveDataUtil.sha256(idCard));
+                appendPatch(profilePatch, "idCard");
+            }
+        }
+        if (isBlank(memberInfo.getRealNameEncrypted())) {
+            String realName = normalizeRealName(identity.realName(), false);
+            if (realName != null) {
+                memberInfo.setRealNameEncrypted(sensitiveDataCipher.encrypt(realName));
+                appendPatch(profilePatch, "realName");
+            }
+        }
+        memberInfo.setUpdatedTs(LocalDateTime.now());
+        log.info("traceId={} requestId={} memberId={} externalUserId={} refreshExistingProfile=false "
+                        + "reason=joint_login_existing_profile_preserved profilePatch={} "
+                        + "joint login existing member profile preserved",
+                TraceIdUtil.getTraceId(),
+                requestId,
+                memberInfo.getMemberId(),
+                identity.cid(),
+                profilePatch.isEmpty() ? "none" : profilePatch);
+    }
+
+    private void syncMemberIdentity(MemberInfo memberInfo, JointIdentity identity, boolean requireNewMemberProfile) {
+        String phone = normalizePhone(identity.phone(), requireNewMemberProfile);
         String idCard = normalizeIdCard(identity.idCard(), false);
-        String realName = normalizeRealName(identity.realName(), newMember);
+        String realName = normalizeRealName(identity.realName(), requireNewMemberProfile);
         memberInfo.setTechPlatformUserId(identity.cid());
         memberInfo.setExternalUserId(identity.cid());
         if (phone != null) {
@@ -230,6 +275,17 @@ public class JointLoginServiceImpl implements JointLoginService {
             memberInfo.setCreatedTs(LocalDateTime.now());
         }
         memberInfo.setUpdatedTs(LocalDateTime.now());
+    }
+
+    private void appendPatch(StringBuilder profilePatch, String fieldName) {
+        if (!profilePatch.isEmpty()) {
+            profilePatch.append(',');
+        }
+        profilePatch.append(fieldName);
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private JointIdentity mapToIdentity(UserTokenResponse tokenResponse, UserQueryResponse userQueryResponse) {

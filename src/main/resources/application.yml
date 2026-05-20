@@ -238,6 +238,8 @@ nexusfin:
     retry-max-attempts: ${TECH_PLATFORM_RETRY_MAX_ATTEMPTS:2}
     default-channel-code: ${AUTH_DEFAULT_CHANNEL_CODE:KJ}
     default-redirect-url: ${AUTH_DEFAULT_REDIRECT_URL:/equity/index}
+    joint-login:
+      refresh-existing-profile: ${JOINT_LOGIN_REFRESH_EXISTING_PROFILE:false}
     redirect-whitelist:
       - /equity/
       - https://equity.nexusfin.com/

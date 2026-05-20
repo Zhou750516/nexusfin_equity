@@ -18,6 +18,7 @@ import com.nexusfin.equity.thirdparty.yunka.UserTokenResponse;
 import com.nexusfin.equity.util.JointLoginTargetPageResolver;
 import com.nexusfin.equity.util.JwtUtil;
 import com.nexusfin.equity.util.SensitiveDataCipher;
+import com.nexusfin.equity.util.SensitiveDataUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -99,8 +100,12 @@ class JointLoginServiceTest {
                         && "xh-cid-001".equals(userQueryRequest.cid())));
         assertThat(memberCaptor.getValue().getExternalUserId()).isEqualTo("xh-cid-001");
         assertThat(memberCaptor.getValue().getMobileEncrypted()).isNotEqualTo("13800138000");
+        assertThat(sensitiveDataCipher.decrypt(memberCaptor.getValue().getMobileEncrypted()))
+                .isEqualTo("13800138000");
         assertThat(sensitiveDataCipher.decrypt(memberCaptor.getValue().getIdCardEncrypted()))
                 .isEqualTo("310101199001011111");
+        assertThat(sensitiveDataCipher.decrypt(memberCaptor.getValue().getRealNameEncrypted()))
+                .isEqualTo("张三");
         assertThat(result.jwtToken()).isNotBlank();
         assertThat(result.scene()).isEqualTo("push");
         assertThat(result.targetPage()).isEqualTo("landing");
@@ -212,6 +217,176 @@ class JointLoginServiceTest {
         assertThat(result.targetPage()).isEqualTo("joint-refund-entry");
         assertThat(result.scene()).isEqualTo("refund");
         assertThat(result.externalUserId()).isEqualTo("xh-cid-001");
+    }
+
+    @Test
+    void shouldPreserveExistingMemberSensitiveProfileByDefault(CapturedOutput output) throws Exception {
+        AuthProperties authProperties = authProperties();
+        JointLoginServiceImpl jointLoginService = new JointLoginServiceImpl(
+                xiaohuaGatewayService,
+                memberInfoRepository,
+                memberChannelRepository,
+                new JwtUtil(authProperties),
+                authProperties,
+                sensitiveDataCipher,
+                new JointLoginTargetPageResolver()
+        );
+        MemberInfo existing = existingMember("mem-preserve", "old-cid");
+        String localPhoneHash = SensitiveDataUtil.sha256("18518628442");
+        String localIdCardHash = SensitiveDataUtil.sha256("130682199109264075");
+        String localRealNameEncrypted = sensitiveDataCipher.encrypt("张蒙");
+        existing.setMobileEncrypted(sensitiveDataCipher.encrypt("18518628442"));
+        existing.setMobileHash(localPhoneHash);
+        existing.setIdCardEncrypted(sensitiveDataCipher.encrypt("130682199109264075"));
+        existing.setIdCardHash(localIdCardHash);
+        existing.setRealNameEncrypted(localRealNameEncrypted);
+        var previousUpdatedTs = java.time.LocalDateTime.now().minusDays(1);
+        existing.setUpdatedTs(previousUpdatedTs);
+        JointLoginRequest request = new JointLoginRequest(
+                "joint-token-preserve",
+                "push",
+                null,
+                null,
+                null
+        );
+
+        when(xiaohuaGatewayService.validateUserToken(any(), any(), any()))
+                .thenReturn(new UserTokenResponse("xh-cid-preserve", "上游旧用户", "13808041138"));
+        when(xiaohuaGatewayService.queryUser(any(), any(), any()))
+                .thenReturn(new UserQueryResponse(objectMapper.readTree("""
+                        {
+                          "userId": "mem-preserve",
+                          "cid": "xh-cid-preserve",
+                          "idInfo": {
+                            "idno": "43122119951012544X",
+                            "name": "上游旧用户"
+                          }
+                        }
+                        """)));
+        when(memberInfoRepository.selectByCid("xh-cid-preserve")).thenReturn(existing);
+        when(memberChannelRepository.selectByChannelAndExternalUserId("KJ", "xh-cid-preserve")).thenReturn(new MemberChannel());
+
+        jointLoginService.login(request);
+
+        ArgumentCaptor<MemberInfo> memberCaptor = ArgumentCaptor.forClass(MemberInfo.class);
+        verify(memberInfoRepository).updateById(memberCaptor.capture());
+        MemberInfo updated = memberCaptor.getValue();
+        assertThat(updated.getMobileHash()).isEqualTo(localPhoneHash);
+        assertThat(updated.getIdCardHash()).isEqualTo(localIdCardHash);
+        assertThat(updated.getRealNameEncrypted()).isEqualTo(localRealNameEncrypted);
+        assertThat(sensitiveDataCipher.decrypt(updated.getMobileEncrypted())).isEqualTo("18518628442");
+        assertThat(sensitiveDataCipher.decrypt(updated.getIdCardEncrypted())).isEqualTo("130682199109264075");
+        assertThat(sensitiveDataCipher.decrypt(updated.getRealNameEncrypted())).isEqualTo("张蒙");
+        assertThat(updated.getExternalUserId()).isEqualTo("xh-cid-preserve");
+        assertThat(updated.getTechPlatformUserId()).isEqualTo("xh-cid-preserve");
+        assertThat(updated.getUpdatedTs()).isAfter(previousUpdatedTs);
+        assertThat(output)
+                .contains("refreshExistingProfile=false")
+                .contains("reason=joint_login_existing_profile_preserved")
+                .contains("joint login existing member profile preserved")
+                .doesNotContain("18518628442")
+                .doesNotContain("130682199109264075")
+                .doesNotContain("张蒙");
+    }
+
+    @Test
+    void shouldPatchBlankExistingMemberSensitiveProfileWhenRefreshDisabled() throws Exception {
+        AuthProperties authProperties = authProperties();
+        JointLoginServiceImpl jointLoginService = new JointLoginServiceImpl(
+                xiaohuaGatewayService,
+                memberInfoRepository,
+                memberChannelRepository,
+                new JwtUtil(authProperties),
+                authProperties,
+                sensitiveDataCipher,
+                new JointLoginTargetPageResolver()
+        );
+        MemberInfo existing = existingMember("mem-patch-blank", "xh-cid-patch");
+        JointLoginRequest request = new JointLoginRequest(
+                "joint-token-patch",
+                "push",
+                null,
+                null,
+                null
+        );
+
+        when(xiaohuaGatewayService.validateUserToken(any(), any(), any()))
+                .thenReturn(new UserTokenResponse("xh-cid-patch", "补空用户", "13800138009"));
+        when(xiaohuaGatewayService.queryUser(any(), any(), any()))
+                .thenReturn(new UserQueryResponse(objectMapper.readTree("""
+                        {
+                          "userId": "mem-patch-blank",
+                          "cid": "xh-cid-patch",
+                          "idInfo": {
+                            "idno": "310101199001011119",
+                            "name": "补空用户"
+                          }
+                        }
+                        """)));
+        when(memberInfoRepository.selectByCid("xh-cid-patch")).thenReturn(existing);
+        when(memberChannelRepository.selectByChannelAndExternalUserId("KJ", "xh-cid-patch")).thenReturn(new MemberChannel());
+
+        jointLoginService.login(request);
+
+        ArgumentCaptor<MemberInfo> memberCaptor = ArgumentCaptor.forClass(MemberInfo.class);
+        verify(memberInfoRepository).updateById(memberCaptor.capture());
+        MemberInfo updated = memberCaptor.getValue();
+        assertThat(updated.getMobileHash()).isEqualTo(SensitiveDataUtil.sha256("13800138009"));
+        assertThat(updated.getIdCardHash()).isEqualTo(SensitiveDataUtil.sha256("310101199001011119"));
+        assertThat(sensitiveDataCipher.decrypt(updated.getRealNameEncrypted())).isEqualTo("补空用户");
+    }
+
+    @Test
+    void shouldRefreshExistingMemberSensitiveProfileWhenEnabled() throws Exception {
+        AuthProperties authProperties = authProperties();
+        authProperties.getJointLogin().setRefreshExistingProfile(true);
+        JointLoginServiceImpl jointLoginService = new JointLoginServiceImpl(
+                xiaohuaGatewayService,
+                memberInfoRepository,
+                memberChannelRepository,
+                new JwtUtil(authProperties),
+                authProperties,
+                sensitiveDataCipher,
+                new JointLoginTargetPageResolver()
+        );
+        MemberInfo existing = existingMember("mem-refresh", "xh-cid-refresh");
+        existing.setMobileEncrypted(sensitiveDataCipher.encrypt("18518628442"));
+        existing.setMobileHash(SensitiveDataUtil.sha256("18518628442"));
+        existing.setIdCardEncrypted(sensitiveDataCipher.encrypt("130682199109264075"));
+        existing.setIdCardHash(SensitiveDataUtil.sha256("130682199109264075"));
+        existing.setRealNameEncrypted(sensitiveDataCipher.encrypt("张蒙"));
+        JointLoginRequest request = new JointLoginRequest(
+                "joint-token-refresh",
+                "push",
+                null,
+                null,
+                null
+        );
+
+        when(xiaohuaGatewayService.validateUserToken(any(), any(), any()))
+                .thenReturn(new UserTokenResponse("xh-cid-refresh", "上游用户", "13808041138"));
+        when(xiaohuaGatewayService.queryUser(any(), any(), any()))
+                .thenReturn(new UserQueryResponse(objectMapper.readTree("""
+                        {
+                          "userId": "mem-refresh",
+                          "cid": "xh-cid-refresh",
+                          "idInfo": {
+                            "idno": "43122119951012544X",
+                            "name": "上游用户"
+                          }
+                        }
+                        """)));
+        when(memberInfoRepository.selectByCid("xh-cid-refresh")).thenReturn(existing);
+        when(memberChannelRepository.selectByChannelAndExternalUserId("KJ", "xh-cid-refresh")).thenReturn(new MemberChannel());
+
+        jointLoginService.login(request);
+
+        ArgumentCaptor<MemberInfo> memberCaptor = ArgumentCaptor.forClass(MemberInfo.class);
+        verify(memberInfoRepository).updateById(memberCaptor.capture());
+        MemberInfo updated = memberCaptor.getValue();
+        assertThat(updated.getMobileHash()).isEqualTo(SensitiveDataUtil.sha256("13808041138"));
+        assertThat(updated.getIdCardHash()).isEqualTo(SensitiveDataUtil.sha256("43122119951012544X"));
+        assertThat(sensitiveDataCipher.decrypt(updated.getRealNameEncrypted())).isEqualTo("上游用户");
     }
 
     @Test
