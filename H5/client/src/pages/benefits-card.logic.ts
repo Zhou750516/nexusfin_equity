@@ -132,7 +132,12 @@ function isSigned(status: { signed: boolean; status: string }) {
 }
 
 function canReuseExistingSign(status: BenefitsSignStatus) {
-  return Boolean(status.userSignId) && status.canApplySign === false;
+  return Boolean(status.userSignId)
+    || status.canApplySign === false && isExistingSignRecordStatus(status.status);
+}
+
+function isExistingSignRecordStatus(status: string) {
+  return ["QW_SIGN_QUERY_REUSE", "EXISTING_SIGN_RECORD"].includes(status.toUpperCase());
 }
 
 function maskCardLastFour(cardLastFour: string) {

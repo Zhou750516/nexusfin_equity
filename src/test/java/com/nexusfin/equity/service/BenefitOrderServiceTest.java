@@ -247,6 +247,42 @@ class BenefitOrderServiceTest {
     }
 
     @Test
+    void shouldNotTreatQwMemberSyncCode540AsIdempotentSuccess() {
+        BenefitProduct product = new BenefitProduct();
+        product.setProductCode("abs001");
+        product.setProductName("艾博生月卡");
+        product.setStatus("ACTIVE");
+        MemberInfo memberInfo = new MemberInfo();
+        memberInfo.setMemberId("mem-qw-540");
+        MemberChannel memberChannel = new MemberChannel();
+        memberChannel.setChannelCode("KJ");
+        memberChannel.setExternalUserId("user-qw-540");
+        when(benefitProductRepository.selectById("abs001")).thenReturn(product);
+        when(memberInfoRepository.selectById("mem-qw-540")).thenReturn(memberInfo);
+        when(memberChannelRepository.selectOne(any())).thenReturn(memberChannel);
+        when(idempotencyService.isProcessed("req-qw-540")).thenReturn(false);
+        when(paymentProtocolService.resolveForBenefitOrder(any(BenefitOrder.class)))
+                .thenReturn(new PaymentProtocolService.ResolvedPaymentProtocol("QW_SIGN_QUERY_REUSE-2605203409909", "2605203409909", "QW_SIGN_QUERY_REUSE"));
+        when(qwBenefitClient.syncMemberOrder(any()))
+                .thenThrow(new BizException(540, "QW_UPSTREAM_REJECTED", "签约记录状态异常"));
+
+        assertThatThrownBy(() -> benefitOrderService.createOrder(
+                "mem-qw-540",
+                new CreateBenefitOrderRequest("req-qw-540", "abs001", 300000L, 30000L, true)
+        )).isInstanceOf(BizException.class)
+                .hasMessageContaining("签约记录状态异常")
+                .extracting(ex -> ((BizException) ex).getCode(), ex -> ((BizException) ex).getErrorNo())
+                .containsExactly(540, "QW_UPSTREAM_REJECTED");
+
+        ArgumentCaptor<QwMemberSyncRequest> requestCaptor = ArgumentCaptor.forClass(QwMemberSyncRequest.class);
+        verify(qwBenefitClient).syncMemberOrder(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().userSignId()).isEqualTo(2605203409909L);
+        assertThat(requestCaptor.getValue().payAmount()).isEqualTo(30000L);
+        verify(benefitOrderRepository, never()).updateById(any());
+        verify(idempotencyService, never()).markProcessed(any(), any(), any(), any());
+    }
+
+    @Test
     void shouldReplayExistingOrderForDuplicateCreateRequest() {
         BenefitOrder existingOrder = new BenefitOrder();
         existingOrder.setBenefitOrderNo("ord-duplicate-1");

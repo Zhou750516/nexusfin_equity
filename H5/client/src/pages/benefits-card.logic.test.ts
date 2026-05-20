@@ -125,6 +125,28 @@ describe("benefits card page logic", () => {
     expect(getSignStatus).toHaveBeenCalledWith("card-001");
   });
 
+  it("allows direct activation whenever sign status carries an existing userSignId", async () => {
+    const getSignStatus = vi.fn().mockResolvedValue({
+      accountNo: "card-001",
+      signed: false,
+      status: "EXISTING_SIGN_RECORD",
+      userSignId: 2605203409909,
+    });
+
+    const result = await checkBenefitsActivationSignGate({
+      userCard: {
+        cardId: "card-001",
+        bankName: "兴业银行",
+        cardLastFour: "8119",
+        defaultCard: true,
+      },
+      getSignStatus,
+    });
+
+    expect(result).toEqual({ type: "activate" });
+    expect(getSignStatus).toHaveBeenCalledWith("card-001");
+  });
+
   it("opens the sign dialog without activating when the default card is not signed", async () => {
     const getSignStatus = vi.fn().mockResolvedValue({
       accountNo: "card-001",

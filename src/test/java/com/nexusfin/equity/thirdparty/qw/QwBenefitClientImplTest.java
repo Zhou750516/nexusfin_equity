@@ -528,6 +528,36 @@ class QwBenefitClientImplTest {
     }
 
     @Test
+    void shouldRejectPushOrderCode540() {
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        server.expect(requestTo("https://t-api.test.qweimobile.com/api/abs/method"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{\"code\":540,\"msg\":\"签约记录状态异常\",\"data\":\"\"}", MediaType.APPLICATION_JSON));
+        QwBenefitClientImpl client = new QwBenefitClientImpl(qwProperties(), objectMapper, restClientBuilder.build());
+
+        assertThatThrownBy(() -> client.syncMemberOrder(new QwMemberSyncRequest(
+                "user-1",
+                "ord-1",
+                30000L,
+                "abs001",
+                "艾博生月卡",
+                2605203409909L,
+                null,
+                0,
+                null,
+                null,
+                null,
+                null
+        ))).isInstanceOf(BizException.class)
+                .hasMessageContaining("签约记录状态异常")
+                .extracting(error -> ((BizException) error).getCode(), error -> ((BizException) error).getErrorNo())
+                .containsExactly(540, "QW_UPSTREAM_REJECTED");
+
+        server.verify();
+    }
+
+    @Test
     void shouldStillRejectCode530ForSignConfirm() {
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
