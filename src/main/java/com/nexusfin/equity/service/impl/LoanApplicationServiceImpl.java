@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import static com.nexusfin.equity.util.BizIds.next;
+import static com.nexusfin.equity.util.BizIds.newLoanId;
 import static com.nexusfin.equity.util.JsonNodes.readRemark;
 import static com.nexusfin.equity.util.JsonNodes.readText;
 import static com.nexusfin.equity.util.LoanInputValidator.validateAmountAndTerm;
@@ -80,7 +81,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
             );
         }
         String applicationId = next("APP");
-        String loanId = next("LN");
+        Integer loanId = newLoanId();
         CreateBenefitOrderResponse benefitOrder = benefitOrderService.createLocalOrder(
                 memberId,
                 new CreateBenefitOrderRequest(
@@ -179,13 +180,13 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
         } catch (RuntimeException exception) {
             return buildLoanFailedResponse(applicationId, benefitOrder.benefitOrderNo(), exception.getMessage());
         }
-        String upstreamLoanId = readText(response.data(), "loanId", loanId);
+        Integer platformLoanId = readInt(response.data(), "loanId", loanId);
         loanApplicationGateway.save(new LoanApplicationGateway.SaveCommand(
                 memberId,
                 externalUserId,
                 applicationId,
                 benefitOrder.benefitOrderNo(),
-                upstreamLoanId,
+                platformLoanId,
                 request.purpose(),
                 "ACTIVE"
         ));
@@ -240,7 +241,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
             String benefitOrderNo,
             String platformBenefitOrderNo,
             String applyId,
-            String loanId,
+            Integer loanId,
             BigDecimal loanAmount,
             Integer loanPeriod,
             String bankCardNo,
@@ -254,5 +255,24 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
             JsonNode optionInfo,
             JsonNode imageInfo
     ) {
+    }
+
+    private Integer readInt(JsonNode data, String fieldName, Integer fallback) {
+        JsonNode value = data == null ? null : data.path(fieldName);
+        if (value == null || value.isMissingNode() || value.isNull()) {
+            return fallback;
+        }
+        if (value.isInt() || value.isLong()) {
+            return value.asInt();
+        }
+        String text = value.asText("");
+        if (text.isBlank()) {
+            return fallback;
+        }
+        try {
+            return Integer.valueOf(text);
+        } catch (NumberFormatException exception) {
+            throw new BizException("YUNKA_RESPONSE_INVALID", "Yunka loan apply response loanId is invalid");
+        }
     }
 }

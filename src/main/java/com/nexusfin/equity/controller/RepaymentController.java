@@ -38,7 +38,7 @@ public class RepaymentController {
     }
 
     @GetMapping("/info/{loanId}")
-    public Result<RepaymentInfoResponse> getInfo(@PathVariable String loanId) {
+    public Result<RepaymentInfoResponse> getInfo(@PathVariable Integer loanId) {
         AuthPrincipal principal = AuthContextUtil.getRequiredPrincipal();
         log.info("traceId={} bizOrderNo={} repayment info requested by memberId={}",
                 TraceIdUtil.getTraceId(), loanId, principal.memberId());

@@ -227,7 +227,7 @@ class NexusfinEquityApplicationTests {
                   "userId": "%s",
                   "benefitOrderNo": "%s",
                   "platformBenefitOrderNo": "%s",
-                  "loanId": "loan-quickstart-001",
+                  "loanId": 20260514,
                   "status": 7001,
                   "remark": null,
                   "loanAmount": 880000,

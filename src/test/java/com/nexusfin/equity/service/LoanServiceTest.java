@@ -123,7 +123,7 @@ class LoanServiceTest {
                 List.of(),
                 true,
                 "审批通过，预计30分钟内到账",
-                "LN-001",
+                20260501,
                 List.of()
         );
         when(loanApprovalQueryService.getApprovalResult("mem-001", "APP-RESULT-001")).thenReturn(delegated);

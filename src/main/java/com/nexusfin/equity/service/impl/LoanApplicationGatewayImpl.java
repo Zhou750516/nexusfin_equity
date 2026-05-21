@@ -11,8 +11,6 @@ import org.springframework.stereotype.Service;
 public class LoanApplicationGatewayImpl implements LoanApplicationGateway {
 
     private static final String DEFAULT_CHANNEL_CODE = "KJ";
-    private static final String UPSTREAM_QUERY_TYPE = "loanId";
-
     private final LoanApplicationMappingRepository loanApplicationMappingRepository;
 
     public LoanApplicationGatewayImpl(LoanApplicationMappingRepository loanApplicationMappingRepository) {
@@ -27,8 +25,7 @@ public class LoanApplicationGatewayImpl implements LoanApplicationGateway {
         mapping.setBenefitOrderNo(command.benefitOrderNo());
         mapping.setChannelCode(DEFAULT_CHANNEL_CODE);
         mapping.setExternalUserId(command.externalUserId());
-        mapping.setUpstreamQueryType(UPSTREAM_QUERY_TYPE);
-        mapping.setUpstreamQueryValue(command.upstreamLoanId());
+        mapping.setPlatformLoanId(command.platformLoanId());
         mapping.setPurpose(command.purpose());
         mapping.setMappingStatus(command.mappingStatus());
         mapping.setCreatedTs(LocalDateTime.now());

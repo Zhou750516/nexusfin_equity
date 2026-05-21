@@ -36,7 +36,7 @@ class LoanApplicationGatewayTest {
                 "user-001",
                 "APP-001",
                 "BEN-001",
-                "LN-001",
+                20260501,
                 "rent",
                 "ACTIVE"
         ));
@@ -48,8 +48,7 @@ class LoanApplicationGatewayTest {
         assertThat(captor.getValue().getBenefitOrderNo()).isEqualTo("BEN-001");
         assertThat(captor.getValue().getChannelCode()).isEqualTo("KJ");
         assertThat(captor.getValue().getExternalUserId()).isEqualTo("user-001");
-        assertThat(captor.getValue().getUpstreamQueryType()).isEqualTo("loanId");
-        assertThat(captor.getValue().getUpstreamQueryValue()).isEqualTo("LN-001");
+        assertThat(captor.getValue().getPlatformLoanId()).isEqualTo(20260501);
         assertThat(captor.getValue().getPurpose()).isEqualTo("rent");
         assertThat(captor.getValue().getMappingStatus()).isEqualTo("ACTIVE");
         assertThat(captor.getValue().getCreatedTs()).isNotNull();
@@ -63,7 +62,7 @@ class LoanApplicationGatewayTest {
                 "user-001",
                 "APP-002",
                 "BEN-002",
-                "LN-002",
+                20260502,
                 "education",
                 "PENDING_REVIEW"
         ));
@@ -80,7 +79,7 @@ class LoanApplicationGatewayTest {
         LoanApplicationMapping mapping = new LoanApplicationMapping();
         mapping.setApplicationId("APP-003");
         mapping.setMemberId("mem-001");
-        mapping.setUpstreamQueryValue("LN-003");
+        mapping.setPlatformLoanId(20260503);
         mapping.setPurpose("rent");
         mapping.setMappingStatus("ACTIVE");
         mapping.setCreatedTs(LocalDateTime.now());

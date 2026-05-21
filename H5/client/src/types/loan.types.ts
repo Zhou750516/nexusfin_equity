@@ -192,12 +192,12 @@ export interface ApprovalResult {
   steps: ApprovalStep[];
   benefitsCardActivated: boolean;
   tip: string;
-  loanId: string | null;
+  loanId: number | null;
   repaymentPlan?: RepaymentPlanItem[];
 }
 
 export interface RepaymentInfo {
-  loanId: string;
+  loanId: number;
   repaymentAmount: number;
   repaymentType: string;
   bankCard: BankAccount;
@@ -207,7 +207,7 @@ export interface RepaymentInfo {
 }
 
 export interface RepaymentParams {
-  loanId: string;
+  loanId: number;
   amount: number;
   bankCardId: string;
   repaymentType: "early" | "scheduled";
@@ -220,7 +220,7 @@ export interface RepaymentSubmitResult {
 }
 
 export interface RepaymentSmsSendParams {
-  loanId: string;
+  loanId: number;
   bankCardId: string;
 }
 
@@ -231,7 +231,7 @@ export interface RepaymentSmsSendResult {
 }
 
 export interface RepaymentSmsConfirmParams {
-  loanId: string;
+  loanId: number;
   captcha: string;
 }
 

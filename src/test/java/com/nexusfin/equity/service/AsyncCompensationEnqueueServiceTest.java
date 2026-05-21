@@ -55,7 +55,7 @@ class AsyncCompensationEnqueueServiceTest {
                         "user-001",
                         "BEN-001",
                         "APP-20260418-001",
-                        "LN-001",
+                        2026041801,
                         300000L,
                         3,
                         "acc_001"
@@ -72,6 +72,7 @@ class AsyncCompensationEnqueueServiceTest {
         assertThat(captor.getValue().getRequestPayload())
                 .contains("\"path\":\"/loan/apply\"")
                 .contains("\"bizOrderNo\":\"APP-20260418-001\"")
+                .contains("\"loanId\":2026041801")
                 .contains("\"loanAmount\":300000")
                 .contains("\"loanPeriod\":3");
         assertThat(output)
@@ -115,7 +116,7 @@ class AsyncCompensationEnqueueServiceTest {
                         "user-001",
                         "BEN-001",
                         "APP-20260418-duplicate",
-                        "LN-001",
+                        2026041802,
                         300000L,
                         3,
                         "acc_001"

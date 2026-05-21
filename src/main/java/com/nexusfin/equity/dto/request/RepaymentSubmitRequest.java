@@ -1,14 +1,14 @@
 package com.nexusfin.equity.dto.request;
 
 import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
 
 public record RepaymentSubmitRequest(
-        @NotBlank String loanId,
+        @NotNull @Positive Integer loanId,
         @NotNull @DecimalMin("0.01") BigDecimal amount,
-        @NotBlank String bankCardId,
-        @NotBlank String repaymentType
+        @jakarta.validation.constraints.NotBlank String bankCardId,
+        @jakarta.validation.constraints.NotBlank String repaymentType
 ) {
 }

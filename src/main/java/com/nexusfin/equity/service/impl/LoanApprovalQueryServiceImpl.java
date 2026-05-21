@@ -79,7 +79,7 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
         log.info("traceId={} bizOrderNo={} loanId={} upstreamStatus={} approval result resolved",
                 TraceIdUtil.getTraceId(),
                 applicationId,
-                mapping.getUpstreamQueryValue(),
+                mapping.getPlatformLoanId(),
                 snapshot.status());
         String h5Status = mapApprovalStatus(snapshot.status());
         boolean approved = "approved".equals(h5Status);
@@ -93,7 +93,7 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
                 buildApprovalStatusSteps(h5Status),
                 true,
                 resolveApprovalResultTip(snapshot.remark(), h5Status),
-                approved ? mapping.getUpstreamQueryValue() : null,
+                approved ? mapping.getPlatformLoanId() : null,
                 approved ? queryRepayPlan(mapping) : List.of()
         );
     }
@@ -115,7 +115,7 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
                         requestId,
                         yunkaProperties.paths().loanQuery(),
                         mapping.getApplicationId(),
-                        new LoanQueryForwardData(mapping.getMemberId(), mapping.getUpstreamQueryValue())
+                        new LoanQueryForwardData(mapping.getMemberId(), requirePlatformLoanId(mapping))
                 ).withMemberId(mapping.getMemberId())
         );
         return validateLoanQueryData(data);
@@ -231,7 +231,7 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
             var response = xiaohuaGatewayService.queryLoanRepayPlan(
                     requestId,
                     mapping.getApplicationId(),
-                    new LoanRepayPlanRequest(mapping.getMemberId(), mapping.getUpstreamQueryValue())
+                    new LoanRepayPlanRequest(mapping.getMemberId(), requirePlatformLoanId(mapping))
             );
             if (response == null || response.repayPlan() == null) {
                 return List.of();
@@ -273,13 +273,19 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
             throw new BizException("YUNKA_RESPONSE_EMPTY", "Yunka loan query response is empty");
         }
         String status = requiredText(data, "status");
-        String loanId = requiredText(data, "loanId");
         String remark = readText(data, "remark", "");
         long loanAmount = 0L;
         if (LOAN_STATUS_SUCCESS.equals(status)) {
             loanAmount = requiredPositiveAmountInCent(data, "loanAmount");
         }
-        return new LoanQuerySnapshot(status, loanId, loanAmount, remark);
+        return new LoanQuerySnapshot(status, loanAmount, remark);
+    }
+
+    private Integer requirePlatformLoanId(LoanApplicationMapping mapping) {
+        if (mapping.getPlatformLoanId() == null || mapping.getPlatformLoanId() <= 0) {
+            throw new BizException("LOAN_ID_MISSING", "loanId is required for loan query");
+        }
+        return mapping.getPlatformLoanId();
     }
 
     private String requiredText(JsonNode data, String field) {
@@ -304,13 +310,12 @@ public class LoanApprovalQueryServiceImpl implements LoanApprovalQueryService {
 
     private record LoanQueryForwardData(
             String userId,
-            String loanId
+            Integer loanId
     ) {
     }
 
     private record LoanQuerySnapshot(
             String status,
-            String loanId,
             long loanAmount,
             String remark
     ) {

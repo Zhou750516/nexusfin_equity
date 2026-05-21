@@ -99,7 +99,7 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
     void shouldForwardRepaymentInfoToYunkaRepayTrial(CapturedOutput output) throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-info", "user-repay-info");
         insertReceivingAccount(memberInfo.getMemberId(), "acc-repay-info-001", "招商银行", "8648");
-        createApplicationMapping(memberInfo, "APP-REPAY-INFO-001", "LOAN202604130001");
+        createApplicationMapping(memberInfo, "APP-REPAY-INFO-001", 2026041301);
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "repayAmount": 1018.50,
@@ -112,11 +112,11 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         when(yunkaGatewayClient.proxy(any()))
                 .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", yunkaData));
 
-        mockMvc.perform(get("/api/repayment/info/LOAN202604130001")
+        mockMvc.perform(get("/api/repayment/info/2026041301")
                         .cookie(authCookie(memberInfo)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.loanId").value("LOAN202604130001"))
+                .andExpect(jsonPath("$.data.loanId").value(2026041301))
                 .andExpect(jsonPath("$.data.repaymentAmount").value(1018.5))
                 .andExpect(jsonPath("$.data.repaymentType").value("提前还款"))
                 .andExpect(jsonPath("$.data.bankCard.bankName").value("招商银行"))
@@ -129,20 +129,21 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         assertThat(requestCaptor.getValue().path()).isEqualTo("/repay/trial");
         assertThat(data.get("userId").asText()).isEqualTo("mem-repay-info");
         assertThat(data.has("uid")).isFalse();
-        assertThat(data.get("loanId").asText()).isEqualTo("LOAN202604130001");
+        assertThat(data.get("loanId").isInt()).isTrue();
+        assertThat(data.get("loanId").asInt()).isEqualTo(2026041301);
         assertThat(data.get("repayType").asText()).isEqualTo("EARLY");
         assertThat(output).contains("repayment info yunka request begin");
         assertThat(output).contains("scene=repayment info elapsedMs=");
         assertThat(output).contains("yunka request success");
         assertThat(output).contains("path=/repay/trial");
-        assertThat(output).contains("bizOrderNo=LOAN202604130001");
+        assertThat(output).contains("bizOrderNo=2026041301");
     }
 
     @Test
     void shouldForwardRepaymentSubmitToYunkaRepayApply() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-submit", "user-repay-submit");
         insertReceivingAccount(memberInfo.getMemberId(), "acc-repay-submit-001", "招商银行", "8648");
-        createApplicationMapping(memberInfo, "APP-REPAY-SUBMIT-001", "LOAN202604130002");
+        createApplicationMapping(memberInfo, "APP-REPAY-SUBMIT-001", 2026041302);
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "status": "PROCESSING",
@@ -170,7 +171,7 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "loanId": "LOAN202604130002",
+                                  "loanId": 2026041302,
                                   "amount": 1018.50,
                                   "bankCardId": "acc-repay-submit-001",
                                   "repaymentType": "early"
@@ -193,7 +194,8 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         assertThat(repayApplyRequest.path()).isEqualTo("/repay/apply");
         assertThat(data.get("userId").asText()).isEqualTo("mem-repay-submit");
         assertThat(data.has("uid")).isFalse();
-        assertThat(data.get("loanId").asText()).isEqualTo("LOAN202604130002");
+        assertThat(data.get("loanId").isInt()).isTrue();
+        assertThat(data.get("loanId").asInt()).isEqualTo(2026041302);
         assertThat(data.get("bankCardNo").asText()).isEqualTo("acc-repay-submit-001");
         assertThat(data.get("repayAmount").decimalValue()).isEqualByComparingTo("1018.50");
     }
@@ -202,24 +204,24 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
     void shouldForwardRepaymentResultToYunkaRepayQuery() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-result", "user-repay-result");
         insertReceivingAccount(memberInfo.getMemberId(), "acc-repay-result-001", "招商银行", "8648");
-        createApplicationMapping(memberInfo, "APP-REPAY-RESULT-001", "LOAN202604130002");
+        createApplicationMapping(memberInfo, "APP-REPAY-RESULT-001", 2026041302);
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "status": "SUCCESS",
                   "amount": 1018.50,
                   "successTime": "2026-04-13T14:32:00+08:00",
                   "remark": "还款成功",
-                  "swiftNumber": "RP-LOAN202604130002"
+                  "swiftNumber": "RP-2026041302"
                 }
                 """);
         when(yunkaGatewayClient.proxy(any()))
                 .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", yunkaData));
 
-        mockMvc.perform(get("/api/repayment/result/RP-LOAN202604130002")
+        mockMvc.perform(get("/api/repayment/result/RP-2026041302")
                         .cookie(authCookie(memberInfo)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.repaymentId").value("RP-LOAN202604130002"))
+                .andExpect(jsonPath("$.data.repaymentId").value("RP-2026041302"))
                 .andExpect(jsonPath("$.data.status").value("success"))
                 .andExpect(jsonPath("$.data.amount").value(1018.5))
                 .andExpect(jsonPath("$.data.repaymentTime").value("2026-04-13T14:32:00+08:00"))
@@ -232,15 +234,16 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         assertThat(requestCaptor.getValue().path()).isEqualTo("/repay/query");
         assertThat(data.get("userId").asText()).isEqualTo("mem-repay-result");
         assertThat(data.has("uid")).isFalse();
-        assertThat(data.get("loanId").asText()).isEqualTo("LOAN202604130002");
-        assertThat(data.get("swiftNumber").asText()).isEqualTo("RP-LOAN202604130002");
+        assertThat(data.get("loanId").isInt()).isTrue();
+        assertThat(data.get("loanId").asInt()).isEqualTo(2026041302);
+        assertThat(data.get("swiftNumber").asText()).isEqualTo("RP-2026041302");
     }
 
     @Test
     void shouldReturnRepaymentInfoInEnglishWhenAcceptLanguageProvided() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-info-en", "user-repay-info-en");
         insertReceivingAccount(memberInfo.getMemberId(), "acc-repay-info-en-001", "招商银行", "8648");
-        createApplicationMapping(memberInfo, "APP-REPAY-INFO-EN-001", "LOAN202604130009");
+        createApplicationMapping(memberInfo, "APP-REPAY-INFO-EN-001", 2026041309);
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "repayAmount": 1018.50,
@@ -253,25 +256,24 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         when(yunkaGatewayClient.proxy(any()))
                 .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", yunkaData));
 
-        mockMvc.perform(get("/api/repayment/info/LOAN202604130009")
+        mockMvc.perform(get("/api/repayment/info/2026041309")
                         .cookie(authCookie(memberInfo))
                         .header("Accept-Language", "en-US,en;q=0.9"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.loanId").value("LOAN202604130009"))
+                .andExpect(jsonPath("$.data.loanId").value(2026041309))
                 .andExpect(jsonPath("$.data.repaymentType").value("Early repayment"))
                 .andExpect(jsonPath("$.data.tip").value("Repayment takes effect immediately, and interest for the remaining terms will no longer be charged. Please make sure your bank card has sufficient balance."))
                 .andExpect(header().string("Content-Language", "en-US"));
     }
 
-    private void createApplicationMapping(MemberInfo memberInfo, String applicationId, String loanId) {
+    private void createApplicationMapping(MemberInfo memberInfo, String applicationId, Integer loanId) {
         LoanApplicationMapping mapping = new LoanApplicationMapping();
         mapping.setApplicationId(applicationId);
         mapping.setMemberId(memberInfo.getMemberId());
         mapping.setChannelCode("KJ");
         mapping.setExternalUserId(memberInfo.getExternalUserId());
-        mapping.setUpstreamQueryType("loanId");
-        mapping.setUpstreamQueryValue(loanId);
+        mapping.setPlatformLoanId(loanId);
         mapping.setPurpose("rent");
         mapping.setMappingStatus("ACTIVE");
         mapping.setCreatedTs(LocalDateTime.now());

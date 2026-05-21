@@ -4,7 +4,7 @@ public record CardSmsConfirmRequest(
         String userId,
         String phone,
         Integer type,
-        String loanId,
+        Integer loanId,
         String captcha
 ) {
 }

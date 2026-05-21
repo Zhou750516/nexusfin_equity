@@ -13,8 +13,7 @@ public class LoanApplicationMapping {
     private String benefitOrderNo;
     private String channelCode;
     private String externalUserId;
-    private String upstreamQueryType;
-    private String upstreamQueryValue;
+    private Integer platformLoanId;
     private String purpose;
     private String mappingStatus;
     private LocalDateTime createdTs;
@@ -60,20 +59,12 @@ public class LoanApplicationMapping {
         this.externalUserId = externalUserId;
     }
 
-    public String getUpstreamQueryType() {
-        return upstreamQueryType;
+    public Integer getPlatformLoanId() {
+        return platformLoanId;
     }
 
-    public void setUpstreamQueryType(String upstreamQueryType) {
-        this.upstreamQueryType = upstreamQueryType;
-    }
-
-    public String getUpstreamQueryValue() {
-        return upstreamQueryValue;
-    }
-
-    public void setUpstreamQueryValue(String upstreamQueryValue) {
-        this.upstreamQueryValue = upstreamQueryValue;
+    public void setPlatformLoanId(Integer platformLoanId) {
+        this.platformLoanId = platformLoanId;
     }
 
     public String getPurpose() {

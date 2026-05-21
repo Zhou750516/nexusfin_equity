@@ -12,7 +12,7 @@ public record LoanApprovalResultResponse(
         List<LoanApprovalStatusResponse.ApprovalStep> steps,
         boolean benefitsCardActivated,
         String tip,
-        String loanId,
+        Integer loanId,
         List<RepaymentPlanItem> repaymentPlan
 ) {
 

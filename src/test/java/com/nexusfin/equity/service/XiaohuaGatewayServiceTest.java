@@ -158,7 +158,7 @@ class XiaohuaGatewayServiceTest {
         LoanRepayPlanResponse response = gatewayService.queryLoanRepayPlan(
                 "REQ-REPAY-PLAN-001",
                 "BIZ-REPAY-PLAN-001",
-                new LoanRepayPlanRequest("user-001", "loan-001")
+                new LoanRepayPlanRequest("user-001", 20260521)
         );
 
         assertThat(response.repayPlan()).isEmpty();
@@ -170,7 +170,8 @@ class XiaohuaGatewayServiceTest {
         JsonNode forwarded = objectMapper.valueToTree(captor.getValue().data());
         assertThat(forwarded.path("userId").asText()).isEqualTo("user-001");
         assertThat(forwarded.has("uid")).isFalse();
-        assertThat(forwarded.path("loanId").asText()).isEqualTo("loan-001");
+        assertThat(forwarded.path("loanId").isInt()).isTrue();
+        assertThat(forwarded.path("loanId").asInt()).isEqualTo(20260521);
     }
 
     @Test
@@ -213,6 +214,7 @@ class XiaohuaGatewayServiceTest {
                 new BenefitOrderSyncRequest(
                         "BEN-001",
                         "QW-ORDER-001",
+                        20260521,
                         30000L,
                         2,
                         1779335976232L,
@@ -245,6 +247,7 @@ class XiaohuaGatewayServiceTest {
                 new BenefitOrderSyncRequest(
                         "BEN-001",
                         "QW-ORDER-001",
+                        20260521,
                         30000L,
                         2,
                         1779335976232L,
@@ -264,6 +267,8 @@ class XiaohuaGatewayServiceTest {
         JsonNode forwarded = objectMapper.valueToTree(captor.getValue().data());
         assertThat(forwarded.path("platformBenefitOrderNo").asText()).isEqualTo("BEN-001");
         assertThat(forwarded.path("benefitOrderNo").asText()).isEqualTo("QW-ORDER-001");
+        assertThat(forwarded.path("loanId").isInt()).isTrue();
+        assertThat(forwarded.path("loanId").asInt()).isEqualTo(20260521);
         assertThat(forwarded.path("orderAmount").decimalValue()).isEqualByComparingTo("300.00");
         assertThat(forwarded.path("status").isInt()).isTrue();
         assertThat(forwarded.path("status").asInt()).isEqualTo(2);

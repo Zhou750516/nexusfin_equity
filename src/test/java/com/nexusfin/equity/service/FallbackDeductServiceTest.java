@@ -77,7 +77,7 @@ class FallbackDeductServiceTest {
 
     private LoanResultCallbackRequest request(String requestId) {
         return new LoanResultCallbackRequest(
-                requestId, "user-1", null, "ord", "ord", "loan-1",
+                requestId, "user-1", null, "ord", "ord", 20260501,
                 7001, null, 680000L, 710000L, 1711197060L, null, null, null
         );
     }

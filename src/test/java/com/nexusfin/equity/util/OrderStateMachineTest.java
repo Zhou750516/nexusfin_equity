@@ -59,10 +59,10 @@ class OrderStateMachineTest {
         BenefitOrder order = new BenefitOrder();
         order.setOrderStatus("FIRST_DEDUCT_SUCCESS");
 
-        OrderStateMachine.applyGrantResult(order, true, "loan-1");
+        OrderStateMachine.applyGrantResult(order, true, "20260501");
         assertThat(order.getOrderStatus()).isEqualTo("EXERCISE_PENDING");
         assertThat(order.getGrantStatus()).isEqualTo("SUCCESS");
-        assertThat(order.getLoanOrderNo()).isEqualTo("loan-1");
+        assertThat(order.getLoanOrderNo()).isEqualTo("20260501");
 
         OrderStateMachine.applyExerciseResult(order, true);
         assertThat(order.getOrderStatus()).isEqualTo("EXERCISE_SUCCESS");

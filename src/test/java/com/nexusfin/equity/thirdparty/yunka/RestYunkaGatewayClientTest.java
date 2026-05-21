@@ -96,7 +96,7 @@ class RestYunkaGatewayClientTest {
                           "traceId": "YUNKA-TRACE-001",
                           "requestId": "REQ-001",
                           "data": {
-                            "loanId": "LN-001"
+                            "loanId": 20260501
                           }
                         }
                         """, MediaType.APPLICATION_JSON));
@@ -150,7 +150,7 @@ class RestYunkaGatewayClientTest {
         assertThat(output).contains("responseBodyJson=");
         assertThat(output).contains("\"code\":0");
         assertThat(output).contains("\"message\":\"OK\"");
-        assertThat(output).contains("\"data\":{\"loanId\":\"LN-001\"}");
+        assertThat(output).contains("\"data\":{\"loanId\":20260501}");
         server.verify();
     }
 

@@ -22,4 +22,16 @@ class BizIdsTest {
         assertThat(requestId.substring(3)).hasSize(32);
         assertThat(requestId.substring(3)).doesNotContain("-");
     }
+
+    @Test
+    void shouldGeneratePositiveUniqueNumericLoanIds() {
+        int first = BizIds.newLoanId();
+        int second = BizIds.newLoanId();
+
+        assertThat(first).isPositive();
+        assertThat(second).isPositive();
+        assertThat(second).isNotEqualTo(first);
+        assertThat(first).isLessThanOrEqualTo(Integer.MAX_VALUE);
+        assertThat(second).isLessThanOrEqualTo(Integer.MAX_VALUE);
+    }
 }

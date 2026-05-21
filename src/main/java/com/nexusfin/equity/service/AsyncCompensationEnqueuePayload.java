@@ -12,7 +12,7 @@ public sealed interface AsyncCompensationEnqueuePayload
             String uid,
             String benefitOrderNo,
             String applyId,
-            String loanId,
+            Integer loanId,
             Long loanAmount,
             Integer loanPeriod,
             String bankCardNo

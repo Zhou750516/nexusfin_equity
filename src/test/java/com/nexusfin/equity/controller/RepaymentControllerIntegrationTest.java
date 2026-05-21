@@ -102,19 +102,19 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     @Test
     void shouldReturnRepaymentCardsAndSelectedCard() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-cards", "user-repay-cards");
-        createApplicationMapping(memberInfo, "APP-REPAY-001", "LN-REPAY-001");
+        createApplicationMapping(memberInfo, "APP-REPAY-001", 20260501);
         JsonNode yunkaData = objectMapper.readTree("""
                 {"repayAmount":101850}
                 """);
         when(yunkaGatewayClient.proxy(any()))
                 .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", yunkaData));
-        when(xiaohuaGatewayService.queryUserCards(any(), eq("LN-REPAY-001"), any()))
+        when(xiaohuaGatewayService.queryUserCards(any(), eq("20260501"), any()))
                 .thenReturn(new UserCardListResponse(List.of(
                         new UserCardSummary("card-001", "招商银行", "8648", 1),
                         new UserCardSummary("card-002", "建设银行", "1234", 0)
                 )));
 
-        mockMvc.perform(get("/api/repayment/info/LN-REPAY-001")
+        mockMvc.perform(get("/api/repayment/info/20260501")
                         .cookie(authCookie(memberInfo)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
@@ -127,7 +127,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     void shouldReturnControlledErrorWhenLoanIdIsUnknown() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-unknown-loan", "user-repay-unknown-loan");
 
-        mockMvc.perform(get("/api/repayment/info/LN-FAKE-20260429-001")
+        mockMvc.perform(get("/api/repayment/info/99999901")
                         .cookie(authCookie(memberInfo)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(404))
@@ -137,13 +137,13 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     @Test
     void shouldSupportRepaymentSmsSendAndConfirm() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-sms", "user-repay-sms");
-        when(xiaohuaGatewayService.queryUserCards(any(), eq("LN-REPAY-002"), any()))
+        when(xiaohuaGatewayService.queryUserCards(any(), eq("20260502"), any()))
                 .thenReturn(new UserCardListResponse(List.of(
                         new UserCardSummary("card-001", "招商银行", "8648", 1)
                 )));
-        when(xiaohuaGatewayService.sendCardSms(any(), eq("LN-REPAY-002"), any()))
+        when(xiaohuaGatewayService.sendCardSms(any(), eq("20260502"), any()))
                 .thenReturn(new CardSmsSendResponse("sms-001", "11001", "发送成功"));
-        when(xiaohuaGatewayService.confirmCardSms(any(), eq("LN-REPAY-002"), any()))
+        when(xiaohuaGatewayService.confirmCardSms(any(), eq("20260502"), any()))
                 .thenReturn(new CardSmsConfirmResponse("11002", "验证成功"));
 
         mockMvc.perform(post("/api/repayment/sms-send")
@@ -151,7 +151,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "loanId": "LN-REPAY-002",
+                                  "loanId": 20260502,
                                   "bankCardId": "card-001"
                                 }
                                 """))
@@ -165,7 +165,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "loanId": "LN-REPAY-002",
+                                  "loanId": 20260502,
                                   "captcha": "123456"
                                 }
                                 """))
@@ -177,28 +177,28 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     @Test
     void shouldExposeProcessingRepaymentResultWithSwiftNumber() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-result", "user-repay-result");
-        createApplicationMapping(memberInfo, "APP-REPAY-003", "LN-REPAY-003");
+        createApplicationMapping(memberInfo, "APP-REPAY-003", 20260503);
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "status": "8004",
                   "amount": 1018.50,
-                  "swiftNumber": "RP-LN-REPAY-003",
+                  "swiftNumber": "RP-20260503",
                   "discount": 26.50
                 }
                 """);
         when(yunkaGatewayClient.proxy(any()))
                 .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", yunkaData));
-        when(xiaohuaGatewayService.queryUserCards(any(), eq("RP-LN-REPAY-003"), any()))
+        when(xiaohuaGatewayService.queryUserCards(any(), eq("RP-20260503"), any()))
                 .thenReturn(new UserCardListResponse(List.of(
                         new UserCardSummary("card-001", "招商银行", "8648", 1)
                 )));
 
-        mockMvc.perform(get("/api/repayment/result/RP-LN-REPAY-003")
+        mockMvc.perform(get("/api/repayment/result/RP-20260503")
                         .cookie(authCookie(memberInfo)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.status").value("processing"))
-                .andExpect(jsonPath("$.data.swiftNumber").value("RP-LN-REPAY-003"))
+                .andExpect(jsonPath("$.data.swiftNumber").value("RP-20260503"))
                 .andExpect(jsonPath("$.data.interestSaved").value(26.5));
     }
 
@@ -217,7 +217,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     void shouldReturnControlledErrorWhenRepaymentSubmitTimesOut() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-timeout", "user-repay-timeout");
         insertReceivingAccount(memberInfo.getMemberId(), "acc-mem-repay-timeout", "招商银行", "8648");
-        createApplicationMapping(memberInfo, "APP-REPAY-TIMEOUT-001", "LN-REPAY-TIMEOUT-001");
+        createApplicationMapping(memberInfo, "APP-REPAY-TIMEOUT-001", 20260504);
         when(yunkaGatewayClient.proxy(any()))
                 .thenAnswer(invocation -> {
                     YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
@@ -238,7 +238,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "loanId": "LN-REPAY-TIMEOUT-001",
+                                  "loanId": 20260504,
                                   "amount": 1018.50,
                                   "bankCardId": "acc-mem-repay-timeout",
                                   "repaymentType": "early"
@@ -253,7 +253,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     void shouldReturnControlledErrorWhenRepaymentAmountExceedsCurrentRepayableAmount() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-overpay", "user-repay-overpay");
         insertReceivingAccount(memberInfo.getMemberId(), "acc-mem-repay-overpay", "招商银行", "8648");
-        createApplicationMapping(memberInfo, "APP-REPAY-OVERPAY-001", "LN-REPAY-OVERPAY-001");
+        createApplicationMapping(memberInfo, "APP-REPAY-OVERPAY-001", 20260505);
         when(yunkaGatewayClient.proxy(any()))
                 .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
                         0,
@@ -268,7 +268,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "loanId": "LN-REPAY-OVERPAY-001",
+                                  "loanId": 20260505,
                                   "amount": 2000.00,
                                   "bankCardId": "acc-mem-repay-overpay",
                                   "repaymentType": "early"
@@ -285,7 +285,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     void shouldReturnControlledErrorForDuplicateRepaymentSubmitWithoutSecondRepayApplyCall() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-duplicate", "user-repay-duplicate");
         insertReceivingAccount(memberInfo.getMemberId(), "acc-mem-repay-duplicate", "招商银行", "8648");
-        createApplicationMapping(memberInfo, "APP-REPAY-DUP-001", "LN-REPAY-DUP-001");
+        createApplicationMapping(memberInfo, "APP-REPAY-DUP-001", 20260506);
         when(yunkaGatewayClient.proxy(any()))
                 .thenAnswer(invocation -> {
                     YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
@@ -302,14 +302,14 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                             0,
                             "SUCCESS",
                             objectMapper.readTree("""
-                                    {"swiftNumber":"RP-LN-REPAY-DUP-001","status":"8004","remark":"processing"}
+                                    {"swiftNumber":"RP-20260506","status":"8004","remark":"processing"}
                                     """)
                     );
                 });
 
         String payload = """
                 {
-                  "loanId": "LN-REPAY-DUP-001",
+                  "loanId": 20260506,
                   "amount": 1018.50,
                   "bankCardId": "acc-mem-repay-duplicate",
                   "repaymentType": "early"
@@ -322,7 +322,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                         .content(payload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.repaymentId").value("RP-LN-REPAY-DUP-001"));
+                .andExpect(jsonPath("$.data.repaymentId").value("RP-20260506"));
 
         mockMvc.perform(post("/api/repayment/submit")
                         .cookie(authCookie(memberInfo))
@@ -341,14 +341,13 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
         org.assertj.core.api.Assertions.assertThat(repayApplyCalls).isEqualTo(1);
     }
 
-    private void createApplicationMapping(MemberInfo memberInfo, String applicationId, String loanId) {
+    private void createApplicationMapping(MemberInfo memberInfo, String applicationId, Integer loanId) {
         LoanApplicationMapping mapping = new LoanApplicationMapping();
         mapping.setApplicationId(applicationId);
         mapping.setMemberId(memberInfo.getMemberId());
         mapping.setChannelCode("KJ");
         mapping.setExternalUserId(memberInfo.getExternalUserId());
-        mapping.setUpstreamQueryType("loanId");
-        mapping.setUpstreamQueryValue(loanId);
+        mapping.setPlatformLoanId(loanId);
         mapping.setPurpose("rent");
         mapping.setMappingStatus("ACTIVE");
         mapping.setCreatedTs(LocalDateTime.now());

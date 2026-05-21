@@ -1,7 +1,8 @@
 package com.nexusfin.equity.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 
 public record RepaymentResultCallbackRequest(
@@ -10,7 +11,7 @@ public record RepaymentResultCallbackRequest(
         String cid,
         String benefitOrderNo,
         String platformBenefitOrderNo,
-        @NotBlank String loanId,
+        @NotNull @Positive Integer loanId,
         String swiftNumber,
         @NotNull Integer status,
         @NotNull Integer repaymentType,
@@ -23,7 +24,7 @@ public record RepaymentResultCallbackRequest(
 ) {
 
     public String bizOrderNo() {
-        return firstNonBlank(benefitOrderNo, platformBenefitOrderNo, loanId);
+        return firstNonBlank(benefitOrderNo, platformBenefitOrderNo, loanOrderNo());
     }
 
     public String resolvedBenefitOrderNo() {
@@ -31,7 +32,7 @@ public record RepaymentResultCallbackRequest(
     }
 
     public String loanOrderNo() {
-        return loanId;
+        return loanId == null ? "" : String.valueOf(loanId);
     }
 
     public String idempotencyStatus() {

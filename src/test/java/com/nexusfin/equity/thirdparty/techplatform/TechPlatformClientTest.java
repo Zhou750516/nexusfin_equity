@@ -53,7 +53,7 @@ class TechPlatformClientTest {
         TechPlatformClient client = new TechPlatformClientImpl(properties, objectMapper, restClientBuilder);
         TechPlatformNotifyResponse response = client.notifyLoanInfo(new LoanInfoNoticeRequest(
                 "order-1",
-                "loan-1",
+                "20260501",
                 new BigDecimal("3000.00"),
                 12,
                 "2026-03-30",

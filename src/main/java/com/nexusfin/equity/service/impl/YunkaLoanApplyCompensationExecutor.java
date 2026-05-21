@@ -93,9 +93,9 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
         update.setApplicationId(applicationId);
         update.setMappingStatus("ACTIVE");
         if (response != null && response.data() != null && !response.data().isMissingNode() && !response.data().isNull()) {
-            String loanId = response.data().path("loanId").asText(null);
-            if (loanId != null && !loanId.isBlank()) {
-                update.setUpstreamQueryValue(loanId);
+            Integer loanId = readLoanId(response.data().path("loanId"));
+            if (loanId != null) {
+                update.setPlatformLoanId(loanId);
             }
         }
         loanApplicationMappingRepository.updateById(update);
@@ -106,12 +106,15 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
             YunkaLoanApplyPayload payload
     ) {
         String outboundUserId = resolveOutboundUserId(mapping, payload);
-        String upstreamQueryValue = mapping.getUpstreamQueryValue() == null || mapping.getUpstreamQueryValue().isBlank()
+        Integer platformLoanId = mapping.getPlatformLoanId() == null || mapping.getPlatformLoanId() <= 0
                 ? payload.loanId()
-                : mapping.getUpstreamQueryValue();
+                : mapping.getPlatformLoanId();
+        if (platformLoanId == null || platformLoanId <= 0) {
+            throw new BizException("LOAN_ID_MISSING", "loanId is required for loan query");
+        }
         ObjectNode queryData = objectMapper.createObjectNode();
         queryData.put("userId", outboundUserId);
-        queryData.put("loanId", upstreamQueryValue);
+        queryData.put("loanId", platformLoanId);
         try {
             return yunkaCallTemplate.execute(
                     YunkaCallTemplate.YunkaCall.of(
@@ -151,6 +154,26 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
         }
     }
 
+    private Integer readLoanId(com.fasterxml.jackson.databind.JsonNode loanIdNode) {
+        if (loanIdNode == null || loanIdNode.isMissingNode() || loanIdNode.isNull()) {
+            return null;
+        }
+        if (loanIdNode.isInt() || loanIdNode.isLong()) {
+            int loanId = loanIdNode.asInt();
+            return loanId > 0 ? loanId : null;
+        }
+        String text = loanIdNode.asText("");
+        if (text.isBlank()) {
+            return null;
+        }
+        try {
+            int loanId = Integer.parseInt(text);
+            return loanId > 0 ? loanId : null;
+        } catch (NumberFormatException exception) {
+            throw new BizException("YUNKA_RESPONSE_INVALID", "Yunka loan apply response loanId is invalid");
+        }
+    }
+
     private String writeResponse(YunkaGatewayClient.YunkaGatewayResponse response) {
         try {
             return objectMapper.writeValueAsString(response);
@@ -168,7 +191,7 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
             String uid,
             String benefitOrderNo,
             String applyId,
-            String loanId,
+            Integer loanId,
             Long loanAmount,
             Integer loanPeriod,
             String bankCardNo
@@ -179,7 +202,7 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
             String userId,
             String benefitOrderNo,
             String applyId,
-            String loanId,
+            Integer loanId,
             java.math.BigDecimal loanAmount,
             Integer loanPeriod,
             String bankCardNo

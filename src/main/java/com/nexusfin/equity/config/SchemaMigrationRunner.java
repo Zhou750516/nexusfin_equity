@@ -78,6 +78,7 @@ public class SchemaMigrationRunner {
     private void migrateLoanApplicationMapping(DatabaseMetaData metaData, String databaseProduct) throws SQLException {
         if (hasTable(metaData, "loan_application_mapping")) {
             addColumnIfNeeded(metaData, "loan_application_mapping", "purpose", "varchar(32)");
+            addColumnIfNeeded(metaData, "loan_application_mapping", "platform_loan_id", "int");
             return;
         }
         jdbcTemplate.execute(buildCreateLoanApplicationMappingSql(databaseProduct));
@@ -169,8 +170,7 @@ public class SchemaMigrationRunner {
                 + "benefit_order_no varchar(64), "
                 + "channel_code varchar(64), "
                 + "external_user_id varchar(64), "
-                + "upstream_query_type varchar(32), "
-                + "upstream_query_value varchar(128), "
+                + "platform_loan_id int, "
                 + "purpose varchar(32), "
                 + "mapping_status varchar(32) not null, "
                 + "created_ts timestamp not null, "

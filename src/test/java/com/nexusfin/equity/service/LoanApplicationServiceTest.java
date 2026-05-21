@@ -89,7 +89,7 @@ class LoanApplicationServiceTest {
                 "SUCCESS",
                 objectMapper.readTree("""
                         {
-                          "loanId": "LN-UPSTREAM-001",
+                          "loanId": 20260521,
                           "status": "4002",
                           "remark": "处理中"
                         }
@@ -121,6 +121,8 @@ class LoanApplicationServiceTest {
         assertThat(forwardData.path("loanReason").asText()).isEqualTo("DAILY_CONSUMPTION");
         assertThat(forwardData.path("bankCardNum").asText()).isEqualTo("6222020202028648");
         assertThat(forwardData.path("platformBenefitOrderNo").asText()).isEqualTo("PBEN-001");
+        assertThat(forwardData.path("loanId").isInt()).isTrue();
+        assertThat(forwardData.path("loanId").asInt()).isPositive();
         assertThat(forwardData.path("loanAmount").decimalValue()).isEqualByComparingTo("3000.00");
         assertThat(forwardData.path("basicInfo").path("education").asText()).isEqualTo("BACHELOR");
         assertThat(forwardData.path("contactInfo").isArray()).isTrue();
@@ -133,7 +135,7 @@ class LoanApplicationServiceTest {
         assertThat(saveCaptor.getValue().externalUserId()).isEqualTo("cid-test-001");
         assertThat(saveCaptor.getValue().applicationId()).isEqualTo(response.applicationId());
         assertThat(saveCaptor.getValue().benefitOrderNo()).isEqualTo("BEN-001");
-        assertThat(saveCaptor.getValue().upstreamLoanId()).isEqualTo("LN-UPSTREAM-001");
+        assertThat(saveCaptor.getValue().platformLoanId()).isEqualTo(20260521);
         assertThat(saveCaptor.getValue().purpose()).isEqualTo("rent");
         assertThat(saveCaptor.getValue().mappingStatus()).isEqualTo("ACTIVE");
     }
@@ -148,7 +150,7 @@ class LoanApplicationServiceTest {
                 "SUCCESS",
                 objectMapper.readTree("""
                         {
-                          "loanId": "LN-UPSTREAM-NO-PBO",
+                          "loanId": 20260522,
                           "remark": "处理中"
                         }
                         """)
@@ -177,7 +179,7 @@ class LoanApplicationServiceTest {
                 ArgumentCaptor.forClass(LoanApplicationGateway.SaveCommand.class);
         verify(loanApplicationGateway).save(saveCaptor.capture());
         assertThat(saveCaptor.getValue().benefitOrderNo()).isEqualTo("BEN-NO-PBO");
-        assertThat(saveCaptor.getValue().upstreamLoanId()).isEqualTo("LN-UPSTREAM-NO-PBO");
+        assertThat(saveCaptor.getValue().platformLoanId()).isEqualTo(20260522);
     }
 
     @Test
@@ -227,7 +229,7 @@ class LoanApplicationServiceTest {
         assertThat(saveCaptor.getValue().applicationId()).isEqualTo(response.applicationId());
         assertThat(saveCaptor.getValue().benefitOrderNo()).isEqualTo("BEN-TIMEOUT");
         assertThat(saveCaptor.getValue().mappingStatus()).isEqualTo("PENDING_REVIEW");
-        assertThat(saveCaptor.getValue().upstreamLoanId()).startsWith("LN-");
+        assertThat(saveCaptor.getValue().platformLoanId()).isPositive();
 
         ArgumentCaptor<AsyncCompensationEnqueueService.EnqueueCommand> enqueueCaptor =
                 ArgumentCaptor.forClass(AsyncCompensationEnqueueService.EnqueueCommand.class);
@@ -245,6 +247,7 @@ class LoanApplicationServiceTest {
         assertThat(payload.benefitOrderNo()).isEqualTo("BEN-TIMEOUT");
         assertThat(payload.uid()).isEqualTo("cid-test-001");
         assertThat(payload.applyId()).isEqualTo(response.applicationId());
+        assertThat(payload.loanId()).isPositive();
         assertThat(output)
                 .contains("scene=loan apply")
                 .contains("errorNo=YUNKA_UPSTREAM_TIMEOUT");

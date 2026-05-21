@@ -98,13 +98,13 @@ class Phase9TaskGroupCIntegrationTest extends AbstractYunkaXiaohuaIT {
         MemberInfo memberInfo = createMember("mem-loan-calculate", "user-loan-calculate");
         JsonNode yunkaData = objectMapper.readTree("""
                 {
-                  "receiveAmount": 300000,
-                  "repayAmount": 313500,
+                  "receiveAmount": 3000.00,
+                  "repayAmount": 3135.00,
                   "yearRate": "18.0%",
                   "repayPlan": [
-                    {"period": 1, "date": "2026-05-07", "principal": 100000, "interest": 4500, "total": 104500},
-                    {"period": 2, "date": "2026-06-07", "principal": 100000, "interest": 4500, "total": 104500},
-                    {"period": 3, "date": "2026-07-07", "principal": 100000, "interest": 4500, "total": 104500}
+                    {"period": 1, "date": "2026-05-07", "principal": 1000.00, "interest": 45.00, "total": 1045.00},
+                    {"period": 2, "date": "2026-06-07", "principal": 1000.00, "interest": 45.00, "total": 1045.00},
+                    {"period": 3, "date": "2026-07-07", "principal": 1000.00, "interest": 45.00, "total": 1045.00}
                   ]
                 }
                 """);
@@ -135,10 +135,10 @@ class Phase9TaskGroupCIntegrationTest extends AbstractYunkaXiaohuaIT {
         JsonNode data = objectMapper.valueToTree(request.data());
         assertThat(request.path()).isEqualTo("/loan/trial");
         assertThat(request.requestId()).startsWith("LC-");
-        assertThat(data.get("userId").asText()).isEqualTo("user-loan-calculate");
+        assertThat(data.get("userId").asText()).isEqualTo("mem-loan-calculate");
         assertThat(data.has("uid")).isFalse();
-        assertThat(data.get("applyId").asText()).startsWith("LC-");
-        assertThat(data.get("loanAmount").asLong()).isEqualTo(300000L);
+        assertThat(data.has("applyId")).isFalse();
+        assertThat(data.get("loanAmount").decimalValue()).isEqualByComparingTo("3000.00");
         assertThat(data.get("loanPeriod").asInt()).isEqualTo(3);
         assertThat(output).contains("scene=loan calculate");
         assertThat(output).contains("yunka request begin");
@@ -150,12 +150,12 @@ class Phase9TaskGroupCIntegrationTest extends AbstractYunkaXiaohuaIT {
     @Test
     void shouldQueryApprovalStatusFromYunkaLoanQuery() throws Exception {
         MemberInfo memberInfo = createMember("mem-approval-status", "user-approval-status");
-        createApplicationMapping(memberInfo, "APP202604130001", "LOAN202604130001");
+        createApplicationMapping(memberInfo, "APP202604130001", 2026041301);
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "status": "7002",
-                  "loanAmount": 300000,
-                  "repayAmount": 313500,
+                  "loanAmount": 3000.00,
+                  "repayAmount": 3135.00,
                   "loanDate": "2026-04-13T10:00:00+08:00",
                   "remark": "放款处理中"
                 }
@@ -178,20 +178,21 @@ class Phase9TaskGroupCIntegrationTest extends AbstractYunkaXiaohuaIT {
         org.mockito.Mockito.verify(yunkaGatewayClient).proxy(requestCaptor.capture());
         JsonNode data = objectMapper.valueToTree(requestCaptor.getValue().data());
         assertThat(requestCaptor.getValue().path()).isEqualTo("/loan/query");
-        assertThat(data.get("userId").asText()).isEqualTo("user-approval-status");
+        assertThat(data.get("userId").asText()).isEqualTo("mem-approval-status");
         assertThat(data.has("uid")).isFalse();
-        assertThat(data.get("loanId").asText()).isEqualTo("LOAN202604130001");
+        assertThat(data.get("loanId").isInt()).isTrue();
+        assertThat(data.get("loanId").asInt()).isEqualTo(2026041301);
     }
 
     @Test
     void shouldQueryApprovalResultFromYunkaLoanQuery() throws Exception {
         MemberInfo memberInfo = createMember("mem-approval-result", "user-approval-result");
-        createApplicationMapping(memberInfo, "APP202604130002", "LOAN202604130002");
+        createApplicationMapping(memberInfo, "APP202604130002", 2026041302);
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "status": "7001",
-                  "loanAmount": 300000,
-                  "repayAmount": 313500,
+                  "loanAmount": 3000.00,
+                  "repayAmount": 3135.00,
                   "loanDate": "2026-04-13T10:00:00+08:00",
                   "remark": "放款成功"
                 }
@@ -213,18 +214,18 @@ class Phase9TaskGroupCIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(jsonPath("$.data.approvedAmount").value(3000))
                 .andExpect(jsonPath("$.data.benefitsCardActivated").value(true))
                 .andExpect(jsonPath("$.data.repaymentPlan[0].repaymentAmount").value(1045))
-                .andExpect(jsonPath("$.data.loanId").value("LOAN202604130002"));
+                .andExpect(jsonPath("$.data.loanId").value(2026041302));
     }
 
     @Test
     void shouldReturnLocalizedApprovalResultTipWhenAcceptLanguageIsEnglish() throws Exception {
         MemberInfo memberInfo = createMember("mem-approval-result-en", "user-approval-result-en");
-        createApplicationMapping(memberInfo, "APP202604130003", "LOAN202604130003");
+        createApplicationMapping(memberInfo, "APP202604130003", 2026041303);
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "status": "7001",
-                  "loanAmount": 300000,
-                  "repayAmount": 313500,
+                  "loanAmount": 3000.00,
+                  "repayAmount": 3135.00,
                   "loanDate": "2026-04-13T10:00:00+08:00",
                   "remark": "审批通过，预计30分钟内到账"
                 }
@@ -242,14 +243,13 @@ class Phase9TaskGroupCIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(jsonPath("$.data.tip").value("Approved. Funds are expected to arrive within 30 minutes."));
     }
 
-    private void createApplicationMapping(MemberInfo memberInfo, String applicationId, String loanId) {
+    private void createApplicationMapping(MemberInfo memberInfo, String applicationId, Integer loanId) {
         LoanApplicationMapping mapping = new LoanApplicationMapping();
         mapping.setApplicationId(applicationId);
         mapping.setMemberId(memberInfo.getMemberId());
         mapping.setChannelCode("KJ");
         mapping.setExternalUserId(memberInfo.getExternalUserId());
-        mapping.setUpstreamQueryType("loanId");
-        mapping.setUpstreamQueryValue(loanId);
+        mapping.setPlatformLoanId(loanId);
         mapping.setPurpose("rent");
         mapping.setMappingStatus("ACTIVE");
         mapping.setCreatedTs(LocalDateTime.now());

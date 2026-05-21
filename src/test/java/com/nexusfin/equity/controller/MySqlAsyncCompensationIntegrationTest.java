@@ -94,7 +94,7 @@ class MySqlAsyncCompensationIntegrationTest {
                         "mysql-it-user",
                         "BEN-MYSQL-001",
                         bizOrderNo,
-                        "LN-MYSQL-001",
+                        2026041801,
                         300000L,
                         3,
                         "acc_001"

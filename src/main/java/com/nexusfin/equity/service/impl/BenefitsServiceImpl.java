@@ -8,6 +8,7 @@ import com.nexusfin.equity.dto.response.BenefitsActivateResponse;
 import com.nexusfin.equity.dto.response.BenefitsCardDetailResponse;
 import com.nexusfin.equity.dto.response.CreateBenefitOrderResponse;
 import com.nexusfin.equity.entity.BenefitProduct;
+import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.entity.MemberReceivingAccount;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.repository.BenefitProductRepository;
@@ -16,6 +17,7 @@ import com.nexusfin.equity.service.BenefitOrderService;
 import com.nexusfin.equity.service.BenefitRedirectUrlService;
 import com.nexusfin.equity.service.BenefitsService;
 import com.nexusfin.equity.service.H5I18nService;
+import com.nexusfin.equity.service.LoanApplicationGateway;
 import com.nexusfin.equity.service.XiaohuaGatewayService;
 import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncRequest;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryRequest;
@@ -41,6 +43,7 @@ public class BenefitsServiceImpl implements BenefitsService {
     private final BenefitProductRepository benefitProductRepository;
     private final MemberReceivingAccountRepository memberReceivingAccountRepository;
     private final BenefitOrderService benefitOrderService;
+    private final LoanApplicationGateway loanApplicationGateway;
     private final H5I18nService h5I18nService;
     private final XiaohuaGatewayService xiaohuaGatewayService;
     private final BenefitRedirectUrlService benefitRedirectUrlService;
@@ -51,6 +54,7 @@ public class BenefitsServiceImpl implements BenefitsService {
             BenefitProductRepository benefitProductRepository,
             MemberReceivingAccountRepository memberReceivingAccountRepository,
             BenefitOrderService benefitOrderService,
+            LoanApplicationGateway loanApplicationGateway,
             H5I18nService h5I18nService,
             XiaohuaGatewayService xiaohuaGatewayService,
             BenefitRedirectUrlService benefitRedirectUrlService
@@ -60,6 +64,7 @@ public class BenefitsServiceImpl implements BenefitsService {
         this.benefitProductRepository = benefitProductRepository;
         this.memberReceivingAccountRepository = memberReceivingAccountRepository;
         this.benefitOrderService = benefitOrderService;
+        this.loanApplicationGateway = loanApplicationGateway;
         this.h5I18nService = h5I18nService;
         this.xiaohuaGatewayService = xiaohuaGatewayService;
         this.benefitRedirectUrlService = benefitRedirectUrlService;
@@ -152,6 +157,7 @@ public class BenefitsServiceImpl implements BenefitsService {
         if (!cardDetail.protocolReady()) {
             throw new BizException("BENEFITS_PROTOCOL_NOT_READY", "Benefit activation requires ready agreements and active payment protocol");
         }
+        Integer loanId = resolveBenefitOrderNoticeLoanId(memberId, request.applicationId());
         CreateBenefitOrderResponse response = benefitOrderService.createOrder(memberId, new CreateBenefitOrderRequest(
                 "activate-" + request.applicationId(),
                 h5BenefitsProperties.productCode(),
@@ -173,6 +179,7 @@ public class BenefitsServiceImpl implements BenefitsService {
                 new BenefitOrderSyncRequest(
                         request.applicationId(),
                         response.qwOrderNo(),
+                        loanId,
                         activate.defaultBenefitAmount(),
                         2,
                         response.createTime(),
@@ -192,6 +199,21 @@ public class BenefitsServiceImpl implements BenefitsService {
                 "activated",
                 h5I18nService.text("benefits.activate.success", activate.successMessage())
         );
+    }
+
+    private Integer resolveBenefitOrderNoticeLoanId(String memberId, String applicationId) {
+        LoanApplicationMapping mapping = loanApplicationGateway.findActiveOrPendingMapping(memberId, applicationId);
+        Integer loanId = mapping == null ? null : mapping.getPlatformLoanId();
+        if (loanId == null || loanId <= 0) {
+            log.warn("traceId={} bizOrderNo={} errorNo={} errorMsg={} benefit order notice loanId missing",
+                    TraceIdUtil.getTraceId(),
+                    applicationId,
+                    "BENEFIT_ORDER_NOTICE_LOAN_ID_MISSING",
+                    "loanId is required for benefit order notice");
+            throw new BizException("BENEFIT_ORDER_NOTICE_LOAN_ID_MISSING",
+                    "loanId is required for benefit order notice");
+        }
+        return loanId;
     }
 
     private String benefitSyncRequestId(String applicationId) {

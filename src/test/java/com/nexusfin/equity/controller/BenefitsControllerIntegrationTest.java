@@ -2,6 +2,7 @@ package com.nexusfin.equity.controller;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.nexusfin.equity.entity.BenefitProduct;
+import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.entity.MemberChannel;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.entity.MemberPaymentProtocol;
@@ -10,6 +11,7 @@ import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.repository.BenefitProductRepository;
 import com.nexusfin.equity.repository.ContractArchiveRepository;
 import com.nexusfin.equity.repository.IdempotencyRecordRepository;
+import com.nexusfin.equity.repository.LoanApplicationMappingRepository;
 import com.nexusfin.equity.repository.MemberChannelRepository;
 import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
@@ -82,6 +84,9 @@ class BenefitsControllerIntegrationTest {
     private IdempotencyRecordRepository idempotencyRecordRepository;
 
     @Autowired
+    private LoanApplicationMappingRepository loanApplicationMappingRepository;
+
+    @Autowired
     private JwtUtil jwtUtil;
 
     @Autowired
@@ -102,6 +107,7 @@ class BenefitsControllerIntegrationTest {
         signTaskRepository.delete(null);
         benefitOrderRepository.delete(null);
         idempotencyRecordRepository.delete(null);
+        loanApplicationMappingRepository.delete(null);
         memberPaymentProtocolRepository.delete(null);
         memberChannelRepository.delete(null);
         memberInfoRepository.delete(null);
@@ -158,6 +164,7 @@ class BenefitsControllerIntegrationTest {
     void shouldSyncBenefitOrderAfterActivation() throws Exception {
         MemberInfo memberInfo = createReadyMember("mem-benefits-sync", "user-benefits-sync");
         createProduct();
+        createLoanMapping(memberInfo.getMemberId(), "APP-benefits-sync", 20260521);
         when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(new ProtocolQueryResponse(List.of(
                         new ProtocolLink("借款协议", 1, "https://agreements/loan")
@@ -188,6 +195,7 @@ class BenefitsControllerIntegrationTest {
         verify(xiaohuaGatewayService).syncBenefitOrder(any(), any(), syncCaptor.capture());
         assertThat(syncCaptor.getValue().platformBenefitOrderNo()).isEqualTo("APP-benefits-sync");
         assertThat(syncCaptor.getValue().benefitOrderNo()).isNotBlank();
+        assertThat(syncCaptor.getValue().loanId()).isEqualTo(20260521);
         assertThat(syncCaptor.getValue().orderAmount()).isEqualTo(30000L);
         assertThat(syncCaptor.getValue().status()).isEqualTo(2);
         assertThat(syncCaptor.getValue().createTime()).isNotNull();
@@ -195,6 +203,51 @@ class BenefitsControllerIntegrationTest {
         assertThat(syncCaptor.getValue().expireTime()).isNotNull();
         assertThat(syncCaptor.getValue().benefitUrl()).isEmpty();
         verify(benefitRedirectUrlService, never()).generate(any());
+    }
+
+    @Test
+    void shouldRejectActivationWhenLoanIdIsMissingForBenefitOrderNotice() throws Exception {
+        MemberInfo memberInfo = createReadyMember("mem-benefits-no-loan", "user-benefits-no-loan");
+        createProduct();
+        when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(new ProtocolQueryResponse(List.of(
+                        new ProtocolLink("借款协议", 1, "https://agreements/loan")
+                )));
+        when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(new UserCardListResponse(List.of(
+                        new UserCardSummary("card-001", "招商银行", "8648", 1)
+                )));
+
+        mockMvc.perform(post("/api/benefits/activate")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "applicationId": "APP-benefits-no-loan",
+                                  "cardType": "huixuan_card",
+                                  "token": "joint-token-benefits-no-loan"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(-1))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("BENEFIT_ORDER_NOTICE_LOAN_ID_MISSING")));
+
+        verify(xiaohuaGatewayService, never()).syncBenefitOrder(any(), any(), any());
+    }
+
+    private void createLoanMapping(String memberId, String applicationId, Integer loanId) {
+        LoanApplicationMapping mapping = new LoanApplicationMapping();
+        mapping.setApplicationId(applicationId);
+        mapping.setMemberId(memberId);
+        mapping.setBenefitOrderNo("BEN-" + applicationId);
+        mapping.setChannelCode("KJ");
+        mapping.setExternalUserId("user-" + memberId);
+        mapping.setPlatformLoanId(loanId);
+        mapping.setPurpose("rent");
+        mapping.setMappingStatus("ACTIVE");
+        mapping.setCreatedTs(LocalDateTime.now());
+        mapping.setUpdatedTs(LocalDateTime.now());
+        loanApplicationMappingRepository.insert(mapping);
     }
 
     private BenefitProduct createProduct() {

@@ -15,7 +15,7 @@ public interface LoanApplicationGateway {
             String externalUserId,
             String applicationId,
             String benefitOrderNo,
-            String upstreamLoanId,
+            Integer platformLoanId,
             String purpose,
             String mappingStatus
     ) {

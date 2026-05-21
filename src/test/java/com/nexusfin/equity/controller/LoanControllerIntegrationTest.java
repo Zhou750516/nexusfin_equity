@@ -159,10 +159,10 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     @Test
     void shouldReturnApprovedResultWithRepaymentPlan() throws Exception {
         MemberInfo memberInfo = createMember("mem-loan-result", "user-loan-result");
-        createApplicationMapping(memberInfo, "APP-LOAN-001", "LN-LOAN-001");
+        createApplicationMapping(memberInfo, "APP-LOAN-001", 20260501);
         JsonNode loanQueryData = objectMapper.readTree("""
                 {
-                  "loanId": "LN-LOAN-001",
+                  "loanId": 20260501,
                   "status": "7001",
                   "loanAmount": 300000,
                   "remark": "放款成功"
@@ -182,16 +182,16 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.status").value("approved"))
                 .andExpect(jsonPath("$.data.repaymentPlan[0].repaymentAmount").value(1045))
-                .andExpect(jsonPath("$.data.loanId").value("LN-LOAN-001"));
+                .andExpect(jsonPath("$.data.loanId").value(20260501));
     }
 
     @Test
     void shouldReturnRejectedResultWhenLatestStatusIsFailure() throws Exception {
         MemberInfo memberInfo = createMember("mem-loan-rejected", "user-loan-rejected");
-        createApplicationMapping(memberInfo, "APP-LOAN-002", "LN-LOAN-002");
+        createApplicationMapping(memberInfo, "APP-LOAN-002", 20260502);
         JsonNode loanQueryData = objectMapper.readTree("""
                 {
-                  "loanId": "LN-LOAN-002",
+                  "loanId": 20260502,
                   "status": "7003",
                   "loanAmount": 300000,
                   "remark": "审核失败"
@@ -211,7 +211,7 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     @Test
     void shouldReturnControlledErrorWhenLoanQueryDataIsEmpty() throws Exception {
         MemberInfo memberInfo = createMember("mem-loan-empty", "user-loan-empty");
-        createApplicationMapping(memberInfo, "APP-LOAN-EMPTY", "LN-LOAN-EMPTY");
+        createApplicationMapping(memberInfo, "APP-LOAN-EMPTY", 20260503);
 
         when(yunkaGatewayClient.proxy(any()))
                 .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", objectMapper.createObjectNode()));
@@ -226,10 +226,10 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     @Test
     void shouldReturnControlledErrorWhenLoanQueryStatusIsMissing() throws Exception {
         MemberInfo memberInfo = createMember("mem-loan-missing-status", "user-loan-missing-status");
-        createApplicationMapping(memberInfo, "APP-LOAN-MISSING-STATUS", "LN-LOAN-MISSING-STATUS");
+        createApplicationMapping(memberInfo, "APP-LOAN-MISSING-STATUS", 20260504);
         JsonNode loanQueryData = objectMapper.readTree("""
                 {
-                  "loanId": "LN-LOAN-MISSING-STATUS",
+                  "loanId": 20260504,
                   "loanAmount": 300000,
                   "remark": "missing status"
                 }
@@ -248,7 +248,7 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     @Test
     void shouldReturnControlledErrorWhenApprovedLoanQueryLoanIdIsMissing() throws Exception {
         MemberInfo memberInfo = createMember("mem-loan-missing-loanid", "user-loan-missing-loanid");
-        createApplicationMapping(memberInfo, "APP-LOAN-MISSING-LOANID", "LN-LOAN-MISSING-LOANID");
+        createApplicationMapping(memberInfo, "APP-LOAN-MISSING-LOANID", null);
         JsonNode loanQueryData = objectMapper.readTree("""
                 {
                   "status": "7001",
@@ -264,17 +264,16 @@ class LoanControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                         .cookie(authCookie(memberInfo)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(-1))
-                .andExpect(jsonPath("$.message").value("YUNKA_RESPONSE_INVALID:Yunka loan query response is invalid"));
+                .andExpect(jsonPath("$.message").value("LOAN_ID_MISSING:loanId is required for loan query"));
     }
 
-    private void createApplicationMapping(MemberInfo memberInfo, String applicationId, String loanId) {
+    private void createApplicationMapping(MemberInfo memberInfo, String applicationId, Integer loanId) {
         LoanApplicationMapping mapping = new LoanApplicationMapping();
         mapping.setApplicationId(applicationId);
         mapping.setMemberId(memberInfo.getMemberId());
         mapping.setChannelCode("KJ");
         mapping.setExternalUserId(memberInfo.getExternalUserId());
-        mapping.setUpstreamQueryType("loanId");
-        mapping.setUpstreamQueryValue(loanId);
+        mapping.setPlatformLoanId(loanId);
         mapping.setMappingStatus("ACTIVE");
         mapping.setCreatedTs(LocalDateTime.now());
         mapping.setUpdatedTs(LocalDateTime.now());

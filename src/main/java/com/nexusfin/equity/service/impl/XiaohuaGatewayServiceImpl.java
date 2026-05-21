@@ -189,6 +189,7 @@ public class XiaohuaGatewayServiceImpl implements XiaohuaGatewayService {
                 new BenefitOrderSyncForwardData(
                         request.platformBenefitOrderNo(),
                         request.benefitOrderNo(),
+                        request.loanId(),
                         request.orderAmount() == null ? null : centsToYuan(request.orderAmount()),
                         request.status(),
                         request.createTime(),
@@ -269,6 +270,7 @@ public class XiaohuaGatewayServiceImpl implements XiaohuaGatewayService {
     private record BenefitOrderSyncForwardData(
             String platformBenefitOrderNo,
             String benefitOrderNo,
+            Integer loanId,
             BigDecimal orderAmount,
             Integer status,
             Long createTime,

@@ -13,7 +13,7 @@ export interface LoanState {
   approvalMessage: string | null;
   benefitsCardActivated: boolean;
   benefitOrderNo: string | null;
-  loanId: string | null;
+  loanId: number | null;
   repaymentId: string | null;
   receivingAccountId: string | null;
 }
@@ -27,7 +27,7 @@ interface LoanContextValue extends LoanState {
   setApprovalMessage: (message: string | null) => void;
   setBenefitsCardActivated: (activated: boolean) => void;
   setBenefitOrderNo: (benefitOrderNo: string | null) => void;
-  setLoanId: (loanId: string | null) => void;
+  setLoanId: (loanId: number | null) => void;
   setRepaymentId: (repaymentId: string | null) => void;
   setReceivingAccountId: (receivingAccountId: string | null) => void;
   reset: () => void;
@@ -72,7 +72,9 @@ function readStoredState(): LoanState {
       approvalMessage: typeof parsed.approvalMessage === "string" ? parsed.approvalMessage : null,
       benefitsCardActivated: typeof parsed.benefitsCardActivated === "boolean" ? parsed.benefitsCardActivated : false,
       benefitOrderNo: typeof parsed.benefitOrderNo === "string" ? parsed.benefitOrderNo : null,
-      loanId: typeof parsed.loanId === "string" ? parsed.loanId : null,
+      loanId: typeof parsed.loanId === "number" && Number.isInteger(parsed.loanId) && parsed.loanId > 0
+        ? parsed.loanId
+        : null,
       repaymentId: typeof parsed.repaymentId === "string" ? parsed.repaymentId : null,
       receivingAccountId: typeof parsed.receivingAccountId === "string" ? parsed.receivingAccountId : null,
     };

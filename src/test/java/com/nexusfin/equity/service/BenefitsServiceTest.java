@@ -8,6 +8,7 @@ import com.nexusfin.equity.dto.response.BenefitsActivateResponse;
 import com.nexusfin.equity.dto.response.BenefitsCardDetailResponse;
 import com.nexusfin.equity.dto.response.CreateBenefitOrderResponse;
 import com.nexusfin.equity.entity.BenefitProduct;
+import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.entity.MemberReceivingAccount;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.repository.BenefitProductRepository;
@@ -52,6 +53,9 @@ class BenefitsServiceTest {
     private BenefitOrderService benefitOrderService;
 
     @Mock
+    private LoanApplicationGateway loanApplicationGateway;
+
+    @Mock
     private H5I18nService h5I18nService;
 
     @Mock
@@ -71,6 +75,7 @@ class BenefitsServiceTest {
                 benefitProductRepository,
                 memberReceivingAccountRepository,
                 benefitOrderService,
+                loanApplicationGateway,
                 h5I18nService,
                 xiaohuaGatewayService,
                 benefitRedirectUrlService
@@ -182,6 +187,8 @@ class BenefitsServiceTest {
                 .thenReturn(new UserCardListResponse(List.of(
                         new UserCardSummary("card-001", "招商银行", "8648", 1)
                 )));
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-test-001", "APP-001"))
+                .thenReturn(loanMapping("mem-test-001", "APP-001", 20260521));
         when(benefitOrderService.createOrder(eq("mem-test-001"), any(CreateBenefitOrderRequest.class)))
                 .thenReturn(new CreateBenefitOrderResponse(
                         "ord-001",
@@ -211,6 +218,7 @@ class BenefitsServiceTest {
         verify(xiaohuaGatewayService).syncBenefitOrder(any(), eq("ord-001"), syncCaptor.capture());
         assertThat(syncCaptor.getValue().platformBenefitOrderNo()).isEqualTo("APP-001");
         assertThat(syncCaptor.getValue().benefitOrderNo()).isEqualTo("QW-ORDER-001");
+        assertThat(syncCaptor.getValue().loanId()).isEqualTo(20260521);
         assertThat(syncCaptor.getValue().orderAmount()).isEqualTo(30000L);
         assertThat(syncCaptor.getValue().status()).isEqualTo(2);
         assertThat(syncCaptor.getValue().createTime()).isEqualTo(1779335976232L);
@@ -230,6 +238,8 @@ class BenefitsServiceTest {
                 .thenReturn(dynamicProtocolResponse());
         when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(userCardResponse());
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-test-001", "APP-001"))
+                .thenReturn(loanMapping("mem-test-001", "APP-001", 20260521));
         when(benefitOrderService.createOrder(eq("mem-test-001"), any(CreateBenefitOrderRequest.class)))
                 .thenReturn(new CreateBenefitOrderResponse(
                         "ord-001",
@@ -263,6 +273,7 @@ class BenefitsServiceTest {
                 .allSatisfy(payload -> {
                     assertThat(payload.platformBenefitOrderNo()).isEqualTo("APP-001");
                     assertThat(payload.benefitOrderNo()).isEqualTo("QW-ORDER-001");
+                    assertThat(payload.loanId()).isEqualTo(20260521);
                     assertThat(payload.orderAmount()).isEqualTo(30000L);
                     assertThat(payload.status()).isEqualTo(2);
                     assertThat(payload.createTime()).isEqualTo(1779335976232L);
@@ -270,6 +281,28 @@ class BenefitsServiceTest {
                     assertThat(payload.expireTime()).isEqualTo(1781927976232L);
                     assertThat(payload.benefitUrl()).isEmpty();
                 });
+    }
+
+    @Test
+    void shouldNotSyncYunkaWhenLoanIdIsMissingForBenefitOrderNotice() {
+        when(benefitProductRepository.selectById("HUXUAN_CARD")).thenReturn(activeProduct());
+        when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(dynamicProtocolResponse());
+        when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(userCardResponse());
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-test-001", "APP-001"))
+                .thenReturn(loanMapping("mem-test-001", "APP-001", null));
+
+        assertThatThrownBy(() -> benefitsService.activate(
+                "mem-test-001",
+                "cid-test-001",
+                new BenefitsActivateRequest("APP-001", "huixuan_card", "joint-token-benefits-missing-loan-id")
+        )).isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo("BENEFIT_ORDER_NOTICE_LOAN_ID_MISSING");
+
+        verify(benefitOrderService, never()).createOrder(any(), any());
+        verify(xiaohuaGatewayService, never()).syncBenefitOrder(any(), any(), any());
     }
 
     @Test
@@ -283,6 +316,8 @@ class BenefitsServiceTest {
                 .thenReturn(new UserCardListResponse(List.of(
                         new UserCardSummary("card-001", "招商银行", "8648", 1)
                 )));
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-test-001", "APP-001"))
+                .thenReturn(loanMapping("mem-test-001", "APP-001", 20260521));
         when(benefitOrderService.createOrder(eq("mem-test-001"), any(CreateBenefitOrderRequest.class)))
                 .thenReturn(new CreateBenefitOrderResponse(
                         "ord-001",
@@ -314,6 +349,8 @@ class BenefitsServiceTest {
                 .thenReturn(dynamicProtocolResponse());
         when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(userCardResponse());
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-test-001", "APP-001"))
+                .thenReturn(loanMapping("mem-test-001", "APP-001", 20260521));
         when(benefitOrderService.createOrder(eq("mem-test-001"), any(CreateBenefitOrderRequest.class)))
                 .thenThrow(new BizException("QW_SIGN_REQUIRED", "QW sign confirmation required before benefit order"));
 
@@ -336,6 +373,8 @@ class BenefitsServiceTest {
                 .thenReturn(dynamicProtocolResponse());
         when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(userCardResponse());
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-test-001", "APP-001"))
+                .thenReturn(loanMapping("mem-test-001", "APP-001", 20260521));
         when(benefitOrderService.createOrder(eq("mem-test-001"), any(CreateBenefitOrderRequest.class)))
                 .thenReturn(new CreateBenefitOrderResponse(
                         "ord-001",
@@ -445,6 +484,7 @@ class BenefitsServiceTest {
                 benefitProductRepository,
                 memberReceivingAccountRepository,
                 benefitOrderService,
+                loanApplicationGateway,
                 h5I18nService,
                 xiaohuaGatewayService,
                 benefitRedirectUrlService
@@ -458,6 +498,7 @@ class BenefitsServiceTest {
                 benefitProductRepository,
                 memberReceivingAccountRepository,
                 benefitOrderService,
+                loanApplicationGateway,
                 h5I18nService,
                 xiaohuaGatewayService,
                 benefitRedirectUrlService
@@ -481,6 +522,15 @@ class BenefitsServiceTest {
         return new UserCardListResponse(List.of(
                 new UserCardSummary("card-001", "招商银行", "8648", 1)
         ));
+    }
+
+    private LoanApplicationMapping loanMapping(String memberId, String applicationId, Integer loanId) {
+        LoanApplicationMapping mapping = new LoanApplicationMapping();
+        mapping.setMemberId(memberId);
+        mapping.setApplicationId(applicationId);
+        mapping.setPlatformLoanId(loanId);
+        mapping.setMappingStatus("ACTIVE");
+        return mapping;
     }
 
     private H5BenefitsProperties h5BenefitsProperties() {

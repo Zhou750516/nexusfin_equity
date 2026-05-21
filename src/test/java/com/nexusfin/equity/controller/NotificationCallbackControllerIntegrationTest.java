@@ -70,14 +70,14 @@ class NotificationCallbackControllerIntegrationTest {
                   "userId": "%s",
                   "benefitOrderNo": "%s",
                   "platformBenefitOrderNo": "%s",
-                  "loanId": "loan-%s",
+                  "loanId": %d,
                   "status": 7001,
                   "remark": null,
                   "loanAmount": 680000,
                   "repayAmount": 710000,
                   "loanDate": 1711195800
                 }
-                """.formatted(requestId, order.getExternalUserId(), order.getBenefitOrderNo(), order.getBenefitOrderNo(), requestId);
+                """.formatted(requestId, order.getExternalUserId(), order.getBenefitOrderNo(), order.getBenefitOrderNo(), 20260511);
 
         mockMvc.perform(post("/api/callbacks/grant/forward")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -95,7 +95,7 @@ class NotificationCallbackControllerIntegrationTest {
 
         BenefitOrder savedOrder = benefitOrderRepository.selectById(order.getBenefitOrderNo());
         assertThat(savedOrder.getGrantStatus()).isEqualTo("SUCCESS");
-        assertThat(savedOrder.getLoanOrderNo()).startsWith("loan-");
+        assertThat(savedOrder.getLoanOrderNo()).isEqualTo("20260511");
         assertThat(savedOrder.getOrderStatus()).isEqualTo("FALLBACK_DEDUCT_PENDING");
         assertThat(savedOrder.getFallbackDeductStatus()).isEqualTo("PENDING");
 
@@ -109,7 +109,7 @@ class NotificationCallbackControllerIntegrationTest {
     @Test
     void shouldPersistRepaymentNotification() throws Exception {
         BenefitOrder order = createOrder("ord-repayment", "user-repayment");
-        order.setLoanOrderNo("loan-repayment");
+        order.setLoanOrderNo("20260512");
         benefitOrderRepository.updateById(order);
         String requestId = "req-repayment-" + UUID.randomUUID().toString().replace("-", "");
 
@@ -122,7 +122,7 @@ class NotificationCallbackControllerIntegrationTest {
                                   "userId": "%s",
                                   "benefitOrderNo": "%s",
                                   "platformBenefitOrderNo": "%s",
-                                  "loanId": "loan-repayment",
+                                  "loanId": 20260512,
                                   "swiftNumber": "swift-repayment",
                                   "status": 8001,
                                   "repaymentType": 1,
@@ -159,7 +159,7 @@ class NotificationCallbackControllerIntegrationTest {
                                   "userId": "user-missing",
                                   "benefitOrderNo": "ord-missing",
                                   "platformBenefitOrderNo": "ord-missing",
-                                  "loanId": "loan-missing",
+                                  "loanId": 20260513,
                                   "swiftNumber": "swift-missing",
                                   "status": 8001,
                                   "repaymentType": 1,

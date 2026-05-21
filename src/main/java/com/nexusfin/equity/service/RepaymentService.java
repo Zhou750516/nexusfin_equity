@@ -11,7 +11,7 @@ import com.nexusfin.equity.dto.response.RepaymentSubmitResponse;
 
 public interface RepaymentService {
 
-    RepaymentInfoResponse getInfo(String uid, String loanId);
+    RepaymentInfoResponse getInfo(String uid, Integer loanId);
 
     RepaymentSmsSendResponse sendSms(String uid, RepaymentSmsSendRequest request);
 

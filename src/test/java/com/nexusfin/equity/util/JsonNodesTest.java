@@ -13,12 +13,12 @@ class JsonNodesTest {
     void shouldReadTextAndRemarkWithFallbackWhenNodeIsMissingBlankOrNull() throws Exception {
         var data = objectMapper.readTree("""
                 {
-                  "loanId": "LN-001",
+                  "loanId": 20260501,
                   "remark": ""
                 }
                 """);
 
-        assertThat(JsonNodes.readText(data, "loanId", "fallback")).isEqualTo("LN-001");
+        assertThat(JsonNodes.readText(data, "loanId", "fallback")).isEqualTo("20260501");
         assertThat(JsonNodes.readText(data, "missing", "fallback")).isEqualTo("fallback");
         assertThat(JsonNodes.readText(data, "remark", "fallback")).isEqualTo("fallback");
         assertThat(JsonNodes.readText(null, "loanId", "fallback")).isEqualTo("fallback");

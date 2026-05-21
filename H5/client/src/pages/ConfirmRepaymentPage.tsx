@@ -140,7 +140,7 @@ export default function ConfirmRepaymentPage() {
   const { locale, t } = useI18n();
   const [info, setInfo] = useState<RepaymentInfo | null>(null);
   const [loadedLocale, setLoadedLocale] = useState<Locale | null>(null);
-  const [loadedLoanId, setLoadedLoanId] = useState<string | null>(null);
+  const [loadedLoanId, setLoadedLoanId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedBankCardId, setSelectedBankCardId] = useState<string | null>(null);
   const [smsCaptcha, setSmsCaptcha] = useState("");
@@ -151,7 +151,7 @@ export default function ConfirmRepaymentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loanId = getQueryParam("loanId") ?? loan.loanId;
+  const loanId = parseLoanId(getQueryParam("loanId")) ?? loan.loanId;
   const approvalResultPath = loan.applicationId
     ? buildPath("/approval-result", { applicationId: loan.applicationId })
     : "/approval-result";
@@ -170,15 +170,15 @@ export default function ConfirmRepaymentPage() {
     if (!shouldRequestLocalizedData({
       locale,
       loadedLocale,
-      requestKey: loanId,
-      loadedRequestKey: loadedLoanId,
+      requestKey: String(loanId),
+      loadedRequestKey: loadedLoanId == null ? null : String(loadedLoanId),
     })) {
       return;
     }
     void loadInfo(loanId);
   }, [loadedLoanId, loadedLocale, loanId, locale]);
 
-  async function loadInfo(currentLoanId: string) {
+  async function loadInfo(currentLoanId: number) {
     setIsLoading(true);
     setError(null);
     try {
@@ -481,6 +481,14 @@ export default function ConfirmRepaymentPage() {
       </div>
     </MobileLayout>
   );
+}
+
+function parseLoanId(value: string | null): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
 function readErrorMessage(error: unknown): string {

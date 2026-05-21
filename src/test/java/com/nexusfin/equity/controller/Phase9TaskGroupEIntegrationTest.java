@@ -129,7 +129,7 @@ class Phase9TaskGroupEIntegrationTest {
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "status": "4001",
-                  "loanId": "LOAN202604130101",
+                  "loanId": 2026041301,
                   "remark": "借款申请已受理"
                 }
                 """);
@@ -169,7 +169,7 @@ class Phase9TaskGroupEIntegrationTest {
                         .last("limit 1"));
         assertThat(mapping).isNotNull();
         assertThat(mapping.getBenefitOrderNo()).isEqualTo(benefitOrder.getBenefitOrderNo());
-        assertThat(mapping.getUpstreamQueryValue()).isEqualTo("LOAN202604130101");
+        assertThat(mapping.getPlatformLoanId()).isEqualTo(2026041301);
         assertThat(mapping.getMappingStatus()).isEqualTo("ACTIVE");
 
         ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> requestCaptor =
@@ -182,7 +182,8 @@ class Phase9TaskGroupEIntegrationTest {
         assertThat(data.get("benefitOrderNo").asText()).isEqualTo(benefitOrder.getBenefitOrderNo());
         assertThat(data.get("platformBenefitOrderNo").asText()).isEqualTo("PBO-INT-001");
         assertThat(data.get("applyId").asText()).isEqualTo(mapping.getApplicationId());
-        assertThat(data.get("loanId").asText()).startsWith("LN-");
+        assertThat(data.get("loanId").isInt()).isTrue();
+        assertThat(data.get("loanId").asInt()).isPositive();
         assertThat(data.get("loanAmount").decimalValue()).isEqualByComparingTo("3000.00");
         assertThat(data.get("loanPeriod").asInt()).isEqualTo(3);
         assertThat(data.get("bankCardNo").asText()).isEqualTo("acc-mem-loan-apply");
@@ -200,7 +201,7 @@ class Phase9TaskGroupEIntegrationTest {
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "status": "4001",
-                  "loanId": "LOAN202604270001",
+                  "loanId": 2026042701,
                   "remark": "借款申请已受理"
                 }
                 """);
@@ -265,7 +266,7 @@ class Phase9TaskGroupEIntegrationTest {
                         "SUCCESS",
                         objectMapper.readTree("""
                                 {
-                                  "loanId": "LN-PBO-MISSING",
+                                  "loanId": 2026042702,
                                   "remark": "借款申请已受理"
                                 }
                                 """)
@@ -309,7 +310,7 @@ class Phase9TaskGroupEIntegrationTest {
                         "SUCCESS",
                         objectMapper.readTree("""
                                 {
-                                  "loanId": "LN-PBO-BLANK",
+                                  "loanId": 2026042703,
                                   "remark": "借款申请已受理"
                                 }
                                 """)

@@ -102,7 +102,7 @@ public class RepaymentServiceImpl implements RepaymentService {
     }
 
     @Override
-    public RepaymentInfoResponse getInfo(String memberId, String loanId) {
+    public RepaymentInfoResponse getInfo(String memberId, Integer loanId) {
         validateKnownLoanId(memberId, loanId);
         String requestId = next("RT");
         JsonNode data = yunkaCallTemplate.executeForData(
@@ -110,11 +110,11 @@ public class RepaymentServiceImpl implements RepaymentService {
                         "repayment info",
                         requestId,
                         yunkaProperties.paths().repayTrial(),
-                        loanId,
+                        String.valueOf(loanId),
                         new RepayTrialForwardData(memberId, loanId, DEFAULT_REPAY_TYPE, List.of())
                 )
         );
-        List<BankAccountResponse> bankCards = queryRepaymentCards(memberId, loanId);
+        List<BankAccountResponse> bankCards = queryRepaymentCards(memberId, String.valueOf(loanId));
         BankAccountResponse selectedCard = bankCards.stream().findFirst().orElseGet(() -> fallbackBankAccount(memberId));
         return new RepaymentInfoResponse(
                 loanId,
@@ -137,7 +137,7 @@ public class RepaymentServiceImpl implements RepaymentService {
         String requestId = next("RSS");
         var response = xiaohuaGatewayService.sendCardSms(
                 requestId,
-                request.loanId(),
+                String.valueOf(request.loanId()),
                 new CardSmsSendRequest(
                         memberId,
                         request.loanId(),
@@ -161,7 +161,7 @@ public class RepaymentServiceImpl implements RepaymentService {
         String requestId = next("RSC");
         var response = xiaohuaGatewayService.confirmCardSms(
                 requestId,
-                request.loanId(),
+                String.valueOf(request.loanId()),
                 new CardSmsConfirmRequest(
                         memberId,
                         memberProfile.mobile(),
@@ -191,7 +191,7 @@ public class RepaymentServiceImpl implements RepaymentService {
                             "repayment submit",
                             requestId,
                             yunkaProperties.paths().repayApply(),
-                            request.loanId(),
+                            String.valueOf(request.loanId()),
                             new RepayApplyForwardData(
                                     memberId,
                                     request.loanId(),
@@ -205,7 +205,7 @@ public class RepaymentServiceImpl implements RepaymentService {
         } catch (UpstreamTimeoutException exception) {
             throw new BizException(ErrorCodes.YUNKA_UPSTREAM_TIMEOUT, "Repayment submit temporarily unavailable");
         }
-        String swiftNumber = readText(data, "swiftNumber", request.loanId());
+        String swiftNumber = readText(data, "swiftNumber", String.valueOf(request.loanId()));
         return new RepaymentSubmitResponse(
                 swiftNumber,
                 mapSubmitStatus(readText(data, "status", "")),
@@ -213,13 +213,13 @@ public class RepaymentServiceImpl implements RepaymentService {
         );
     }
 
-    private void validateRepaymentAmount(String memberId, String loanId, String repaymentType, long requestedRepayAmount) {
+    private void validateRepaymentAmount(String memberId, Integer loanId, String repaymentType, long requestedRepayAmount) {
         JsonNode trialData = yunkaCallTemplate.executeForData(
                 YunkaCallTemplate.YunkaCall.of(
                         "repayment submit amount validation",
                         next("RTS"),
                         yunkaProperties.paths().repayTrial(),
-                        loanId,
+                        String.valueOf(loanId),
                         new RepayTrialForwardData(memberId, loanId, mapRepayType(repaymentType), List.of())
                 )
         );
@@ -237,7 +237,7 @@ public class RepaymentServiceImpl implements RepaymentService {
         throw new BizException(REPAYMENT_AMOUNT_EXCEEDED, "Repayment amount exceeds current repayable amount");
     }
 
-    private void reserveRepaymentSubmit(String memberId, String loanId, long requestedRepayAmount) {
+    private void reserveRepaymentSubmit(String memberId, Integer loanId, long requestedRepayAmount) {
         LocalDateTime now = LocalDateTime.now();
         String bizKey = repaymentSubmitBizKey(memberId, loanId, requestedRepayAmount);
         IdempotencyRecord existing = idempotencyRecordRepository.selectOne(
@@ -276,7 +276,7 @@ public class RepaymentServiceImpl implements RepaymentService {
         }
     }
 
-    private String repaymentSubmitBizKey(String memberId, String loanId, long requestedRepayAmount) {
+    private String repaymentSubmitBizKey(String memberId, Integer loanId, long requestedRepayAmount) {
         return memberId + ":" + loanId + ":" + requestedRepayAmount;
     }
 
@@ -287,7 +287,7 @@ public class RepaymentServiceImpl implements RepaymentService {
 
     @Override
     public RepaymentResultResponse getResult(String memberId, String repaymentId) {
-        String loanId = validateAndResolveLoanId(memberId, repaymentId);
+        Integer loanId = validateAndResolveLoanId(memberId, repaymentId);
         String requestId = next("RQ");
         JsonNode data = yunkaCallTemplate.executeForData(
                 YunkaCallTemplate.YunkaCall.of(
@@ -370,40 +370,49 @@ public class RepaymentServiceImpl implements RepaymentService {
         );
     }
 
-    private String resolveBankCardNumber(String memberId, String bizOrderNo, String bankCardId) {
-        return queryRepaymentCards(memberId, bizOrderNo).stream()
+    private String resolveBankCardNumber(String memberId, Integer loanId, String bankCardId) {
+        return queryRepaymentCards(memberId, String.valueOf(loanId)).stream()
                 .filter(card -> bankCardId.equals(card.accountId()))
                 .findFirst()
                 .map(BankAccountResponse::accountId)
                 .orElse(bankCardId);
     }
 
-    private void validateKnownLoanId(String memberId, String loanId) {
+    private void validateKnownLoanId(String memberId, Integer loanId) {
         if (findLoanMapping(memberId, loanId) == null) {
             throw new BizException(404, "repayment loan reference not found");
         }
     }
 
-    private String validateAndResolveLoanId(String memberId, String repaymentId) {
-        LoanApplicationMapping directMapping = findLoanMapping(memberId, repaymentId);
-        if (directMapping != null) {
-            return directMapping.getUpstreamQueryValue();
-        }
-        String loanId = extractLoanId(repaymentId);
-        if (loanId != null && findLoanMapping(memberId, loanId) != null) {
-            return loanId;
+    private Integer validateAndResolveLoanId(String memberId, String repaymentId) {
+        String loanIdText = extractLoanId(repaymentId);
+        if (loanIdText != null) {
+            Integer numericLoanId = parseLoanId(loanIdText);
+            if (numericLoanId != null && findLoanMapping(memberId, numericLoanId) != null) {
+                return numericLoanId;
+            }
         }
         throw new BizException(404, "repayment reference not found");
     }
 
-    private LoanApplicationMapping findLoanMapping(String memberId, String loanId) {
+    private LoanApplicationMapping findLoanMapping(String memberId, Integer loanId) {
         return loanApplicationMappingRepository.selectOne(
                 Wrappers.<LoanApplicationMapping>lambdaQuery()
                         .eq(LoanApplicationMapping::getMemberId, memberId)
-                        .eq(LoanApplicationMapping::getUpstreamQueryType, "loanId")
-                        .eq(LoanApplicationMapping::getUpstreamQueryValue, loanId)
+                        .eq(LoanApplicationMapping::getPlatformLoanId, loanId)
                         .last("limit 1")
         );
+    }
+
+    private Integer parseLoanId(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(value);
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 
     private String extractLoanId(String repaymentId) {
@@ -499,7 +508,7 @@ public class RepaymentServiceImpl implements RepaymentService {
 
     private record RepayTrialForwardData(
             String userId,
-            String loanId,
+            Integer loanId,
             String repayType,
             List<Integer> periods
     ) {
@@ -507,7 +516,7 @@ public class RepaymentServiceImpl implements RepaymentService {
 
     private record RepayApplyForwardData(
             String userId,
-            String loanId,
+            Integer loanId,
             String repayType,
             List<Integer> periods,
             String bankCardNo,
@@ -517,7 +526,7 @@ public class RepaymentServiceImpl implements RepaymentService {
 
     private record RepayQueryForwardData(
             String userId,
-            String loanId,
+            Integer loanId,
             String swiftNumber
     ) {
     }

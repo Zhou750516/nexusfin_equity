@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public record BenefitOrderSyncRequest(
         String platformBenefitOrderNo,
         String benefitOrderNo,
+        Integer loanId,
         Long orderAmount,
         Integer status,
         Long createTime,

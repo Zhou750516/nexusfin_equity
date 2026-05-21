@@ -32,7 +32,7 @@ class YunkaCallTemplateTest {
     @Test
     void shouldExecuteStrictDataCallAndForwardGatewayRequest() {
         YunkaCallTemplate template = new YunkaCallTemplate(yunkaGatewayClient);
-        JsonNode data = JsonNodeFactory.instance.objectNode().put("loanId", "LN-001");
+        JsonNode data = JsonNodeFactory.instance.objectNode().put("loanId", 20260501);
         when(yunkaGatewayClient.proxy(any()))
                 .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", data));
 
@@ -46,7 +46,8 @@ class YunkaCallTemplateTest {
                 ).withMemberId("mem-001")
         );
 
-        assertThat(response.path("loanId").asText()).isEqualTo("LN-001");
+        assertThat(response.path("loanId").isInt()).isTrue();
+        assertThat(response.path("loanId").asInt()).isEqualTo(20260501);
 
         ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> captor =
                 ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
@@ -64,7 +65,7 @@ class YunkaCallTemplateTest {
                 .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", null));
 
         JsonNode response = template.executeForData(
-                YunkaCallTemplate.YunkaCall.of("repay trial", "RT-001", "/repay/trial", "LN-001", new Object())
+                YunkaCallTemplate.YunkaCall.of("repay trial", "RT-001", "/repay/trial", "20260501", new Object())
         );
 
         assertThat(response.isObject()).isTrue();

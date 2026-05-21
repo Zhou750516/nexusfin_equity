@@ -70,7 +70,7 @@ class NotificationServiceTest {
         when(qwBenefitClient.notifyDeduction(any())).thenReturn(new QwDeductionNotifyResponse("qw-order-1"));
 
         notificationService.handleGrant(new LoanResultCallbackRequest(
-                "req-1", "user-1", null, "ord-1", "ord-1", "loan-1",
+                "req-1", "user-1", null, "ord-1", "ord-1", 20260501,
                 7001, null, 680000L, 710000L, 1711197120L, null, null, null));
 
         verify(fallbackDeductService).triggerFallback(any(BenefitOrder.class), any(LoanResultCallbackRequest.class));
@@ -90,7 +90,7 @@ class NotificationServiceTest {
         when(idempotencyService.isProcessed("req-2")).thenReturn(true);
 
         notificationService.handleRepayment(new RepaymentResultCallbackRequest(
-                "req-2", "user-2", null, "ord-2", "ord-2", "loan-2", "swift-2",
+                "req-2", "user-2", null, "ord-2", "ord-2", 20260502, "swift-2",
                 8001, 1, "1", null, 100L, 1711197180L, null, null));
 
         verify(notificationReceiveLogRepository, never()).insert(any());
@@ -131,7 +131,7 @@ class NotificationServiceTest {
         when(qwBenefitClient.notifyDeduction(any())).thenReturn(new QwDeductionNotifyResponse("qw-order-5"));
 
         notificationService.handleGrant(new LoanResultCallbackRequest(
-                "req-5", "user-5", null, "ord-5", "ord-5", "loan-5",
+                "req-5", "user-5", null, "ord-5", "ord-5", 20260505,
                 7003, "reason", 0L, null, 1711197240L, null, null, null));
 
         ArgumentCaptor<NotificationReceiveLog> captor = ArgumentCaptor.forClass(NotificationReceiveLog.class);
@@ -153,7 +153,7 @@ class NotificationServiceTest {
         when(notificationReceiveLogRepository.selectOne(any())).thenReturn(null);
 
         notificationService.handleRepayment(new RepaymentResultCallbackRequest(
-                "req-6", "user-6", null, "ord-missing", "ord-missing", "loan-missing", "swift-missing",
+                "req-6", "user-6", null, "ord-missing", "ord-missing", 20260506, "swift-missing",
                 8001, 1, "1", null, 100L, 1711197300L, null, null));
 
         ArgumentCaptor<NotificationReceiveLog> captor = ArgumentCaptor.forClass(NotificationReceiveLog.class);
@@ -176,7 +176,7 @@ class NotificationServiceTest {
                 .thenThrow(new IllegalStateException("first deduct record missing"));
 
         assertThatThrownBy(() -> notificationService.handleGrant(new LoanResultCallbackRequest(
-                "req-log", "user-log", null, "ord-log", "ord-log", "loan-log",
+                "req-log", "user-log", null, "ord-log", "ord-log", 20260507,
                 7001, null, 680000L, 710000L, 1711197120L, null, null, null)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("first deduct record missing");
@@ -190,17 +190,17 @@ class NotificationServiceTest {
     void shouldKeepLoanOrderNoAndMarkRepaymentProcessingWithLatestStatus() {
         BenefitOrder order = new BenefitOrder();
         order.setBenefitOrderNo("ord-8");
-        order.setLoanOrderNo("loan-old");
+        order.setLoanOrderNo("20260508");
         when(idempotencyService.isProcessed("req-8")).thenReturn(false);
         when(benefitOrderRepository.selectById("ord-8")).thenReturn(order);
         when(notificationReceiveLogRepository.selectOne(any())).thenReturn(null);
 
         notificationService.handleRepayment(new RepaymentResultCallbackRequest(
-                "req-8", "user-8", null, "ord-8", "ord-8", "loan-new", "swift-8",
+                "req-8", "user-8", null, "ord-8", "ord-8", 20260509, "swift-8",
                 8004, 2, "1", "处理中", 100L, 1711197300L, 20L, 120L));
 
         verify(benefitOrderRepository).updateById(order);
-        assertThat(order.getLoanOrderNo()).isEqualTo("loan-new");
+        assertThat(order.getLoanOrderNo()).isEqualTo("20260509");
         verify(idempotencyService).markProcessed("req-8", "REPAYMENT", "ord-8", "8004");
     }
 
@@ -215,7 +215,7 @@ class NotificationServiceTest {
         when(notificationReceiveLogRepository.selectOne(any())).thenReturn(null);
 
         notificationService.handleGrant(new LoanResultCallbackRequest(
-                "req-7", "user-7", null, "ord-7", "ord-7", "loan-7",
+                "req-7", "user-7", null, "ord-7", "ord-7", 20260510,
                 7002, null, null, null, null, null, null, null));
 
         verify(benefitOrderRepository).updateById(order);

@@ -100,7 +100,7 @@ export function getApprovalResult(applicationId: string) {
   });
 }
 
-export function getRepaymentInfo(loanId: string) {
+export function getRepaymentInfo(loanId: number) {
   return apiRequest<RepaymentInfo>({
     method: "GET",
     url: `/repayment/info/${loanId}`,
