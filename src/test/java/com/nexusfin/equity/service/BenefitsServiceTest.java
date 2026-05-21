@@ -35,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -220,6 +221,55 @@ class BenefitsServiceTest {
         assertThat(syncCaptor.getValue().benefitServiceProvider()).isEqualTo("齐为");
         assertThat(syncCaptor.getValue().benefitUrl()).isEmpty();
         verify(benefitRedirectUrlService, never()).generate(any());
+    }
+
+    @Test
+    void shouldGenerateUniqueYunkaRequestIdForRepeatedBenefitActivation() {
+        when(benefitProductRepository.selectById("HUXUAN_CARD")).thenReturn(activeProduct());
+        when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(dynamicProtocolResponse());
+        when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(userCardResponse());
+        when(benefitOrderService.createOrder(eq("mem-test-001"), any(CreateBenefitOrderRequest.class)))
+                .thenReturn(new CreateBenefitOrderResponse(
+                        "ord-001",
+                        "FIRST_DEDUCT_PENDING",
+                        "/h5/equity/orders/ord-001",
+                        "QW-ORDER-001",
+                        1779335976232L,
+                        1779335976232L,
+                        1781927976232L
+                ));
+        when(xiaohuaGatewayService.syncBenefitOrder(any(), eq("ord-001"), any()))
+                .thenReturn(new BenefitOrderSyncResponse("SUCCESS", "ok"));
+
+        BenefitsActivateRequest request = new BenefitsActivateRequest(
+                "APP-001",
+                "huixuan_card",
+                "joint-token-benefits-repeated"
+        );
+        benefitsService.activate("mem-test-001", "cid-test-001", request);
+        benefitsService.activate("mem-test-001", "cid-test-001", request);
+
+        ArgumentCaptor<String> requestIdCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<BenefitOrderSyncRequest> syncCaptor = ArgumentCaptor.forClass(BenefitOrderSyncRequest.class);
+        verify(xiaohuaGatewayService, times(2))
+                .syncBenefitOrder(requestIdCaptor.capture(), eq("ord-001"), syncCaptor.capture());
+        assertThat(requestIdCaptor.getAllValues()).hasSize(2);
+        assertThat(requestIdCaptor.getAllValues().get(0)).startsWith("BENEFITS-SYNC-APP-001-");
+        assertThat(requestIdCaptor.getAllValues().get(1)).startsWith("BENEFITS-SYNC-APP-001-");
+        assertThat(requestIdCaptor.getAllValues().get(0)).isNotEqualTo(requestIdCaptor.getAllValues().get(1));
+        assertThat(syncCaptor.getAllValues())
+                .allSatisfy(payload -> {
+                    assertThat(payload.platformBenefitOrderNo()).isEqualTo("APP-001");
+                    assertThat(payload.benefitOrderNo()).isEqualTo("QW-ORDER-001");
+                    assertThat(payload.orderAmount()).isEqualTo(30000L);
+                    assertThat(payload.status()).isEqualTo(2);
+                    assertThat(payload.createTime()).isEqualTo(1779335976232L);
+                    assertThat(payload.payTime()).isEqualTo(1779335976232L);
+                    assertThat(payload.expireTime()).isEqualTo(1781927976232L);
+                    assertThat(payload.benefitUrl()).isEmpty();
+                });
     }
 
     @Test

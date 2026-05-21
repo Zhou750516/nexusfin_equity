@@ -108,7 +108,7 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
         String appId = headerValue(yunkaProperties.appId());
         String signaturePrefix = maskSignature(signature);
         String headerJson = headerJson(traceId, xRequestId, xTimestamp, xChannelCode, appId, signaturePrefix);
-        // X-Request-Id is the idempotency key. Same-business retries should reuse it instead of generating a new value.
+        // X-Request-Id mirrors the body requestId; business idempotency belongs in request data fields.
         log.info("traceId={} requestId={} path={} appId={} xTimestamp={} xChannelCode={} xRequestId={} signaturePrefix={} headerJson={} requestBodyJson={} yunka gateway request begin",
                 traceId,
                 request.requestId(),

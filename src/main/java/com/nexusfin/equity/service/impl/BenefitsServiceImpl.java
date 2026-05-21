@@ -21,6 +21,7 @@ import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncRequest;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserCardListRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserCardListResponse;
+import com.nexusfin.equity.util.BizIds;
 import com.nexusfin.equity.util.TraceIdUtil;
 import java.util.Comparator;
 import java.util.List;
@@ -167,7 +168,7 @@ public class BenefitsServiceImpl implements BenefitsService {
                 activate.defaultBenefitAmount());
         requireBenefitOrderNoticeData(response);
         var syncResponse = xiaohuaGatewayService.syncBenefitOrder(
-                "BENEFITS-SYNC-" + request.applicationId(),
+                benefitSyncRequestId(request.applicationId()),
                 response.benefitOrderNo(),
                 new BenefitOrderSyncRequest(
                         request.applicationId(),
@@ -191,6 +192,10 @@ public class BenefitsServiceImpl implements BenefitsService {
                 "activated",
                 h5I18nService.text("benefits.activate.success", activate.successMessage())
         );
+    }
+
+    private String benefitSyncRequestId(String applicationId) {
+        return "BENEFITS-SYNC-" + applicationId + "-" + BizIds.newCompactUuid().substring(0, 12);
     }
 
     private void requireBenefitOrderNoticeData(CreateBenefitOrderResponse response) {
