@@ -27,6 +27,10 @@ public class BenefitOrder {
     private String payProtocolNoSnapshot;
     private String payProtocolSource;
     private Long qwUserSignIdSnapshot;
+    private String qwOrderNo;
+    private String qwCardNo;
+    private LocalDateTime qwCardCreatedTs;
+    private LocalDateTime qwCardExpiryTs;
     private LocalDateTime createdTs;
     private LocalDateTime updatedTs;
 
@@ -180,6 +184,38 @@ public class BenefitOrder {
 
     public void setQwUserSignIdSnapshot(Long qwUserSignIdSnapshot) {
         this.qwUserSignIdSnapshot = qwUserSignIdSnapshot;
+    }
+
+    public String getQwOrderNo() {
+        return qwOrderNo;
+    }
+
+    public void setQwOrderNo(String qwOrderNo) {
+        this.qwOrderNo = qwOrderNo;
+    }
+
+    public String getQwCardNo() {
+        return qwCardNo;
+    }
+
+    public void setQwCardNo(String qwCardNo) {
+        this.qwCardNo = qwCardNo;
+    }
+
+    public LocalDateTime getQwCardCreatedTs() {
+        return qwCardCreatedTs;
+    }
+
+    public void setQwCardCreatedTs(LocalDateTime qwCardCreatedTs) {
+        this.qwCardCreatedTs = qwCardCreatedTs;
+    }
+
+    public LocalDateTime getQwCardExpiryTs() {
+        return qwCardExpiryTs;
+    }
+
+    public void setQwCardExpiryTs(LocalDateTime qwCardExpiryTs) {
+        this.qwCardExpiryTs = qwCardExpiryTs;
     }
 
     public LocalDateTime getCreatedTs() {

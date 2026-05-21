@@ -122,6 +122,13 @@ class BenefitOrderServiceTest {
         verify(qwBenefitClient).syncMemberOrder(syncRequestCaptor.capture());
 
         assertThat(response.orderStatus()).isEqualTo("FIRST_DEDUCT_PENDING");
+        assertThat(response.qwOrderNo()).isEqualTo("qw-order-1");
+        assertThat(response.createTime()).isNotNull();
+        assertThat(response.payTime()).isNotNull();
+        assertThat(response.expireTime()).isEqualTo(java.time.LocalDateTime.of(2027, 3, 26, 12, 0)
+                .atZone(java.time.ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli());
         assertThat(captor.getValue().getProductCode()).isEqualTo("P-2");
         assertThat(captor.getValue().getMemberId()).isEqualTo("mem-2");
         assertThat(captor.getValue().getRequestId()).isEqualTo("req-order-1");
@@ -129,6 +136,8 @@ class BenefitOrderServiceTest {
         assertThat(captor.getValue().getPayProtocolNoSnapshot()).isEqualTo("AGRM-REAL-001");
         assertThat(captor.getValue().getPayProtocolSource()).isEqualTo("QW_SIGN");
         assertThat(captor.getValue().getQwUserSignIdSnapshot()).isEqualTo(10001L);
+        assertThat(captor.getValue().getQwOrderNo()).isEqualTo("qw-order-1");
+        assertThat(captor.getValue().getQwCardExpiryTs()).isEqualTo(java.time.LocalDateTime.of(2027, 3, 26, 12, 0));
         assertThat(syncRequestCaptor.getValue().payAmount()).isEqualTo(30000L);
         assertThat(syncRequestCaptor.getValue().userSignId()).isEqualTo(10001L);
         verify(idempotencyService).markProcessed("req-order-1", "CREATE_ORDER", captor.getValue().getBenefitOrderNo(), "FIRST_DEDUCT_PENDING");
@@ -173,6 +182,10 @@ class BenefitOrderServiceTest {
 
     @Test
     void shouldTreatQwMemberSyncOrderAlreadyExistsAsIdempotentSuccess(CapturedOutput output) {
+        BenefitOrder previousSuccessfulOrder = new BenefitOrder();
+        previousSuccessfulOrder.setBenefitOrderNo("ord-existing-qw");
+        previousSuccessfulOrder.setQwOrderNo("QW-ORDER-EXISTING");
+        previousSuccessfulOrder.setQwCardExpiryTs(java.time.LocalDateTime.of(2026, 6, 19, 23, 59, 59));
         BenefitProduct product = new BenefitProduct();
         product.setProductCode("abs001");
         product.setProductName("艾博生月卡");
@@ -188,6 +201,7 @@ class BenefitOrderServiceTest {
         when(idempotencyService.isProcessed("req-qw-530")).thenReturn(false);
         when(paymentProtocolService.resolveForBenefitOrder(any(BenefitOrder.class)))
                 .thenReturn(new PaymentProtocolService.ResolvedPaymentProtocol("QW_SIGN_QUERY_REUSE-2605203409909", "2605203409909", "QW_SIGN_QUERY_REUSE"));
+        when(benefitOrderRepository.selectOne(any())).thenReturn(null, previousSuccessfulOrder);
         when(qwBenefitClient.syncMemberOrder(any()))
                 .thenThrow(new BizException(530, "QW_UPSTREAM_REJECTED", "订单已经存在"));
 
@@ -208,12 +222,49 @@ class BenefitOrderServiceTest {
                 "FIRST_DEDUCT_PENDING"
         );
         assertThat(response.orderStatus()).isEqualTo("FIRST_DEDUCT_PENDING");
+        assertThat(response.qwOrderNo()).isEqualTo("QW-ORDER-EXISTING");
+        assertThat(response.expireTime()).isEqualTo(1781884799000L);
         assertThat(orderCaptor.getValue().getSyncStatus()).isEqualTo(BenefitOrderStatusEnum.SYNC_SUCCESS.name());
         assertThat(orderCaptor.getValue().getQwUserSignIdSnapshot()).isEqualTo(2605203409909L);
+        assertThat(orderCaptor.getValue().getQwOrderNo()).isEqualTo("QW-ORDER-EXISTING");
+        assertThat(orderCaptor.getValue().getQwCardExpiryTs()).isEqualTo(java.time.LocalDateTime.of(2026, 6, 19, 23, 59, 59));
         assertThat(requestCaptor.getValue().payAmount()).isEqualTo(30000L);
         assertThat(output).contains("qwCode=530");
         assertThat(output).contains("reason=qw_member_order_already_exists");
         assertThat(output).contains("userSignId=2605203409909");
+    }
+
+    @Test
+    void shouldRejectQwOrderNoticeWhenQwOrderSnapshotIsMissingAfterCode530(CapturedOutput output) {
+        BenefitProduct product = new BenefitProduct();
+        product.setProductCode("abs001");
+        product.setProductName("艾博生月卡");
+        product.setStatus("ACTIVE");
+        MemberInfo memberInfo = new MemberInfo();
+        memberInfo.setMemberId("mem-qw-530-missing");
+        MemberChannel memberChannel = new MemberChannel();
+        memberChannel.setChannelCode("KJ");
+        memberChannel.setExternalUserId("user-qw-530-missing");
+        when(benefitProductRepository.selectById("abs001")).thenReturn(product);
+        when(memberInfoRepository.selectById("mem-qw-530-missing")).thenReturn(memberInfo);
+        when(memberChannelRepository.selectOne(any())).thenReturn(memberChannel);
+        when(idempotencyService.isProcessed("req-qw-530-missing")).thenReturn(false);
+        when(paymentProtocolService.resolveForBenefitOrder(any(BenefitOrder.class)))
+                .thenReturn(new PaymentProtocolService.ResolvedPaymentProtocol("QW_SIGN_QUERY_REUSE-2605203409909", "2605203409909", "QW_SIGN_QUERY_REUSE"));
+        when(benefitOrderRepository.selectOne(any())).thenReturn(null);
+        when(qwBenefitClient.syncMemberOrder(any()))
+                .thenThrow(new BizException(530, "QW_UPSTREAM_REJECTED", "订单已经存在"));
+
+        assertThatThrownBy(() -> benefitOrderService.createOrder(
+                "mem-qw-530-missing",
+                new CreateBenefitOrderRequest("req-qw-530-missing", "abs001", 300000L, 30000L, true)
+        )).isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo("QW_ORDER_NOTICE_DATA_INCOMPLETE");
+
+        verify(idempotencyService, never()).markProcessed(any(), any(), any(), any());
+        assertThat(output).contains("errorNo=QW_ORDER_NOTICE_DATA_INCOMPLETE");
+        assertThat(output).contains("errorMsg=Missing QW orderNo or cardExpiryDate for benefit order notice");
     }
 
     @Test

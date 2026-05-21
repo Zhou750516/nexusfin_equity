@@ -165,15 +165,22 @@ public class BenefitsServiceImpl implements BenefitsService {
                 request.applicationId(),
                 activate.defaultLoanAmount(),
                 activate.defaultBenefitAmount());
+        requireBenefitOrderNoticeData(response);
         var syncResponse = xiaohuaGatewayService.syncBenefitOrder(
                 "BENEFITS-SYNC-" + request.applicationId(),
                 response.benefitOrderNo(),
                 new BenefitOrderSyncRequest(
-                        memberId,
                         request.applicationId(),
-                        "ACTIVE",
+                        response.qwOrderNo(),
                         activate.defaultBenefitAmount(),
-                        null
+                        2,
+                        response.createTime(),
+                        response.payTime(),
+                        response.expireTime(),
+                        "QW",
+                        response.qwOrderNo(),
+                        "齐为",
+                        ""
                 )
         );
         if (syncResponse != null && !isBenefitSyncAccepted(syncResponse.status())) {
@@ -184,6 +191,22 @@ public class BenefitsServiceImpl implements BenefitsService {
                 "activated",
                 h5I18nService.text("benefits.activate.success", activate.successMessage())
         );
+    }
+
+    private void requireBenefitOrderNoticeData(CreateBenefitOrderResponse response) {
+        if (response == null
+                || response.qwOrderNo() == null
+                || response.qwOrderNo().isBlank()
+                || response.createTime() == null
+                || response.payTime() == null
+                || response.expireTime() == null) {
+            log.warn("traceId={} bizOrderNo={} errorNo={} errorMsg={} benefit order notice data incomplete",
+                    TraceIdUtil.getTraceId(),
+                    response == null ? null : response.benefitOrderNo(),
+                    "QW_ORDER_NOTICE_DATA_INCOMPLETE",
+                    "Missing QW orderNo, createTime, payTime or expireTime for benefit order notice");
+            throw new BizException("QW_ORDER_NOTICE_DATA_INCOMPLETE", "Missing QW orderNo, createTime, payTime or expireTime for benefit order notice");
+        }
     }
 
     private List<BenefitsCardDetailResponse.Feature> mapFeatures(List<H5BenefitsProperties.Feature> features) {

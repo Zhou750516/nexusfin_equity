@@ -49,6 +49,10 @@ public class SchemaMigrationRunner {
         addColumnIfNeeded(metaData, "benefit_order", "pay_protocol_no_snapshot", "varchar(128)");
         addColumnIfNeeded(metaData, "benefit_order", "pay_protocol_source", "varchar(32)");
         addColumnIfNeeded(metaData, "benefit_order", "qw_user_sign_id_snapshot", "bigint");
+        addColumnIfNeeded(metaData, "benefit_order", "qw_order_no", "varchar(64)");
+        addColumnIfNeeded(metaData, "benefit_order", "qw_card_no", "varchar(64)");
+        addColumnIfNeeded(metaData, "benefit_order", "qw_card_created_ts", "timestamp");
+        addColumnIfNeeded(metaData, "benefit_order", "qw_card_expiry_ts", "timestamp");
     }
 
     private void migratePaymentRecord(DatabaseMetaData metaData, String databaseProduct) throws SQLException {

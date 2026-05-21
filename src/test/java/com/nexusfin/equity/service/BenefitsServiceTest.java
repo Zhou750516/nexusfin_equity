@@ -182,7 +182,15 @@ class BenefitsServiceTest {
                         new UserCardSummary("card-001", "招商银行", "8648", 1)
                 )));
         when(benefitOrderService.createOrder(eq("mem-test-001"), any(CreateBenefitOrderRequest.class)))
-                .thenReturn(new CreateBenefitOrderResponse("ord-001", "FIRST_DEDUCT_PENDING", "/h5/equity/orders/ord-001"));
+                .thenReturn(new CreateBenefitOrderResponse(
+                        "ord-001",
+                        "FIRST_DEDUCT_PENDING",
+                        "/h5/equity/orders/ord-001",
+                        "QW-ORDER-001",
+                        1779335976232L,
+                        1779335976232L,
+                        1781927976232L
+                ));
         when(xiaohuaGatewayService.syncBenefitOrder(any(), eq("ord-001"), any()))
                 .thenReturn(new BenefitOrderSyncResponse("SUCCESS", "ok"));
 
@@ -200,10 +208,17 @@ class BenefitsServiceTest {
         assertThat(orderCaptor.getValue().benefitAmount()).isEqualTo(30000L);
         ArgumentCaptor<BenefitOrderSyncRequest> syncCaptor = ArgumentCaptor.forClass(BenefitOrderSyncRequest.class);
         verify(xiaohuaGatewayService).syncBenefitOrder(any(), eq("ord-001"), syncCaptor.capture());
-        assertThat(syncCaptor.getValue().userId()).isEqualTo("mem-test-001");
-        assertThat(syncCaptor.getValue().userId()).isNotEqualTo("cid-test-001");
-        assertThat(syncCaptor.getValue().benefitAmount()).isEqualTo(30000L);
-        assertThat(syncCaptor.getValue().benefitUrl()).isNull();
+        assertThat(syncCaptor.getValue().platformBenefitOrderNo()).isEqualTo("APP-001");
+        assertThat(syncCaptor.getValue().benefitOrderNo()).isEqualTo("QW-ORDER-001");
+        assertThat(syncCaptor.getValue().orderAmount()).isEqualTo(30000L);
+        assertThat(syncCaptor.getValue().status()).isEqualTo(2);
+        assertThat(syncCaptor.getValue().createTime()).isEqualTo(1779335976232L);
+        assertThat(syncCaptor.getValue().payTime()).isEqualTo(1779335976232L);
+        assertThat(syncCaptor.getValue().expireTime()).isEqualTo(1781927976232L);
+        assertThat(syncCaptor.getValue().memberPayType()).isEqualTo("QW");
+        assertThat(syncCaptor.getValue().paymentNo()).isEqualTo("QW-ORDER-001");
+        assertThat(syncCaptor.getValue().benefitServiceProvider()).isEqualTo("齐为");
+        assertThat(syncCaptor.getValue().benefitUrl()).isEmpty();
         verify(benefitRedirectUrlService, never()).generate(any());
     }
 
@@ -219,7 +234,15 @@ class BenefitsServiceTest {
                         new UserCardSummary("card-001", "招商银行", "8648", 1)
                 )));
         when(benefitOrderService.createOrder(eq("mem-test-001"), any(CreateBenefitOrderRequest.class)))
-                .thenReturn(new CreateBenefitOrderResponse("ord-001", "FIRST_DEDUCT_PENDING", "/h5/equity/orders/ord-001"));
+                .thenReturn(new CreateBenefitOrderResponse(
+                        "ord-001",
+                        "FIRST_DEDUCT_PENDING",
+                        "/h5/equity/orders/ord-001",
+                        "QW-ORDER-001",
+                        1779335976232L,
+                        1779335976232L,
+                        1781927976232L
+                ));
         when(xiaohuaGatewayService.syncBenefitOrder(any(), eq("ord-001"), any()))
                 .thenReturn(new BenefitOrderSyncResponse("SUCCESS", "ok"));
 
@@ -253,6 +276,31 @@ class BenefitsServiceTest {
                 .isEqualTo("QW_SIGN_REQUIRED");
 
         verify(benefitRedirectUrlService, never()).generate(any());
+        verify(xiaohuaGatewayService, never()).syncBenefitOrder(any(), any(), any());
+    }
+
+    @Test
+    void shouldNotSyncYunkaWhenQwOrderNoticeDataIsIncomplete() {
+        when(benefitProductRepository.selectById("HUXUAN_CARD")).thenReturn(activeProduct());
+        when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(dynamicProtocolResponse());
+        when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(userCardResponse());
+        when(benefitOrderService.createOrder(eq("mem-test-001"), any(CreateBenefitOrderRequest.class)))
+                .thenReturn(new CreateBenefitOrderResponse(
+                        "ord-001",
+                        "FIRST_DEDUCT_PENDING",
+                        "/h5/equity/orders/ord-001"
+                ));
+
+        assertThatThrownBy(() -> benefitsService.activate(
+                "mem-test-001",
+                "cid-test-001",
+                new BenefitsActivateRequest("APP-001", "huixuan_card", "joint-token-benefits-incomplete")
+        )).isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo("QW_ORDER_NOTICE_DATA_INCOMPLETE");
+
         verify(xiaohuaGatewayService, never()).syncBenefitOrder(any(), any(), any());
     }
 

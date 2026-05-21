@@ -186,7 +186,14 @@ class BenefitsControllerIntegrationTest {
         assertThat(benefitOrderRepository.selectCount(Wrappers.emptyWrapper())).isEqualTo(1);
         ArgumentCaptor<BenefitOrderSyncRequest> syncCaptor = ArgumentCaptor.forClass(BenefitOrderSyncRequest.class);
         verify(xiaohuaGatewayService).syncBenefitOrder(any(), any(), syncCaptor.capture());
-        assertThat(syncCaptor.getValue().benefitUrl()).isNull();
+        assertThat(syncCaptor.getValue().platformBenefitOrderNo()).isEqualTo("APP-benefits-sync");
+        assertThat(syncCaptor.getValue().benefitOrderNo()).isNotBlank();
+        assertThat(syncCaptor.getValue().orderAmount()).isEqualTo(30000L);
+        assertThat(syncCaptor.getValue().status()).isEqualTo(2);
+        assertThat(syncCaptor.getValue().createTime()).isNotNull();
+        assertThat(syncCaptor.getValue().payTime()).isNotNull();
+        assertThat(syncCaptor.getValue().expireTime()).isNotNull();
+        assertThat(syncCaptor.getValue().benefitUrl()).isEmpty();
         verify(benefitRedirectUrlService, never()).generate(any());
     }
 

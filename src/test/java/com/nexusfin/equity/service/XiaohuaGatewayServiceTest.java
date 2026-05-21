@@ -210,14 +210,26 @@ class XiaohuaGatewayServiceTest {
         assertThatThrownBy(() -> gatewayService.syncBenefitOrder(
                 "REQ-SYNC-001",
                 "BIZ-SYNC-001",
-                new BenefitOrderSyncRequest("user-001", "BEN-001", "ACTIVE", 30000L, "https://redirect.test/exercise")
+                new BenefitOrderSyncRequest(
+                        "BEN-001",
+                        "QW-ORDER-001",
+                        30000L,
+                        2,
+                        1779335976232L,
+                        1779335976232L,
+                        1781927976232L,
+                        "QW",
+                        "QW-ORDER-001",
+                        "齐为",
+                        ""
+                )
         )).isInstanceOf(BizException.class)
                 .extracting(ex -> ((BizException) ex).getErrorNo())
                 .isEqualTo(ErrorCodes.YUNKA_UPSTREAM_REJECTED);
     }
 
     @Test
-    void shouldForwardBenefitUrlWhenSyncingBenefitOrder() throws Exception {
+    void shouldForwardDocumentFieldsWhenSyncingBenefitOrder() throws Exception {
         JsonNode data = objectMapper.readTree("""
                 {
                   "status": "SUCCESS",
@@ -230,7 +242,19 @@ class XiaohuaGatewayServiceTest {
         gatewayService.syncBenefitOrder(
                 "REQ-SYNC-002",
                 "BIZ-SYNC-002",
-                new BenefitOrderSyncRequest("user-001", "BEN-001", "ACTIVE", 30000L, "https://redirect.test/exercise")
+                new BenefitOrderSyncRequest(
+                        "BEN-001",
+                        "QW-ORDER-001",
+                        30000L,
+                        2,
+                        1779335976232L,
+                        1779335976232L,
+                        1781927976232L,
+                        "QW",
+                        "QW-ORDER-001",
+                        "齐为",
+                        ""
+                )
         );
 
         ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> captor =
@@ -238,8 +262,26 @@ class XiaohuaGatewayServiceTest {
         verify(yunkaGatewayClient).proxy(captor.capture());
         assertThat(captor.getValue().path()).isEqualTo("/vip/orderNotice");
         JsonNode forwarded = objectMapper.valueToTree(captor.getValue().data());
-        assertThat(forwarded.path("benefiturl").asText()).isEqualTo("https://redirect.test/exercise");
-        assertThat(forwarded.path("benefitAmount").decimalValue()).isEqualByComparingTo("300.00");
+        assertThat(forwarded.path("platformBenefitOrderNo").asText()).isEqualTo("BEN-001");
+        assertThat(forwarded.path("benefitOrderNo").asText()).isEqualTo("QW-ORDER-001");
+        assertThat(forwarded.path("orderAmount").decimalValue()).isEqualByComparingTo("300.00");
+        assertThat(forwarded.path("status").isInt()).isTrue();
+        assertThat(forwarded.path("status").asInt()).isEqualTo(2);
+        assertThat(forwarded.path("createTime").isLong()).isTrue();
+        assertThat(forwarded.path("createTime").asLong()).isEqualTo(1779335976232L);
+        assertThat(forwarded.path("payTime").isLong()).isTrue();
+        assertThat(forwarded.path("payTime").asLong()).isEqualTo(1779335976232L);
+        assertThat(forwarded.path("expireTime").isLong()).isTrue();
+        assertThat(forwarded.path("expireTime").asLong()).isEqualTo(1781927976232L);
+        assertThat(forwarded.path("memberPayType").asText()).isEqualTo("QW");
+        assertThat(forwarded.path("paymentNo").asText()).isEqualTo("QW-ORDER-001");
+        assertThat(forwarded.path("benefitServiceProvider").asText()).isEqualTo("齐为");
+        assertThat(forwarded.has("benefiturl")).isTrue();
+        assertThat(forwarded.path("benefiturl").isNull()).isFalse();
+        assertThat(forwarded.path("benefiturl").asText()).isEmpty();
+        assertThat(forwarded.has("userId")).isFalse();
+        assertThat(forwarded.has("benefitStatus")).isFalse();
+        assertThat(forwarded.has("benefitAmount")).isFalse();
     }
 
     private YunkaProperties yunkaProperties() {

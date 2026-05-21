@@ -187,11 +187,17 @@ public class XiaohuaGatewayServiceImpl implements XiaohuaGatewayService {
                 yunkaProperties.paths().benefitSync(),
                 bizOrderNo,
                 new BenefitOrderSyncForwardData(
-                        request.userId(),
                         request.platformBenefitOrderNo(),
-                        request.benefitStatus(),
-                        request.benefitAmount() == null ? null : centsToYuan(request.benefitAmount()),
-                        request.benefitUrl()
+                        request.benefitOrderNo(),
+                        request.orderAmount() == null ? null : centsToYuan(request.orderAmount()),
+                        request.status(),
+                        request.createTime(),
+                        request.payTime(),
+                        request.expireTime(),
+                        request.memberPayType(),
+                        request.paymentNo(),
+                        request.benefitServiceProvider(),
+                        request.benefitUrl() == null ? "" : request.benefitUrl()
                 )
         );
         return new BenefitOrderSyncResponse(
@@ -261,10 +267,16 @@ public class XiaohuaGatewayServiceImpl implements XiaohuaGatewayService {
 
     // Only the outbound Yunka payload is converted to yuan here; ABS internal benefit amount semantics remain unchanged.
     private record BenefitOrderSyncForwardData(
-            String userId,
             String platformBenefitOrderNo,
-            String benefitStatus,
-            BigDecimal benefitAmount,
+            String benefitOrderNo,
+            BigDecimal orderAmount,
+            Integer status,
+            Long createTime,
+            Long payTime,
+            Long expireTime,
+            String memberPayType,
+            String paymentNo,
+            String benefitServiceProvider,
             @com.fasterxml.jackson.annotation.JsonProperty("benefiturl")
             String benefitUrl
     ) {

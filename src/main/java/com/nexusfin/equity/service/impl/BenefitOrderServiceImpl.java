@@ -32,7 +32,11 @@ import com.nexusfin.equity.thirdparty.qw.QwMemberSyncRequest;
 import com.nexusfin.equity.thirdparty.qw.QwMemberSyncResponse;
 import com.nexusfin.equity.util.OrderStateMachine;
 import com.nexusfin.equity.util.RequestIdUtil;
+import com.nexusfin.equity.util.TraceIdUtil;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +47,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class BenefitOrderServiceImpl implements BenefitOrderService {
 
     private static final Logger log = LoggerFactory.getLogger(BenefitOrderServiceImpl.class);
+    private static final DateTimeFormatter QW_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final ZoneId SYSTEM_ZONE = ZoneId.systemDefault();
 
     private final BenefitProductRepository benefitProductRepository;
     private final BenefitOrderRepository benefitOrderRepository;
@@ -201,6 +207,7 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
                     benefitAmount,
                     userSignId);
             syncResponse = qwBenefitClient.syncMemberOrder(buildQwMemberSyncRequest(benefitOrder, product, benefitAmount, userSignId));
+            applyQwMemberSyncSnapshot(benefitOrder, syncResponse);
             benefitOrder.setSyncStatus(BenefitOrderStatusEnum.SYNC_SUCCESS.name());
             benefitOrder.setUpdatedTs(LocalDateTime.now());
             benefitOrderRepository.updateById(benefitOrder);
@@ -230,17 +237,8 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
             if (!isQwMemberOrderAlreadyExists(exception)) {
                 throw exception;
             }
-            syncResponse = new QwMemberSyncResponse(
-                    null,
-                    null,
-                    null,
-                    null,
-                    product.getProductCode(),
-                    product.getProductName(),
-                    null,
-                    null,
-                    null
-            );
+            applyExistingQwMemberSyncSnapshot(benefitOrder, product, userSignId);
+            syncResponse = buildQwMemberSyncResponseFromOrder(benefitOrder, product);
             benefitOrder.setSyncStatus(BenefitOrderStatusEnum.SYNC_SUCCESS.name());
             benefitOrder.setUpdatedTs(LocalDateTime.now());
             benefitOrderRepository.updateById(benefitOrder);
@@ -305,8 +303,100 @@ public class BenefitOrderServiceImpl implements BenefitOrderService {
         return new CreateBenefitOrderResponse(
                 order.getBenefitOrderNo(),
                 order.getOrderStatus(),
-                "/h5/equity/orders/" + order.getBenefitOrderNo()
+                "/h5/equity/orders/" + order.getBenefitOrderNo(),
+                order.getQwOrderNo(),
+                toEpochMillis(order.getCreatedTs()),
+                toEpochMillis(order.getUpdatedTs()),
+                toEpochMillis(order.getQwCardExpiryTs())
         );
+    }
+
+    private void applyQwMemberSyncSnapshot(BenefitOrder order, QwMemberSyncResponse response) {
+        if (response == null) {
+            throw new BizException("QW_ORDER_NOTICE_DATA_INCOMPLETE", "Missing QW member sync response for benefit order notice");
+        }
+        order.setQwOrderNo(blankToNull(response.orderNo()));
+        order.setQwCardNo(blankToNull(response.cardNo()));
+        order.setQwCardCreatedTs(parseQwDateTime(response.cardCreatedDate(), "cardCreatedDate", order.getBenefitOrderNo()));
+        order.setQwCardExpiryTs(parseQwDateTime(response.cardExpiryDate(), "cardExpiryDate", order.getBenefitOrderNo()));
+        requireQwOrderNoticeSnapshot(order);
+    }
+
+    private void applyExistingQwMemberSyncSnapshot(BenefitOrder order, BenefitProduct product, Long userSignId) {
+        BenefitOrder existing = benefitOrderRepository.selectOne(Wrappers.<BenefitOrder>lambdaQuery()
+                .eq(BenefitOrder::getExternalUserId, order.getExternalUserId())
+                .eq(BenefitOrder::getProductCode, product.getProductCode())
+                .eq(BenefitOrder::getQwUserSignIdSnapshot, userSignId)
+                .eq(BenefitOrder::getSyncStatus, BenefitOrderStatusEnum.SYNC_SUCCESS.name())
+                .isNotNull(BenefitOrder::getQwOrderNo)
+                .isNotNull(BenefitOrder::getQwCardExpiryTs)
+                .orderByDesc(BenefitOrder::getUpdatedTs)
+                .last("limit 1"));
+        if (existing != null) {
+            order.setQwOrderNo(existing.getQwOrderNo());
+            order.setQwCardNo(existing.getQwCardNo());
+            order.setQwCardCreatedTs(existing.getQwCardCreatedTs());
+            order.setQwCardExpiryTs(existing.getQwCardExpiryTs());
+        }
+        requireQwOrderNoticeSnapshot(order);
+    }
+
+    private void requireQwOrderNoticeSnapshot(BenefitOrder order) {
+        if (isBlank(order.getQwOrderNo()) || order.getQwCardExpiryTs() == null) {
+            log.warn("traceId={} bizOrderNo={} errorNo={} errorMsg={} qw order notice data incomplete",
+                    TraceIdUtil.getTraceId(),
+                    order.getBenefitOrderNo(),
+                    "QW_ORDER_NOTICE_DATA_INCOMPLETE",
+                    "Missing QW orderNo or cardExpiryDate for benefit order notice");
+            throw new BizException("QW_ORDER_NOTICE_DATA_INCOMPLETE", "Missing QW orderNo or cardExpiryDate for benefit order notice");
+        }
+    }
+
+    private QwMemberSyncResponse buildQwMemberSyncResponseFromOrder(BenefitOrder order, BenefitProduct product) {
+        return new QwMemberSyncResponse(
+                order.getQwOrderNo(),
+                order.getQwCardNo(),
+                null,
+                null,
+                product.getProductCode(),
+                product.getProductName(),
+                null,
+                formatQwDateTime(order.getQwCardCreatedTs()),
+                formatQwDateTime(order.getQwCardExpiryTs())
+        );
+    }
+
+    private LocalDateTime parseQwDateTime(String value, String fieldName, String benefitOrderNo) {
+        if (isBlank(value)) {
+            return null;
+        }
+        try {
+            return LocalDateTime.parse(value.trim(), QW_DATE_TIME_FORMATTER);
+        } catch (DateTimeParseException exception) {
+            log.warn("traceId={} bizOrderNo={} field={} errorNo={} errorMsg={} qw datetime parse failed",
+                    TraceIdUtil.getTraceId(),
+                    benefitOrderNo,
+                    fieldName,
+                    "QW_ORDER_NOTICE_DATA_INCOMPLETE",
+                    "Invalid QW " + fieldName + " for benefit order notice");
+            throw new BizException("QW_ORDER_NOTICE_DATA_INCOMPLETE", "Invalid QW " + fieldName + " for benefit order notice");
+        }
+    }
+
+    private String formatQwDateTime(LocalDateTime value) {
+        return value == null ? null : QW_DATE_TIME_FORMATTER.format(value);
+    }
+
+    private Long toEpochMillis(LocalDateTime value) {
+        return value == null ? null : value.atZone(SYSTEM_ZONE).toInstant().toEpochMilli();
+    }
+
+    private String blankToNull(String value) {
+        return isBlank(value) ? null : value.trim();
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private QwMemberSyncRequest buildQwMemberSyncRequest(

@@ -53,6 +53,10 @@ create table if not exists benefit_order (
     pay_protocol_no_snapshot varchar(128),
     pay_protocol_source varchar(32),
     qw_user_sign_id_snapshot bigint,
+    qw_order_no varchar(64),
+    qw_card_no varchar(64),
+    qw_card_created_ts timestamp,
+    qw_card_expiry_ts timestamp,
     created_ts timestamp not null,
     updated_ts timestamp not null
 );
