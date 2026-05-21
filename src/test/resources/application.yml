@@ -38,6 +38,7 @@ nexusfin:
       lender: XX商业银行
     benefits:
       product-code: HUXUAN_CARD
+      benefit-redirect-public-base-url: https://benefits.test
       activate:
         default-loan-amount: 300000
         default-benefit-amount: 30000

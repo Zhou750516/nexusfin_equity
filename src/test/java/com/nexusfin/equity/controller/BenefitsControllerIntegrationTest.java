@@ -201,7 +201,10 @@ class BenefitsControllerIntegrationTest {
         assertThat(syncCaptor.getValue().createTime()).isNotNull();
         assertThat(syncCaptor.getValue().payTime()).isNotNull();
         assertThat(syncCaptor.getValue().expireTime()).isNotNull();
-        assertThat(syncCaptor.getValue().benefitUrl()).isEmpty();
+        assertThat(syncCaptor.getValue().benefitUrl()).startsWith("https://benefits.test/api/auth/redrect_benefit_url?");
+        assertThat(syncCaptor.getValue().benefitUrl()).contains("benefitOrderNo=" + syncCaptor.getValue().benefitOrderNo());
+        assertThat(syncCaptor.getValue().benefitUrl()).doesNotContain("token");
+        assertThat(syncCaptor.getValue().benefitUrl()).doesNotContain("jwt");
         verify(benefitRedirectUrlService, never()).generate(any());
     }
 

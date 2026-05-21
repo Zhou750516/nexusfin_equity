@@ -9,6 +9,7 @@ public record H5BenefitsProperties(
         String productCode,
         @DefaultValue("true") boolean protocolLinkRequired,
         @DefaultValue("false") boolean useLocalReceivingAccount,
+        @DefaultValue("") String benefitRedirectPublicBaseUrl,
         Activate activate,
         Detail detail
 ) {

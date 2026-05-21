@@ -14,6 +14,8 @@ public interface BenefitRedirectUrlService {
      */
     BenefitRedirectUrlResult generate(BenefitRedirectUrlRequest request);
 
+    BenefitRedirectUrlResult generateForMember(String memberId, String benefitOrderNo);
+
     record BenefitRedirectUrlResult(
             String redirectUrl
     ) {

@@ -70,6 +70,7 @@ nexusfin:
       product-code: ${H5_BENEFITS_PRODUCT_CODE:abs001}
       protocol-link-required: ${H5_BENEFITS_PROTOCOL_LINK_REQUIRED:true}
       use-local-receiving-account: ${H5_BENEFITS_USE_LOCAL_RECEIVING_ACCOUNT:false}
+      benefit-redirect-public-base-url: ${H5_BENEFIT_REDIRECT_PUBLIC_BASE_URL:}
       activate:
         # 内部金额单位为分；300000 = 3000 元，用信金额。
         default-loan-amount: ${H5_BENEFITS_ACTIVATE_DEFAULT_LOAN_AMOUNT:300000}

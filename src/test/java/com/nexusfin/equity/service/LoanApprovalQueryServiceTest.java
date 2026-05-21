@@ -235,6 +235,7 @@ class LoanApprovalQueryServiceTest {
                 "HUXUAN_CARD",
                 true,
                 false,
+                "https://benefits.test",
                 new H5BenefitsProperties.Activate(300000L, 30000L, "huixuan_card", "惠选卡开通成功"),
                 new H5BenefitsProperties.Detail(
                         "惠选卡",

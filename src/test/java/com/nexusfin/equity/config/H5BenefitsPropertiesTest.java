@@ -14,6 +14,7 @@ class H5BenefitsPropertiesTest {
     void shouldBindSeparateLoanAmountAndBenefitAmountForActivation() {
         H5BenefitsProperties properties = bind(Map.of(
                 "nexusfin.h5.benefits.product-code", "abs001",
+                "nexusfin.h5.benefits.benefit-redirect-public-base-url", "https://www.aibosoftware.com",
                 "nexusfin.h5.benefits.activate.default-loan-amount", "300000",
                 "nexusfin.h5.benefits.activate.default-benefit-amount", "30000",
                 "nexusfin.h5.benefits.activate.supported-card-type", "huixuan_card",
@@ -22,6 +23,7 @@ class H5BenefitsPropertiesTest {
 
         assertThat(properties.activate().defaultLoanAmount()).isEqualTo(300000L);
         assertThat(properties.activate().defaultBenefitAmount()).isEqualTo(30000L);
+        assertThat(properties.benefitRedirectPublicBaseUrl()).isEqualTo("https://www.aibosoftware.com");
     }
 
     private H5BenefitsProperties bind(Map<String, String> values) {

@@ -223,7 +223,7 @@ class XiaohuaGatewayServiceTest {
                         "QW",
                         "QW-ORDER-001",
                         "齐为",
-                        ""
+                        "https://benefits.test/api/auth/redrect_benefit_url?benefitOrderNo=QW-ORDER-001"
                 )
         )).isInstanceOf(BizException.class)
                 .extracting(ex -> ((BizException) ex).getErrorNo())
@@ -256,7 +256,7 @@ class XiaohuaGatewayServiceTest {
                         "QW",
                         "QW-ORDER-001",
                         "齐为",
-                        ""
+                        "https://benefits.test/api/auth/redrect_benefit_url?benefitOrderNo=QW-ORDER-001"
                 )
         );
 
@@ -283,7 +283,9 @@ class XiaohuaGatewayServiceTest {
         assertThat(forwarded.path("benefitServiceProvider").asText()).isEqualTo("齐为");
         assertThat(forwarded.has("benefiturl")).isTrue();
         assertThat(forwarded.path("benefiturl").isNull()).isFalse();
-        assertThat(forwarded.path("benefiturl").asText()).isEmpty();
+        assertThat(forwarded.path("benefiturl").asText())
+                .isEqualTo("https://benefits.test/api/auth/redrect_benefit_url?benefitOrderNo=QW-ORDER-001");
+        assertThat(forwarded.path("benefiturl").asText()).doesNotContain("token");
         assertThat(forwarded.has("userId")).isFalse();
         assertThat(forwarded.has("benefitStatus")).isFalse();
         assertThat(forwarded.has("benefitAmount")).isFalse();

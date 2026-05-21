@@ -1,8 +1,10 @@
 package com.nexusfin.equity.service;
 
 import com.nexusfin.equity.dto.request.BenefitRedirectUrlRequest;
+import com.nexusfin.equity.entity.BenefitOrder;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
+import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.service.impl.BenefitRedirectUrlServiceImpl;
 import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
 import com.nexusfin.equity.thirdparty.qw.QwExerciseUrlRequest;
@@ -30,9 +32,12 @@ class BenefitRedirectUrlServiceTest {
     @Mock
     private QwBenefitClient qwBenefitClient;
 
+    @Mock
+    private BenefitOrderRepository benefitOrderRepository;
+
     @Test
     void shouldReturnCurrentQwExerciseRedirectUrlForBenefitSyncContract() {
-        BenefitRedirectUrlServiceImpl service = new BenefitRedirectUrlServiceImpl(jointLoginService, qwBenefitClient);
+        BenefitRedirectUrlServiceImpl service = new BenefitRedirectUrlServiceImpl(jointLoginService, qwBenefitClient, benefitOrderRepository);
         BenefitRedirectUrlRequest request = new BenefitRedirectUrlRequest("joint-token-redirect-001", "BEN-REDIRECT-001");
         when(jointLoginService.login(any())).thenReturn(new JointLoginService.JointLoginResult(
                 "jwt-joint-token",
@@ -61,7 +66,7 @@ class BenefitRedirectUrlServiceTest {
 
     @Test
     void shouldPropagateControlledErrorWhenJointLoginFails() {
-        BenefitRedirectUrlServiceImpl service = new BenefitRedirectUrlServiceImpl(jointLoginService, qwBenefitClient);
+        BenefitRedirectUrlServiceImpl service = new BenefitRedirectUrlServiceImpl(jointLoginService, qwBenefitClient, benefitOrderRepository);
         when(jointLoginService.login(any()))
                 .thenThrow(new BizException("JOINT_LOGIN_TOKEN_INVALID", "Joint login session expired"));
 
@@ -73,7 +78,7 @@ class BenefitRedirectUrlServiceTest {
 
     @Test
     void shouldTranslateQwFailureToControlledBusinessError(CapturedOutput output) {
-        BenefitRedirectUrlServiceImpl service = new BenefitRedirectUrlServiceImpl(jointLoginService, qwBenefitClient);
+        BenefitRedirectUrlServiceImpl service = new BenefitRedirectUrlServiceImpl(jointLoginService, qwBenefitClient, benefitOrderRepository);
         when(jointLoginService.login(any())).thenReturn(new JointLoginService.JointLoginResult(
                 "jwt-joint-token",
                 "exercise",
@@ -96,7 +101,7 @@ class BenefitRedirectUrlServiceTest {
 
     @Test
     void shouldLogErrorFieldsWhenQwExerciseRedirectTimesOut(CapturedOutput output) {
-        BenefitRedirectUrlServiceImpl service = new BenefitRedirectUrlServiceImpl(jointLoginService, qwBenefitClient);
+        BenefitRedirectUrlServiceImpl service = new BenefitRedirectUrlServiceImpl(jointLoginService, qwBenefitClient, benefitOrderRepository);
         when(jointLoginService.login(any())).thenReturn(new JointLoginService.JointLoginResult(
                 "jwt-joint-token",
                 "exercise",
@@ -115,5 +120,61 @@ class BenefitRedirectUrlServiceTest {
         assertThat(output).contains("benefit redirect qw exercise redirect url timed out");
         assertThat(output).contains("errorNo=REDRECT_BENEFIT_URL_UPSTREAM_TIMEOUT");
         assertThat(output).contains("errorMsg=QW gateway timeout");
+    }
+
+    @Test
+    void shouldGenerateRedirectUrlForAuthenticatedMemberOwnedQwOrderNo() {
+        BenefitRedirectUrlServiceImpl service = new BenefitRedirectUrlServiceImpl(jointLoginService, qwBenefitClient, benefitOrderRepository);
+        when(benefitOrderRepository.selectOne(any())).thenReturn(order("ord-001", "mem-redirect-001", "QW-ORDER-001", "user-qw-001"));
+        when(qwBenefitClient.getExerciseUrl(any())).thenReturn(new QwExerciseUrlResponse(
+                0,
+                "https://redirect.test/member-benefit",
+                "qw-token-005",
+                "2026-04-30 10:00:00",
+                "2027-04-30 10:00:00"
+        ));
+
+        BenefitRedirectUrlService.BenefitRedirectUrlResult result =
+                service.generateForMember("mem-redirect-001", "QW-ORDER-001");
+
+        assertThat(result.redirectUrl()).isEqualTo("https://redirect.test/member-benefit");
+        ArgumentCaptor<QwExerciseUrlRequest> requestCaptor = ArgumentCaptor.forClass(QwExerciseUrlRequest.class);
+        verify(qwBenefitClient).getExerciseUrl(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().uniqueId()).isEqualTo("user-qw-001");
+        assertThat(requestCaptor.getValue().partnerOrderNo()).isEqualTo("ord-001");
+    }
+
+    @Test
+    void shouldRejectMemberRedirectWhenQwOrderNoDoesNotBelongToMember() {
+        BenefitRedirectUrlServiceImpl service = new BenefitRedirectUrlServiceImpl(jointLoginService, qwBenefitClient, benefitOrderRepository);
+        when(benefitOrderRepository.selectOne(any())).thenReturn(null);
+
+        assertThatThrownBy(() -> service.generateForMember("mem-redirect-other", "QW-ORDER-001"))
+                .isInstanceOf(BizException.class)
+                .satisfies(throwable -> {
+                    BizException exception = (BizException) throwable;
+                    assertThat(exception.getCode()).isEqualTo(403);
+                    assertThat(exception.getErrorNo()).isEqualTo("BENEFIT_REDIRECT_FORBIDDEN");
+                });
+    }
+
+    @Test
+    void shouldRejectMemberRedirectWhenExternalUserIdIsMissing() {
+        BenefitRedirectUrlServiceImpl service = new BenefitRedirectUrlServiceImpl(jointLoginService, qwBenefitClient, benefitOrderRepository);
+        when(benefitOrderRepository.selectOne(any())).thenReturn(order("ord-002", "mem-redirect-002", "QW-ORDER-002", ""));
+
+        assertThatThrownBy(() -> service.generateForMember("mem-redirect-002", "QW-ORDER-002"))
+                .isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo("BENEFIT_REDIRECT_MEMBER_NOT_BOUND");
+    }
+
+    private BenefitOrder order(String benefitOrderNo, String memberId, String qwOrderNo, String externalUserId) {
+        BenefitOrder order = new BenefitOrder();
+        order.setBenefitOrderNo(benefitOrderNo);
+        order.setMemberId(memberId);
+        order.setQwOrderNo(qwOrderNo);
+        order.setExternalUserId(externalUserId);
+        return order;
     }
 }

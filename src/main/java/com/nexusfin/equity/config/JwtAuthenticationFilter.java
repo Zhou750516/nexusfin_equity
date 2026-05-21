@@ -47,7 +47,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String requestUri = request.getRequestURI();
         if (shouldSkip(requestUri)) {
-            filterChain.doFilter(request, response);
+            bindOptionalPrincipal(request, filterChain, response);
             return;
         }
         String token = resolveToken(request);
@@ -61,6 +61,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
         } catch (IllegalArgumentException exception) {
             writeUnauthorized(request, response, "Invalid auth cookie");
+        } finally {
+            AuthContextUtil.clear();
+        }
+    }
+
+    private void bindOptionalPrincipal(
+            HttpServletRequest request,
+            FilterChain filterChain,
+            HttpServletResponse response
+    ) throws ServletException, IOException {
+        String token = resolveToken(request);
+        if (token == null) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+        try {
+            AuthContextUtil.bind(jwtUtil.parseToken(token));
+            filterChain.doFilter(request, response);
+        } catch (IllegalArgumentException exception) {
+            filterChain.doFilter(request, response);
         } finally {
             AuthContextUtil.clear();
         }

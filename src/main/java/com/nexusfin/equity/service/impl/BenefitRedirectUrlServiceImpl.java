@@ -1,8 +1,11 @@
 package com.nexusfin.equity.service.impl;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.nexusfin.equity.dto.request.BenefitRedirectUrlRequest;
+import com.nexusfin.equity.entity.BenefitOrder;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
+import com.nexusfin.equity.repository.BenefitOrderRepository;
 import com.nexusfin.equity.service.BenefitRedirectUrlService;
 import com.nexusfin.equity.service.JointLoginService;
 import com.nexusfin.equity.thirdparty.qw.QwBenefitClient;
@@ -21,13 +24,16 @@ public class BenefitRedirectUrlServiceImpl implements BenefitRedirectUrlService 
 
     private final JointLoginService jointLoginService;
     private final QwBenefitClient qwBenefitClient;
+    private final BenefitOrderRepository benefitOrderRepository;
 
     public BenefitRedirectUrlServiceImpl(
             JointLoginService jointLoginService,
-            QwBenefitClient qwBenefitClient
+            QwBenefitClient qwBenefitClient,
+            BenefitOrderRepository benefitOrderRepository
     ) {
         this.jointLoginService = jointLoginService;
         this.qwBenefitClient = qwBenefitClient;
+        this.benefitOrderRepository = benefitOrderRepository;
     }
 
     @Override
@@ -76,6 +82,60 @@ public class BenefitRedirectUrlServiceImpl implements BenefitRedirectUrlService 
             log.warn("traceId={} bizOrderNo={} benefit redirect qw exercise redirect url failed errorNo={} errorMsg={}",
                     TraceIdUtil.getTraceId(),
                     request.benefitOrderNo(),
+                    exception.getErrorNo(),
+                    exception.getErrorMsg());
+            throw new BizException("REDRECT_BENEFIT_URL_UPSTREAM_FAILED", "Benefit redirect url is unavailable");
+        }
+    }
+
+    @Override
+    public BenefitRedirectUrlResult generateForMember(String memberId, String benefitOrderNo) {
+        BenefitOrder order = benefitOrderRepository.selectOne(Wrappers.<BenefitOrder>lambdaQuery()
+                .eq(BenefitOrder::getMemberId, memberId)
+                .eq(BenefitOrder::getQwOrderNo, benefitOrderNo)
+                .last("limit 1"));
+        if (order == null) {
+            log.warn("traceId={} bizOrderNo={} memberId={} errorNo={} errorMsg={} benefit redirect forbidden",
+                    TraceIdUtil.getTraceId(),
+                    benefitOrderNo,
+                    memberId,
+                    "BENEFIT_REDIRECT_FORBIDDEN",
+                    "Benefit order does not belong to current member");
+            throw new BizException(403, "BENEFIT_REDIRECT_FORBIDDEN", "Benefit order does not belong to current member");
+        }
+        if (order.getExternalUserId() == null || order.getExternalUserId().isBlank()) {
+            log.warn("traceId={} bizOrderNo={} memberId={} errorNo={} errorMsg={} benefit redirect member not bound",
+                    TraceIdUtil.getTraceId(),
+                    benefitOrderNo,
+                    memberId,
+                    "BENEFIT_REDIRECT_MEMBER_NOT_BOUND",
+                    "Member is not bound to QW user");
+            throw new BizException("BENEFIT_REDIRECT_MEMBER_NOT_BOUND", "Member is not bound to QW user");
+        }
+        return getQwExerciseRedirectUrl(order.getExternalUserId(), order.getBenefitOrderNo());
+    }
+
+    private BenefitRedirectUrlResult getQwExerciseRedirectUrl(String externalUserId, String benefitOrderNo) {
+        try {
+            QwExerciseUrlResponse response = qwBenefitClient.getExerciseUrl(new QwExerciseUrlRequest(
+                    externalUserId,
+                    benefitOrderNo
+            ));
+            log.info("traceId={} bizOrderNo={} benefit redirect url resolved from qw exercise redirect url",
+                    TraceIdUtil.getTraceId(),
+                    benefitOrderNo);
+            return new BenefitRedirectUrlResult(response.redirectUrl());
+        } catch (UpstreamTimeoutException exception) {
+            log.error("traceId={} bizOrderNo={} benefit redirect qw exercise redirect url timed out errorNo={} errorMsg={}",
+                    TraceIdUtil.getTraceId(),
+                    benefitOrderNo,
+                    "REDRECT_BENEFIT_URL_UPSTREAM_TIMEOUT",
+                    ErrorLogFields.errorMsg(exception, "Benefit redirect url temporarily unavailable"));
+            throw new BizException("REDRECT_BENEFIT_URL_UPSTREAM_TIMEOUT", "Benefit redirect url temporarily unavailable");
+        } catch (BizException exception) {
+            log.warn("traceId={} bizOrderNo={} benefit redirect qw exercise redirect url failed errorNo={} errorMsg={}",
+                    TraceIdUtil.getTraceId(),
+                    benefitOrderNo,
                     exception.getErrorNo(),
                     exception.getErrorMsg());
             throw new BizException("REDRECT_BENEFIT_URL_UPSTREAM_FAILED", "Benefit redirect url is unavailable");

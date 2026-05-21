@@ -25,6 +25,8 @@ import com.nexusfin.equity.thirdparty.yunka.UserCardListRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserCardListResponse;
 import com.nexusfin.equity.util.BizIds;
 import com.nexusfin.equity.util.TraceIdUtil;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -166,13 +168,14 @@ public class BenefitsServiceImpl implements BenefitsService {
                 Boolean.TRUE
         ));
         log.info("traceId={} bizOrderNo={} applicationId={} loanAmount={} benefitAmount={} reason=benefits_activate_skip_redirect_url "
-                        + "benefits activate skips redirect url before yunka sync",
+                        + "benefits activate builds local redirect url before yunka sync",
                 TraceIdUtil.getTraceId(),
                 response.benefitOrderNo(),
                 request.applicationId(),
                 activate.defaultLoanAmount(),
                 activate.defaultBenefitAmount());
         requireBenefitOrderNoticeData(response);
+        String benefitUrl = buildBenefitRedirectUrl(response.qwOrderNo());
         var syncResponse = xiaohuaGatewayService.syncBenefitOrder(
                 benefitSyncRequestId(request.applicationId()),
                 response.benefitOrderNo(),
@@ -188,7 +191,7 @@ public class BenefitsServiceImpl implements BenefitsService {
                         "QW",
                         response.qwOrderNo(),
                         "齐为",
-                        ""
+                        benefitUrl
                 )
         );
         if (syncResponse != null && !isBenefitSyncAccepted(syncResponse.status())) {
@@ -214,6 +217,24 @@ public class BenefitsServiceImpl implements BenefitsService {
                     "loanId is required for benefit order notice");
         }
         return loanId;
+    }
+
+    private String buildBenefitRedirectUrl(String benefitOrderNo) {
+        String publicBaseUrl = h5BenefitsProperties.benefitRedirectPublicBaseUrl();
+        if (publicBaseUrl == null || publicBaseUrl.isBlank()) {
+            log.warn("traceId={} bizOrderNo={} errorNo={} errorMsg={} benefit redirect public base url missing",
+                    TraceIdUtil.getTraceId(),
+                    benefitOrderNo,
+                    "BENEFIT_REDIRECT_BASE_URL_MISSING",
+                    "Benefit redirect public base url is required");
+            throw new BizException("BENEFIT_REDIRECT_BASE_URL_MISSING", "Benefit redirect public base url is required");
+        }
+        String normalizedBaseUrl = publicBaseUrl.endsWith("/")
+                ? publicBaseUrl.substring(0, publicBaseUrl.length() - 1)
+                : publicBaseUrl;
+        return normalizedBaseUrl
+                + "/api/auth/redrect_benefit_url?benefitOrderNo="
+                + URLEncoder.encode(benefitOrderNo, StandardCharsets.UTF_8);
     }
 
     private String benefitSyncRequestId(String applicationId) {

@@ -23,6 +23,9 @@ import com.nexusfin.equity.thirdparty.yunka.UserCardListResponse;
 import com.nexusfin.equity.thirdparty.yunka.UserCardListRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserCardSummary;
 import java.math.BigDecimal;
+import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -177,7 +180,7 @@ class BenefitsServiceTest {
     }
 
     @Test
-    void shouldSyncBenefitOrderAfterActivationWithoutRedirectUrl() {
+    void shouldSyncBenefitOrderAfterActivationWithAibosoRedirectUrl() {
         when(benefitProductRepository.selectById("HUXUAN_CARD")).thenReturn(activeProduct());
         when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
                 .thenReturn(new ProtocolQueryResponse(List.of(
@@ -227,7 +230,10 @@ class BenefitsServiceTest {
         assertThat(syncCaptor.getValue().memberPayType()).isEqualTo("QW");
         assertThat(syncCaptor.getValue().paymentNo()).isEqualTo("QW-ORDER-001");
         assertThat(syncCaptor.getValue().benefitServiceProvider()).isEqualTo("齐为");
-        assertThat(syncCaptor.getValue().benefitUrl()).isEmpty();
+        assertThat(syncCaptor.getValue().benefitUrl()).startsWith("https://benefits.test/api/auth/redrect_benefit_url?");
+        assertThat(syncCaptor.getValue().benefitUrl()).contains("benefitOrderNo=QW-ORDER-001");
+        assertThat(syncCaptor.getValue().benefitUrl()).doesNotContain("token");
+        assertThat(syncCaptor.getValue().benefitUrl()).doesNotContain("jwt");
         verify(benefitRedirectUrlService, never()).generate(any());
     }
 
@@ -279,8 +285,53 @@ class BenefitsServiceTest {
                     assertThat(payload.createTime()).isEqualTo(1779335976232L);
                     assertThat(payload.payTime()).isEqualTo(1779335976232L);
                     assertThat(payload.expireTime()).isEqualTo(1781927976232L);
-                    assertThat(payload.benefitUrl()).isEmpty();
+                    assertThat(payload.benefitUrl()).startsWith("https://benefits.test/api/auth/redrect_benefit_url?");
+                    assertThat(URLDecoder.decode(URI.create(payload.benefitUrl()).getRawQuery(), StandardCharsets.UTF_8))
+                            .isEqualTo("benefitOrderNo=QW-ORDER-001");
+                    assertThat(payload.benefitUrl()).doesNotContain("token");
                 });
+    }
+
+    @Test
+    void shouldNotSyncYunkaWhenBenefitRedirectPublicBaseUrlIsMissing() {
+        BenefitsService service = new BenefitsServiceImpl(
+                h5BenefitsProperties(true, false, ""),
+                h5LoanProperties(),
+                benefitProductRepository,
+                memberReceivingAccountRepository,
+                benefitOrderService,
+                loanApplicationGateway,
+                h5I18nService,
+                xiaohuaGatewayService,
+                benefitRedirectUrlService
+        );
+        when(benefitProductRepository.selectById("HUXUAN_CARD")).thenReturn(activeProduct());
+        when(xiaohuaGatewayService.queryProtocols(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(dynamicProtocolResponse());
+        when(xiaohuaGatewayService.queryUserCards(any(), eq("benefits-card-detail"), any()))
+                .thenReturn(userCardResponse());
+        when(loanApplicationGateway.findActiveOrPendingMapping("mem-test-001", "APP-001"))
+                .thenReturn(loanMapping("mem-test-001", "APP-001", 20260521));
+        when(benefitOrderService.createOrder(eq("mem-test-001"), any(CreateBenefitOrderRequest.class)))
+                .thenReturn(new CreateBenefitOrderResponse(
+                        "ord-001",
+                        "FIRST_DEDUCT_PENDING",
+                        "/h5/equity/orders/ord-001",
+                        "QW-ORDER-001",
+                        1779335976232L,
+                        1779335976232L,
+                        1781927976232L
+                ));
+
+        assertThatThrownBy(() -> service.activate(
+                "mem-test-001",
+                "cid-test-001",
+                new BenefitsActivateRequest("APP-001", "huixuan_card", "joint-token-benefits-missing-base-url")
+        )).isInstanceOf(BizException.class)
+                .extracting(ex -> ((BizException) ex).getErrorNo())
+                .isEqualTo("BENEFIT_REDIRECT_BASE_URL_MISSING");
+
+        verify(xiaohuaGatewayService, never()).syncBenefitOrder(any(), any(), any());
     }
 
     @Test
@@ -545,10 +596,19 @@ class BenefitsServiceTest {
             boolean protocolLinkRequired,
             boolean useLocalReceivingAccount
     ) {
+        return h5BenefitsProperties(protocolLinkRequired, useLocalReceivingAccount, "https://benefits.test");
+    }
+
+    private H5BenefitsProperties h5BenefitsProperties(
+            boolean protocolLinkRequired,
+            boolean useLocalReceivingAccount,
+            String benefitRedirectPublicBaseUrl
+    ) {
         return new H5BenefitsProperties(
                 "HUXUAN_CARD",
                 protocolLinkRequired,
                 useLocalReceivingAccount,
+                benefitRedirectPublicBaseUrl,
                 new H5BenefitsProperties.Activate(300000L, 30000L, "huixuan_card", "惠选卡开通成功"),
                 new H5BenefitsProperties.Detail(
                         "惠选卡",
