@@ -254,7 +254,7 @@ class RestYunkaGatewayClientTest {
                         "/card/smsConfirm",
                         "/card/userCards",
                         "/credit/image/query",
-                        "/huijuapi/vip/orderNotice"
+                        "/vip/orderNotice"
                 ),
                 TEST_CHANNEL_CODE,
                 TEST_APP_ID,

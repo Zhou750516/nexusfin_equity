@@ -33,7 +33,7 @@ class YunkaPropertiesTest {
         assertThat(properties.paths().cardSmsConfirm()).isEqualTo("/card/smsConfirm");
         assertThat(properties.paths().cardUserCards()).isEqualTo("/card/userCards");
         assertThat(properties.paths().creditImageQuery()).isEqualTo("/credit/image/query");
-        assertThat(properties.paths().benefitSync()).isEqualTo("/huijuapi/vip/orderNotice");
+        assertThat(properties.paths().benefitSync()).isEqualTo("/vip/orderNotice");
     }
 
     @Test
@@ -56,7 +56,7 @@ class YunkaPropertiesTest {
                 "/loan/apply",
                 "/loan/query",
                 "/protocol/queryProtocolAggregationLink",
-                "/huijuapi/vip/orderNotice",
+                "/vip/orderNotice",
                 "/user/token",
                 "/user/query",
                 "/repay/trial",

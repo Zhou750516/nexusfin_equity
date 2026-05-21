@@ -279,7 +279,7 @@ class LoanApprovalQueryServiceTest {
                         "/card/smsConfirm",
                         "/card/userCards",
                         "/credit/image/query",
-                        "/huijuapi/vip/orderNotice"
+                        "/vip/orderNotice"
                 ),
                 "ABS",
                 "ABS-YUNKA-TEST",

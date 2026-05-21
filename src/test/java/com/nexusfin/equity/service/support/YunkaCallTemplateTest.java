@@ -78,7 +78,7 @@ class YunkaCallTemplateTest {
                 .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(10003, "invalid state", null));
 
         assertThatThrownBy(() -> template.executeForData(
-                YunkaCallTemplate.YunkaCall.of("benefit sync", "SYNC-001", "/huijuapi/vip/orderNotice", "BEN-001", new Object())
+                YunkaCallTemplate.YunkaCall.of("benefit sync", "SYNC-001", "/vip/orderNotice", "BEN-001", new Object())
         )).isInstanceOf(BizException.class)
                 .extracting(ex -> ((BizException) ex).getErrorNo())
                 .isEqualTo(ErrorCodes.YUNKA_UPSTREAM_REJECTED);
