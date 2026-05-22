@@ -15,6 +15,8 @@ import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.ErrorCodes;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.entity.LoanApplicationMapping;
+import com.nexusfin.equity.entity.MemberInfo;
+import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.AsyncCompensationEnqueueService;
 import com.nexusfin.equity.service.AsyncCompensationEnqueuePayload;
 import com.nexusfin.equity.service.BenefitOrderService;
@@ -26,6 +28,7 @@ import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.CreditImageQueryRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserQueryRequest;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
+import com.nexusfin.equity.util.SensitiveDataCipher;
 import com.nexusfin.equity.util.TraceIdUtil;
 import java.math.BigDecimal;
 import org.slf4j.Logger;
@@ -49,10 +52,12 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
     private final H5BenefitsProperties h5BenefitsProperties;
     private final YunkaProperties yunkaProperties;
     private final LoanApplicationGateway loanApplicationGateway;
+    private final MemberInfoRepository memberInfoRepository;
     private final BenefitOrderService benefitOrderService;
     private final H5I18nService h5I18nService;
     private final MemberReceivingAccountService memberReceivingAccountService;
     private final AsyncCompensationEnqueueService asyncCompensationEnqueueService;
+    private final SensitiveDataCipher sensitiveDataCipher;
     private final YunkaCallTemplate yunkaCallTemplate;
 
     public LoanApplicationServiceImpl(
@@ -60,20 +65,24 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
             H5BenefitsProperties h5BenefitsProperties,
             YunkaProperties yunkaProperties,
             LoanApplicationGateway loanApplicationGateway,
+            MemberInfoRepository memberInfoRepository,
             BenefitOrderService benefitOrderService,
             H5I18nService h5I18nService,
             MemberReceivingAccountService memberReceivingAccountService,
             AsyncCompensationEnqueueService asyncCompensationEnqueueService,
+            SensitiveDataCipher sensitiveDataCipher,
             YunkaCallTemplate yunkaCallTemplate
     ) {
         this.h5LoanProperties = h5LoanProperties;
         this.h5BenefitsProperties = h5BenefitsProperties;
         this.yunkaProperties = yunkaProperties;
         this.loanApplicationGateway = loanApplicationGateway;
+        this.memberInfoRepository = memberInfoRepository;
         this.benefitOrderService = benefitOrderService;
         this.h5I18nService = h5I18nService;
         this.memberReceivingAccountService = memberReceivingAccountService;
         this.asyncCompensationEnqueueService = asyncCompensationEnqueueService;
+        this.sensitiveDataCipher = sensitiveDataCipher;
         this.yunkaCallTemplate = yunkaCallTemplate;
     }
 
@@ -104,6 +113,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
         String requestId = next("LA");
         String upstreamBankCardNum = resolveBankCardNum(request);
         JsonNode userProfile;
+        LoanApplyIdentity identity;
         JsonNode imageInfo;
         try {
             userProfile = queryRequiredUserProfile(
@@ -112,6 +122,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                     applicationId,
                     benefitOrder.benefitOrderNo()
             );
+            identity = resolveLoanApplyIdentity(memberId, userProfile);
             imageInfo = queryRequiredImageInfo(memberId, applicationId, benefitOrder.benefitOrderNo());
         } catch (BizException exception) {
             logLoanApplyPreflightFailed(applicationId, benefitOrder.benefitOrderNo(),
@@ -132,9 +143,9 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                 request.term(),
                 upstreamBankCardNum,
                 upstreamBankCardNum,
-                resolvePhone(userProfile),
-                resolveIdNo(userProfile),
-                resolveName(userProfile),
+                identity.phone(),
+                identity.idno(),
+                identity.name(),
                 toLoanReason(request.purpose()),
                 requiredNode(userProfile, "basicInfo", "LOAN_APPLY_USER_PROFILE_INCOMPLETE"),
                 requiredNode(userProfile, "idInfo", "LOAN_APPLY_USER_PROFILE_INCOMPLETE"),
@@ -325,18 +336,44 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
 
     private void validateUserProfile(JsonNode data) {
         requiredNode(data, "basicInfo", "LOAN_APPLY_USER_PROFILE_INCOMPLETE");
-        JsonNode idInfo = requiredNode(data, "idInfo", "LOAN_APPLY_USER_PROFILE_INCOMPLETE");
+        requiredNode(data, "idInfo", "LOAN_APPLY_USER_PROFILE_INCOMPLETE");
         requiredArray(data, "contactInfo", "LOAN_APPLY_USER_PROFILE_INCOMPLETE");
         requiredNode(data, "supplementInfo", "LOAN_APPLY_USER_PROFILE_INCOMPLETE");
         requiredNode(data, "optionInfo", "LOAN_APPLY_USER_PROFILE_INCOMPLETE");
-        if (!hasText(resolveName(data)) || !hasText(resolveIdNo(data)) || !hasText(resolvePhone(data))) {
+    }
+
+    private LoanApplyIdentity resolveLoanApplyIdentity(String memberId, JsonNode userProfile) {
+        LocalMemberIdentity localIdentity = loadLocalMemberIdentity(memberId);
+        LoanApplyIdentity identity = new LoanApplyIdentity(
+                firstNonBlank(resolvePhone(userProfile), localIdentity.phone()),
+                firstNonBlank(resolveIdNo(userProfile), localIdentity.idno()),
+                firstNonBlank(resolveName(userProfile), localIdentity.name())
+        );
+        if (!hasText(identity.phone()) || !hasText(identity.idno()) || !hasText(identity.name())) {
             throw new BizException("LOAN_APPLY_USER_PROFILE_INCOMPLETE",
-                    "user query data is missing name/idno/phone for loan apply");
+                    "loan apply profile is missing required name/idno/phone after local fallback");
         }
-        if (!hasText(idInfo.path("name").asText("")) || !hasText(idInfo.path("idno").asText(""))) {
-            throw new BizException("LOAN_APPLY_USER_PROFILE_INCOMPLETE",
-                    "user query idInfo is missing name/idno for loan apply");
+        return identity;
+    }
+
+    private LocalMemberIdentity loadLocalMemberIdentity(String memberId) {
+        MemberInfo memberInfo = memberInfoRepository.selectById(memberId);
+        if (memberInfo == null) {
+            return LocalMemberIdentity.EMPTY;
         }
+        return new LocalMemberIdentity(
+                decryptOptional(memberInfo.getMobileEncrypted()),
+                decryptOptional(memberInfo.getIdCardEncrypted()),
+                decryptOptional(memberInfo.getRealNameEncrypted())
+        );
+    }
+
+    private String decryptOptional(String ciphertext) {
+        if (!hasText(ciphertext)) {
+            return "";
+        }
+        String plaintext = sensitiveDataCipher.decrypt(ciphertext);
+        return hasText(plaintext) ? plaintext : "";
     }
 
     private JsonNode requiredNode(JsonNode data, String fieldName, String errorNo) {
@@ -428,6 +465,10 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
         return "";
     }
 
+    private String firstNonBlank(String primary, String fallback) {
+        return hasText(primary) ? primary : fallback;
+    }
+
     private String toLoanReason(String purpose) {
         if (!hasText(purpose)) {
             return "70010";
@@ -469,6 +510,21 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
             JsonNode optionInfo,
             JsonNode imageInfo
     ) {
+    }
+
+    private record LoanApplyIdentity(
+            String phone,
+            String idno,
+            String name
+    ) {
+    }
+
+    private record LocalMemberIdentity(
+            String phone,
+            String idno,
+            String name
+    ) {
+        private static final LocalMemberIdentity EMPTY = new LocalMemberIdentity("", "", "");
     }
 
     private Integer readInt(JsonNode data, String fieldName, Integer fallback) {

@@ -9,11 +9,14 @@ import com.nexusfin.equity.dto.request.LoanApplyRequest;
 import com.nexusfin.equity.dto.response.CreateBenefitOrderResponse;
 import com.nexusfin.equity.dto.response.LoanApplyResponse;
 import com.nexusfin.equity.entity.LoanApplicationMapping;
+import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.UpstreamTimeoutException;
+import com.nexusfin.equity.repository.MemberInfoRepository;
 import com.nexusfin.equity.service.impl.LoanApplicationServiceImpl;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
+import com.nexusfin.equity.util.SensitiveDataCipher;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,6 +51,9 @@ class LoanApplicationServiceTest {
     private LoanApplicationGateway loanApplicationGateway;
 
     @Mock
+    private MemberInfoRepository memberInfoRepository;
+
+    @Mock
     private BenefitOrderService benefitOrderService;
 
     @Mock
@@ -58,6 +64,9 @@ class LoanApplicationServiceTest {
 
     @Mock
     private AsyncCompensationEnqueueService asyncCompensationEnqueueService;
+
+    @Mock
+    private SensitiveDataCipher sensitiveDataCipher;
 
     private LoanApplicationService loanApplicationService;
 
@@ -71,10 +80,12 @@ class LoanApplicationServiceTest {
                 h5BenefitsProperties(),
                 yunkaProperties(),
                 loanApplicationGateway,
+                memberInfoRepository,
                 benefitOrderService,
                 h5I18nService,
                 memberReceivingAccountService,
                 asyncCompensationEnqueueService,
+                sensitiveDataCipher,
                 new YunkaCallTemplate(yunkaGatewayClient)
         );
     }
@@ -303,6 +314,69 @@ class LoanApplicationServiceTest {
     }
 
     @Test
+    void shouldUseLocalMemberIdentityWhenUserQueryOmitsLoanApplyIdentity() throws Exception {
+        when(loanApplicationGateway.findLatestPendingMapping("mem-test-001")).thenReturn(null);
+        when(benefitOrderService.createLocalOrder(eq("mem-test-001"), any()))
+                .thenReturn(new CreateBenefitOrderResponse("BEN-LOCAL-IDENTITY", "FIRST_DEDUCT_PENDING", "/redirect"));
+        when(memberInfoRepository.selectById("mem-test-001")).thenReturn(localMemberInfo());
+        when(sensitiveDataCipher.decrypt("local-mobile")).thenReturn("18518628442");
+        when(sensitiveDataCipher.decrypt("local-id-card")).thenReturn("110101199001011234");
+        when(sensitiveDataCipher.decrypt("local-real-name")).thenReturn("本地用户");
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(successfulUserQueryResponseWithoutLoanApplyIdentity())
+                .thenReturn(successfulImageQueryResponse())
+                .thenReturn(successfulLoanApplyResponse(20260523));
+
+        LoanApplyResponse response = loanApplicationService.apply("mem-test-001", "cid-test-001",
+                buildApplyRequestWithSparseDocumentFields(null));
+
+        assertThat(response.status()).isEqualTo("pending");
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> yunkaCaptor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient, org.mockito.Mockito.times(3)).proxy(yunkaCaptor.capture());
+        assertThat(yunkaCaptor.getAllValues().get(0).path()).isEqualTo("/user/query");
+        assertThat(yunkaCaptor.getAllValues().get(1).path()).isEqualTo("/credit/image/query");
+        assertThat(yunkaCaptor.getAllValues().get(2).path()).isEqualTo("/loan/apply");
+
+        JsonNode forwardData = objectMapper.valueToTree(yunkaCaptor.getAllValues().get(2).data());
+        assertThat(forwardData.path("phone").asText()).isEqualTo("18518628442");
+        assertThat(forwardData.path("idno").asText()).isEqualTo("110101199001011234");
+        assertThat(forwardData.path("name").asText()).isEqualTo("本地用户");
+        assertThat(forwardData.path("platformBenefitOrderNo").asText()).isEqualTo(response.applicationId());
+        assertThat(forwardData.path("loanReason").asText()).isEqualTo("70006");
+        assertThat(forwardData.path("loanId").isInt()).isTrue();
+        assertThat(forwardData.path("basicInfo").isObject()).isTrue();
+        assertThat(forwardData.path("idInfo").isObject()).isTrue();
+        assertThat(forwardData.path("contactInfo").isArray()).isTrue();
+        assertThat(forwardData.path("supplementInfo").isObject()).isTrue();
+        assertThat(forwardData.path("optionInfo").isObject()).isTrue();
+        assertThat(forwardData.path("imageInfo").isArray()).isTrue();
+    }
+
+    @Test
+    void shouldNotQueryImagesWhenUserQueryAndLocalMemberDoNotProvidePhone(CapturedOutput output) throws Exception {
+        when(loanApplicationGateway.findLatestPendingMapping("mem-test-001")).thenReturn(null);
+        when(benefitOrderService.createLocalOrder(eq("mem-test-001"), any()))
+                .thenReturn(new CreateBenefitOrderResponse("BEN-PHONE-MISSING", "FIRST_DEDUCT_PENDING", "/redirect"));
+        when(memberInfoRepository.selectById("mem-test-001")).thenReturn(new MemberInfo());
+        when(yunkaGatewayClient.proxy(any())).thenReturn(successfulUserQueryResponseWithoutPhone());
+
+        LoanApplyResponse response = loanApplicationService.apply("mem-test-001", "cid-test-001",
+                buildApplyRequestWithSparseDocumentFields(null));
+
+        assertThat(response.status()).isEqualTo("loan_failed");
+        assertThat(response.message()).contains("LOAN_APPLY_USER_PROFILE_INCOMPLETE");
+        assertThat(output)
+                .contains("benefitOrderNo=BEN-PHONE-MISSING")
+                .contains("errorNo=LOAN_APPLY_USER_PROFILE_INCOMPLETE")
+                .contains("errorMsg=loan apply profile is missing required name/idno/phone after local fallback");
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> yunkaCaptor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(yunkaCaptor.capture());
+        assertThat(yunkaCaptor.getValue().path()).isEqualTo("/user/query");
+    }
+
+    @Test
     void shouldNotSendLoanApplyWhenCreditImagesAreMissing(CapturedOutput output) throws Exception {
         when(loanApplicationGateway.findLatestPendingMapping("mem-test-001")).thenReturn(null);
         when(benefitOrderService.createLocalOrder(eq("mem-test-001"), any()))
@@ -472,6 +546,54 @@ class LoanApplicationServiceTest {
                         }
                         """)
         );
+    }
+
+    private YunkaGatewayClient.YunkaGatewayResponse successfulUserQueryResponseWithoutPhone() throws Exception {
+        return new YunkaGatewayClient.YunkaGatewayResponse(
+                0,
+                "SUCCESS",
+                objectMapper.readTree("""
+                        {
+                          "userId": "mem-test-001",
+                          "basicInfo": {"monthlyIncome": 10000},
+                          "idInfo": {"name": "张三", "idno": "310101199001011111", "gender": 1},
+                          "contactInfo": [
+                            {"name": "李四", "phone": "13900139000", "relation": "80003", "sort": 1}
+                          ],
+                          "supplementInfo": {"occupation": "20001"},
+                          "optionInfo": {"maritalStatus": "50002"}
+                        }
+                        """)
+        );
+    }
+
+    private YunkaGatewayClient.YunkaGatewayResponse successfulUserQueryResponseWithoutLoanApplyIdentity()
+            throws Exception {
+        return new YunkaGatewayClient.YunkaGatewayResponse(
+                0,
+                "SUCCESS",
+                objectMapper.readTree("""
+                        {
+                          "userId": "mem-test-001",
+                          "basicInfo": {"monthlyIncome": 10000},
+                          "idInfo": {"gender": 1, "address": "上海市浦东新区"},
+                          "contactInfo": [
+                            {"name": "李四", "phone": "13900139000", "relation": "80003", "sort": 1}
+                          ],
+                          "supplementInfo": {"occupation": "20001"},
+                          "optionInfo": {"maritalStatus": "50002"}
+                        }
+                        """)
+        );
+    }
+
+    private MemberInfo localMemberInfo() {
+        MemberInfo memberInfo = new MemberInfo();
+        memberInfo.setMemberId("mem-test-001");
+        memberInfo.setMobileEncrypted("local-mobile");
+        memberInfo.setIdCardEncrypted("local-id-card");
+        memberInfo.setRealNameEncrypted("local-real-name");
+        return memberInfo;
     }
 
     private YunkaGatewayClient.YunkaGatewayResponse successfulImageQueryResponse() throws Exception {

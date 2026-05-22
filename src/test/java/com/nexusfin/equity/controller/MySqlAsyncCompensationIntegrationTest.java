@@ -13,6 +13,7 @@ import com.nexusfin.equity.service.AsyncCompensationExecutor;
 import com.nexusfin.equity.service.AsyncCompensationSupervisorService;
 import com.nexusfin.equity.service.AsyncCompensationWorkerService;
 import com.nexusfin.equity.service.impl.AsyncCompensationRouterExecutor;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -97,7 +98,24 @@ class MySqlAsyncCompensationIntegrationTest {
                         2026041801,
                         300000L,
                         3,
-                        "acc_001"
+                        "acc_001",
+                        "13800138000",
+                        "310101199001011111",
+                        "测试用户",
+                        "70006",
+                        JsonNodeFactory.instance.objectNode().put("monthlyIncome", 10000),
+                        JsonNodeFactory.instance.objectNode()
+                                .put("name", "测试用户")
+                                .put("idno", "310101199001011111"),
+                        JsonNodeFactory.instance.arrayNode()
+                                .add(JsonNodeFactory.instance.objectNode()
+                                        .put("name", "紧急联系人")
+                                        .put("phone", "13900139000")),
+                        JsonNodeFactory.instance.objectNode().put("occupation", "20001"),
+                        JsonNodeFactory.instance.objectNode().put("maritalStatus", "50002"),
+                        JsonNodeFactory.instance.arrayNode()
+                                .add(JsonNodeFactory.instance.objectNode()
+                                        .put("type", "back,front,nature"))
                 )
         ));
 
