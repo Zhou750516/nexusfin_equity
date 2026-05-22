@@ -94,6 +94,35 @@ class AsyncCompensationWorkerServiceTest {
     }
 
     @Test
+    void shouldPersistLargeRequestPayloadToAttemptWhenTaskSucceeded() {
+        AsyncCompensationWorkerService service = buildService();
+        AsyncCompensationTask task = buildTask("task-large-payload", "INIT", 0, 5);
+        String largePayload = "{\"path\":\"/loan/apply\",\"imageInfo\":[{\"back\":\""
+                + largeBase64("BACK", 70000)
+                + "\",\"front\":\""
+                + largeBase64("FRONT", 70000)
+                + "\",\"nature\":\""
+                + largeBase64("NATURE", 70000)
+                + "\",\"type\":\"back,front,nature\"}]}";
+        task.setRequestPayload(largePayload);
+        when(taskRepository.selectOne(any())).thenReturn(task);
+        when(routerExecutor.execute(any()))
+                .thenReturn(new AsyncCompensationExecutor.ExecutionResult("{\"code\":0,\"message\":\"SUCCESS\"}"));
+
+        boolean handled = service.processNext("worker-3", 3);
+
+        assertThat(handled).isTrue();
+        ArgumentCaptor<AsyncCompensationAttempt> attemptCaptor = ArgumentCaptor.forClass(AsyncCompensationAttempt.class);
+        verify(attemptRepository).insert(attemptCaptor.capture());
+        assertThat(attemptCaptor.getValue().getRequestPayload().length()).isGreaterThan(65535);
+        assertThat(attemptCaptor.getValue().getRequestPayload())
+                .contains("BACK-END")
+                .contains("FRONT-END")
+                .contains("NATURE-END")
+                .contains("\"imageInfo\"");
+    }
+
+    @Test
     void shouldLogTraceableFieldsWhenTaskFailsBeforeMaxRetry(CapturedOutput output) {
         AsyncCompensationWorkerService service = buildService();
         AsyncCompensationTask task = buildTask("task-retry", "INIT", 0, 2);
@@ -226,5 +255,9 @@ class AsyncCompensationWorkerServiceTest {
         task.setCreatedTs(LocalDateTime.now().minusMinutes(2));
         task.setUpdatedTs(LocalDateTime.now().minusMinutes(2));
         return task;
+    }
+
+    private String largeBase64(String prefix, int size) {
+        return prefix + "-" + "A".repeat(size) + "-" + prefix + "-END";
     }
 }

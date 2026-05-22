@@ -79,6 +79,9 @@ class MySqlAsyncCompensationIntegrationTest {
         String uniqueId = UUID.randomUUID().toString().replace("-", "");
         String bizKey = TASK_BIZ_KEY_PREFIX + uniqueId;
         String bizOrderNo = TASK_BIZ_ORDER_PREFIX + uniqueId;
+        String largeBack = largeBase64("BACK", 70000);
+        String largeFront = largeBase64("FRONT", 70000);
+        String largeNature = largeBase64("NATURE", 70000);
         enqueueService.enqueue(new AsyncCompensationEnqueueService.EnqueueCommand(
                 "YUNKA_LOAN_APPLY_RETRY",
                 bizKey,
@@ -115,6 +118,9 @@ class MySqlAsyncCompensationIntegrationTest {
                         JsonNodeFactory.instance.objectNode().put("maritalStatus", "50002"),
                         JsonNodeFactory.instance.arrayNode()
                                 .add(JsonNodeFactory.instance.objectNode()
+                                        .put("back", largeBack)
+                                        .put("front", largeFront)
+                                        .put("nature", largeNature)
                                         .put("type", "back,front,nature"))
                 )
         ));
@@ -126,6 +132,11 @@ class MySqlAsyncCompensationIntegrationTest {
         assertThat(task.getTaskStatus()).isEqualTo("INIT");
         assertThat(task.getRequestPayload()).contains("\"path\":\"/loan/apply\"");
         assertThat(task.getRequestPayload()).contains("\"bizOrderNo\":\"" + bizOrderNo + "\"");
+        assertThat(task.getRequestPayload().length()).isGreaterThan(65535);
+        assertThat(task.getRequestPayload())
+                .contains("BACK-END")
+                .contains("FRONT-END")
+                .contains("NATURE-END");
 
         when(routerExecutor.execute(any()))
                 .thenReturn(new AsyncCompensationExecutor.ExecutionResult(
@@ -147,6 +158,11 @@ class MySqlAsyncCompensationIntegrationTest {
         assertThat(attempts).hasSize(1);
         assertThat(attempts.get(0).getResultStatus()).isEqualTo("SUCCESS");
         assertThat(attempts.get(0).getWorkerId()).isEqualTo(WORKER_ID_PREFIX + task.getPartitionNo());
+        assertThat(attempts.get(0).getRequestPayload().length()).isGreaterThan(65535);
+        assertThat(attempts.get(0).getRequestPayload())
+                .contains("BACK-END")
+                .contains("FRONT-END")
+                .contains("NATURE-END");
     }
 
     @Test
@@ -205,6 +221,14 @@ class MySqlAsyncCompensationIntegrationTest {
         assertThat(deadCount).isGreaterThanOrEqualTo(1L);
     }
 
+    @Test
+    void shouldUseMediumTextForAsyncCompensationPayloadColumnsInMySql() {
+        assertColumnType("async_compensation_task", "request_payload", "mediumtext", "NO");
+        assertColumnType("async_compensation_task", "response_payload", "mediumtext", "YES");
+        assertColumnType("async_compensation_attempt", "request_payload", "mediumtext", "YES");
+        assertColumnType("async_compensation_attempt", "response_payload", "mediumtext", "YES");
+    }
+
     private void insertTask(
             String taskId,
             int partitionNo,
@@ -246,6 +270,18 @@ class MySqlAsyncCompensationIntegrationTest {
                 .likeRight(AsyncCompensationPartitionRuntime::getWorkerId, WORKER_ID_PREFIX));
     }
 
+    private void assertColumnType(String tableName, String columnName, String expectedDataType, String expectedNullable) {
+        Map<String, Object> column = jdbcTemplate.queryForMap("""
+                SELECT LOWER(DATA_TYPE) AS data_type, IS_NULLABLE AS is_nullable
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = ?
+                  AND column_name = ?
+                """, tableName, columnName);
+        assertThat(column.get("data_type")).isEqualTo(expectedDataType);
+        assertThat(column.get("is_nullable")).isEqualTo(expectedNullable);
+    }
+
     private void alignAsyncCompensationSchema() {
         jdbcTemplate.execute((Connection connection) -> {
             DatabaseMetaData metaData = connection.getMetaData();
@@ -262,8 +298,8 @@ class MySqlAsyncCompensationIntegrationTest {
                             request_path VARCHAR(256) NOT NULL,
                             http_method VARCHAR(16) NOT NULL,
                             request_headers TEXT NULL,
-                            request_payload TEXT NOT NULL,
-                            response_payload TEXT NULL,
+                            request_payload MEDIUMTEXT NOT NULL,
+                            response_payload MEDIUMTEXT NULL,
                             retry_count INT NOT NULL,
                             max_retry_count INT NOT NULL,
                             next_retry_ts TIMESTAMP NULL,
@@ -288,8 +324,8 @@ class MySqlAsyncCompensationIntegrationTest {
                             partition_no INT NOT NULL,
                             worker_id VARCHAR(64) NULL,
                             attempt_no INT NOT NULL,
-                            request_payload TEXT NULL,
-                            response_payload TEXT NULL,
+                            request_payload MEDIUMTEXT NULL,
+                            response_payload MEDIUMTEXT NULL,
                             result_status VARCHAR(32) NOT NULL,
                             error_code VARCHAR(64) NULL,
                             error_message VARCHAR(512) NULL,
@@ -320,5 +356,9 @@ class MySqlAsyncCompensationIntegrationTest {
         try (ResultSet tables = metaData.getTables(null, null, tableName, null)) {
             return tables.next();
         }
+    }
+
+    private String largeBase64(String prefix, int size) {
+        return prefix + "-" + "A".repeat(size) + "-" + prefix + "-END";
     }
 }

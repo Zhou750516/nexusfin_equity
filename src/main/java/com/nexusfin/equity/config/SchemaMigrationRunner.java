@@ -34,6 +34,7 @@ public class SchemaMigrationRunner {
             migratePaymentRecord(metaData, databaseProduct);
             migratePaymentProtocol(metaData, databaseProduct);
             migrateLoanApplicationMapping(metaData, databaseProduct);
+            migrateAsyncCompensationPayloadColumns(metaData, databaseProduct);
             return null;
         });
     }
@@ -85,6 +86,21 @@ public class SchemaMigrationRunner {
         log.info("schema table created table=loan_application_mapping");
     }
 
+    private void migrateAsyncCompensationPayloadColumns(DatabaseMetaData metaData, String databaseProduct)
+            throws SQLException {
+        if (!databaseProduct.contains("mysql")) {
+            return;
+        }
+        modifyColumnTypeIfNeeded(metaData, "async_compensation_task", "request_payload", "MEDIUMTEXT",
+                "mediumtext not null");
+        modifyColumnTypeIfNeeded(metaData, "async_compensation_task", "response_payload", "MEDIUMTEXT",
+                "mediumtext");
+        modifyColumnTypeIfNeeded(metaData, "async_compensation_attempt", "request_payload", "MEDIUMTEXT",
+                "mediumtext");
+        modifyColumnTypeIfNeeded(metaData, "async_compensation_attempt", "response_payload", "MEDIUMTEXT",
+                "mediumtext");
+    }
+
     private void renameColumnIfNeeded(
             DatabaseMetaData metaData,
             String databaseProduct,
@@ -110,6 +126,24 @@ public class SchemaMigrationRunner {
         }
         jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + columnDefinition);
         log.info("schema column added table={} column={}", tableName, columnName);
+    }
+
+    private void modifyColumnTypeIfNeeded(
+            DatabaseMetaData metaData,
+            String tableName,
+            String columnName,
+            String expectedTypeName,
+            String columnDefinition
+    ) throws SQLException {
+        if (!hasColumn(metaData, tableName, columnName)) {
+            return;
+        }
+        String currentTypeName = columnTypeName(metaData, tableName, columnName);
+        if (expectedTypeName.equalsIgnoreCase(currentTypeName)) {
+            return;
+        }
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " MODIFY COLUMN " + columnName + " " + columnDefinition);
+        log.info("schema column type modified table={} column={} type={}", tableName, columnName, expectedTypeName);
     }
 
     private void createIndexIfNeeded(
@@ -200,5 +234,14 @@ public class SchemaMigrationRunner {
             }
         }
         return false;
+    }
+
+    private String columnTypeName(DatabaseMetaData metaData, String tableName, String columnName) throws SQLException {
+        try (ResultSet columns = metaData.getColumns(null, null, tableName, columnName)) {
+            if (columns.next()) {
+                return columns.getString("TYPE_NAME");
+            }
+        }
+        return "";
     }
 }

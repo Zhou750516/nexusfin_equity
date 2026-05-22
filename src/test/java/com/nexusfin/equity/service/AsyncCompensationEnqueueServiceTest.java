@@ -83,6 +83,45 @@ class AsyncCompensationEnqueueServiceTest {
     }
 
     @Test
+    void shouldPreserveLargeImageInfoPayloadWhenTaskEnqueued() throws Exception {
+        AsyncCompensationProperties properties = new AsyncCompensationProperties();
+        properties.setPartitionCount(8);
+        properties.setMaxRetryCount(5);
+        AsyncCompensationEnqueueService service = new AsyncCompensationEnqueueServiceImpl(
+                taskRepository,
+                new AsyncCompensationPartitioner(properties),
+                properties,
+                new ObjectMapper()
+        );
+        String largeBack = largeBase64("BACK", 70000);
+        String largeFront = largeBase64("FRONT", 70000);
+        String largeNature = largeBase64("NATURE", 70000);
+
+        service.enqueue(new AsyncCompensationEnqueueService.EnqueueCommand(
+                "YUNKA_LOAN_APPLY_RETRY",
+                "LOAN_APPLY:APP-large-image",
+                "APP-large-image",
+                "YUNKA",
+                "/api/gateway/proxy",
+                "POST",
+                null,
+                largeLoanApplyRetry("LA-large-image", "APP-large-image", 2026041810,
+                        largeBack, largeFront, largeNature)
+        ));
+
+        ArgumentCaptor<AsyncCompensationTask> captor = ArgumentCaptor.forClass(AsyncCompensationTask.class);
+        verify(taskRepository).insert(captor.capture());
+        String requestPayload = captor.getValue().getRequestPayload();
+        assertThat(requestPayload.length()).isGreaterThan(65535);
+        assertThat(requestPayload)
+                .contains(largeBack)
+                .contains(largeFront)
+                .contains(largeNature)
+                .contains("\"imageInfo\"")
+                .contains("\"loanId\":2026041810");
+    }
+
+    @Test
     void shouldLogTraceableFieldsWhenDuplicateTaskIgnored(CapturedOutput output) throws Exception {
         AsyncCompensationProperties properties = new AsyncCompensationProperties();
         properties.setPartitionCount(8);
@@ -150,5 +189,43 @@ class AsyncCompensationEnqueueServiceTest {
                 objectMapper.readTree("{\"maritalStatus\":\"50002\"}"),
                 objectMapper.readTree("[{\"back\":\"BACK\",\"front\":\"FRONT\",\"nature\":\"NATURE\",\"type\":\"back,front,nature\"}]")
         );
+    }
+
+    private AsyncCompensationEnqueuePayload.YunkaLoanApplyRetry largeLoanApplyRetry(
+            String requestId,
+            String applicationId,
+            Integer loanId,
+            String back,
+            String front,
+            String nature
+    ) throws Exception {
+        return new AsyncCompensationEnqueuePayload.YunkaLoanApplyRetry(
+                requestId,
+                "/loan/apply",
+                applicationId,
+                "mem-001",
+                "user-001",
+                "BEN-001",
+                applicationId,
+                loanId,
+                300000L,
+                3,
+                "acc_001",
+                "13800138000",
+                "310101199001011111",
+                "张三",
+                "70006",
+                objectMapper.readTree("{\"monthlyIncome\":10000}"),
+                objectMapper.readTree("{\"name\":\"张三\",\"idno\":\"310101199001011111\"}"),
+                objectMapper.readTree("[{\"name\":\"李四\",\"phone\":\"13900139000\",\"relation\":\"80003\",\"sort\":1}]"),
+                objectMapper.readTree("{\"occupation\":\"20001\"}"),
+                objectMapper.readTree("{\"maritalStatus\":\"50002\"}"),
+                objectMapper.readTree("[{\"back\":\"" + back + "\",\"front\":\"" + front
+                        + "\",\"nature\":\"" + nature + "\",\"type\":\"back,front,nature\"}]")
+        );
+    }
+
+    private String largeBase64(String prefix, int size) {
+        return prefix + "-" + "A".repeat(size) + "-" + prefix + "-END";
     }
 }
