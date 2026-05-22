@@ -1,7 +1,9 @@
 package com.nexusfin.equity.thirdparty.yunka;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.exception.BizException;
@@ -10,6 +12,7 @@ import com.nexusfin.equity.exception.UpstreamTimeoutException;
 import com.nexusfin.equity.util.TraceIdUtil;
 import com.nexusfin.equity.util.UpstreamTimeoutDetector;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -101,6 +104,7 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
         String timestamp = timestampSupplier.get();
         String dataJson = toJson(request.data());
         String requestBodyJson = toJson(request);
+        String logRequestBodyJson = toLogJson(request);
         String signature = sign(dataJson, request.requestId(), timestamp);
         String xTimestamp = timestamp;
         String xRequestId = headerValue(request.requestId());
@@ -119,7 +123,7 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                 xRequestId,
                 signaturePrefix,
                 headerJson,
-                requestBodyJson);
+                logRequestBodyJson);
         try {
             byte[] responseBodyBytes = restClient.post()
                     .uri(yunkaProperties.gatewayPath())
@@ -149,11 +153,11 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                         ErrorCodes.YUNKA_RESPONSE_EMPTY,
                         "Yunka gateway returned empty response",
                         headerJson,
-                        requestBodyJson,
+                        logRequestBodyJson,
                         "null");
                 return null;
             }
-            String responseBodyJson = toJson(response);
+            String responseBodyJson = toLogJson(response);
             if (response.code() == 0) {
                 log.info("traceId={} requestId={} path={} appId={} xTimestamp={} xChannelCode={} xRequestId={} elapsedMs={} yunkaCode={} headerJson={} requestBodyJson={} responseBodyJson={} yunka gateway request success",
                         traceId,
@@ -166,7 +170,7 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                         elapsedMs,
                         response.code(),
                         headerJson,
-                        requestBodyJson,
+                        logRequestBodyJson,
                         responseBodyJson);
             } else {
                 log.warn("traceId={} requestId={} path={} appId={} xTimestamp={} xChannelCode={} xRequestId={} elapsedMs={} yunkaCode={} errorNo={} errorMsg={} headerJson={} requestBodyJson={} responseBodyJson={}",
@@ -182,7 +186,7 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                         ErrorCodes.YUNKA_UPSTREAM_REJECTED,
                         response.message(),
                         headerJson,
-                        requestBodyJson,
+                        logRequestBodyJson,
                         responseBodyJson);
             }
             return response;
@@ -201,7 +205,7 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                         ErrorCodes.YUNKA_UPSTREAM_TIMEOUT,
                         "Yunka gateway timeout",
                         headerJson,
-                        requestBodyJson,
+                        logRequestBodyJson,
                         "null");
                 throw new UpstreamTimeoutException("Yunka gateway timeout", exception);
             }
@@ -217,7 +221,7 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
                     ErrorCodes.YUNKA_UPSTREAM_FAILED,
                     exception.getMessage(),
                     headerJson,
-                    requestBodyJson,
+                    logRequestBodyJson,
                     "null");
             throw new BizException(ErrorCodes.YUNKA_UPSTREAM_FAILED, "Failed to call Yunka gateway");
         }
@@ -235,6 +239,62 @@ public class RestYunkaGatewayClient implements YunkaGatewayClient {
             return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException exception) {
             return "\"SERIALIZE_FAILED\"";
+        }
+    }
+
+    private String toLogJson(Object value) {
+        try {
+            JsonNode root = objectMapper.valueToTree(value);
+            redactImageFieldsRecursively(root);
+            return objectMapper.writeValueAsString(root);
+        } catch (JsonProcessingException | IllegalArgumentException exception) {
+            return "\"SERIALIZE_FAILED\"";
+        }
+    }
+
+    private void redactImageFieldsRecursively(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return;
+        }
+        if (node.isArray()) {
+            for (JsonNode item : node) {
+                redactImageFieldsRecursively(item);
+            }
+            return;
+        }
+        if (!(node instanceof ObjectNode objectNode)) {
+            return;
+        }
+        redactImageField(objectNode, "back");
+        redactImageField(objectNode, "front");
+        redactImageField(objectNode, "nature");
+        objectNode.fields().forEachRemaining(entry -> redactImageFieldsRecursively(entry.getValue()));
+    }
+
+    private void redactImageField(ObjectNode objectNode, String fieldName) {
+        JsonNode value = objectNode.path(fieldName);
+        if (value.isMissingNode() || value.isNull()) {
+            return;
+        }
+        String text = value.asText("");
+        ObjectNode summary = JsonNodeFactory.instance.objectNode();
+        summary.put("redacted", "IMAGE_BASE64");
+        summary.put("length", text.length());
+        summary.put("sha256Prefix", sha256Prefix(text));
+        objectNode.set(fieldName, summary);
+    }
+
+    private String sha256Prefix(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder();
+            for (int i = 0; i < Math.min(6, hash.length); i++) {
+                builder.append(String.format("%02x", hash[i]));
+            }
+            return builder.toString();
+        } catch (Exception exception) {
+            return "HASH_FAILED";
         }
     }
 

@@ -69,10 +69,22 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
                                 resolveOutboundUserId(mapping, payload),
                                 payload.benefitOrderNo(),
                                 payload.applyId(),
+                                payload.applyId(),
                                 payload.loanId(),
                                 centsToYuan(payload.loanAmount()),
                                 payload.loanPeriod(),
-                                payload.bankCardNo()
+                                payload.bankCardNo(),
+                                payload.bankCardNo(),
+                                payload.phone(),
+                                payload.idno(),
+                                payload.name(),
+                                payload.loanReason(),
+                                payload.basicInfo(),
+                                payload.idInfo(),
+                                payload.contactInfo(),
+                                payload.supplementInfo(),
+                                payload.optionInfo(),
+                                payload.imageInfo()
                         )
                 ),
                 gatewayResponse -> {
@@ -194,18 +206,40 @@ public class YunkaLoanApplyCompensationExecutor implements AsyncCompensationExec
             Integer loanId,
             Long loanAmount,
             Integer loanPeriod,
-            String bankCardNo
+            String bankCardNo,
+            String phone,
+            String idno,
+            String name,
+            String loanReason,
+            com.fasterxml.jackson.databind.JsonNode basicInfo,
+            com.fasterxml.jackson.databind.JsonNode idInfo,
+            com.fasterxml.jackson.databind.JsonNode contactInfo,
+            com.fasterxml.jackson.databind.JsonNode supplementInfo,
+            com.fasterxml.jackson.databind.JsonNode optionInfo,
+            com.fasterxml.jackson.databind.JsonNode imageInfo
     ) {
     }
 
     private record YunkaLoanApplyForwardData(
             String userId,
             String benefitOrderNo,
+            String platformBenefitOrderNo,
             String applyId,
             Integer loanId,
             java.math.BigDecimal loanAmount,
             Integer loanPeriod,
-            String bankCardNo
+            String bankCardNo,
+            String bankCardNum,
+            String phone,
+            String idno,
+            String name,
+            String loanReason,
+            com.fasterxml.jackson.databind.JsonNode basicInfo,
+            com.fasterxml.jackson.databind.JsonNode idInfo,
+            com.fasterxml.jackson.databind.JsonNode contactInfo,
+            com.fasterxml.jackson.databind.JsonNode supplementInfo,
+            com.fasterxml.jackson.databind.JsonNode optionInfo,
+            com.fasterxml.jackson.databind.JsonNode imageInfo
     ) {
     }
 }

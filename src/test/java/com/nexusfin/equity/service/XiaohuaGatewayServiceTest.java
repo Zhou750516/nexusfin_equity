@@ -7,6 +7,8 @@ import com.nexusfin.equity.exception.BizException;
 import com.nexusfin.equity.exception.ErrorCodes;
 import com.nexusfin.equity.service.impl.XiaohuaGatewayServiceImpl;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
+import com.nexusfin.equity.thirdparty.yunka.CreditImageQueryRequest;
+import com.nexusfin.equity.thirdparty.yunka.CreditImageQueryResponse;
 import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanRequest;
 import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanResponse;
 import com.nexusfin.equity.thirdparty.yunka.BenefitOrderSyncRequest;
@@ -201,6 +203,37 @@ class XiaohuaGatewayServiceTest {
         JsonNode forwarded = objectMapper.valueToTree(captor.getValue().data());
         assertThat(forwarded.path("userId").asText()).isEqualTo("mem-001");
         assertThat(forwarded.path("cid").asText()).isEqualTo("cid-001");
+    }
+
+    @Test
+    void shouldForwardImageTypesAndExposeCreditImagePayload() throws Exception {
+        JsonNode data = objectMapper.readTree("""
+                {
+                  "back": "BACK_BASE64",
+                  "front": "FRONT_BASE64",
+                  "nature": "NATURE_BASE64"
+                }
+                """);
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", data));
+
+        CreditImageQueryResponse response = gatewayService.queryCreditImages(
+                "REQ-IMAGE-001",
+                "BIZ-IMAGE-001",
+                new CreditImageQueryRequest("mem-001", "back,front,nature")
+        );
+
+        assertThat(response.payload().path("back").asText()).isEqualTo("BACK_BASE64");
+        assertThat(response.payload().path("front").asText()).isEqualTo("FRONT_BASE64");
+        assertThat(response.payload().path("nature").asText()).isEqualTo("NATURE_BASE64");
+
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> captor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(captor.capture());
+        assertThat(captor.getValue().path()).isEqualTo("/credit/image/query");
+        JsonNode forwarded = objectMapper.valueToTree(captor.getValue().data());
+        assertThat(forwarded.path("userId").asText()).isEqualTo("mem-001");
+        assertThat(forwarded.path("type").asText()).isEqualTo("back,front,nature");
     }
 
     @Test

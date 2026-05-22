@@ -26,9 +26,10 @@ class AsyncCompensationEnqueueServiceTest {
 
     @Mock
     private AsyncCompensationTaskRepository taskRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void shouldLogTraceableFieldsWhenTaskEnqueued(CapturedOutput output) {
+    void shouldLogTraceableFieldsWhenTaskEnqueued(CapturedOutput output) throws Exception {
         AsyncCompensationProperties properties = new AsyncCompensationProperties();
         properties.setPartitionCount(8);
         properties.setMaxRetryCount(5);
@@ -47,19 +48,7 @@ class AsyncCompensationEnqueueServiceTest {
                 "/api/gateway/proxy",
                 "POST",
                 null,
-                new AsyncCompensationEnqueuePayload.YunkaLoanApplyRetry(
-                        "LA-001",
-                        "/loan/apply",
-                        "APP-20260418-001",
-                        "mem-001",
-                        "user-001",
-                        "BEN-001",
-                        "APP-20260418-001",
-                        2026041801,
-                        300000L,
-                        3,
-                        "acc_001"
-                )
+                loanApplyRetry("LA-001", "APP-20260418-001", 2026041801)
         ));
 
         ArgumentCaptor<AsyncCompensationTask> captor = ArgumentCaptor.forClass(AsyncCompensationTask.class);
@@ -74,7 +63,11 @@ class AsyncCompensationEnqueueServiceTest {
                 .contains("\"bizOrderNo\":\"APP-20260418-001\"")
                 .contains("\"loanId\":2026041801")
                 .contains("\"loanAmount\":300000")
-                .contains("\"loanPeriod\":3");
+                .contains("\"loanPeriod\":3")
+                .contains("\"loanReason\":\"70006\"")
+                .contains("\"basicInfo\"")
+                .contains("\"imageInfo\"")
+                .contains("\"back\":\"BACK\"");
         assertThat(output)
                 .contains("traceId=")
                 .contains("bizOrderNo=APP-20260418-001")
@@ -84,11 +77,13 @@ class AsyncCompensationEnqueueServiceTest {
                 .contains("targetCode=YUNKA")
                 .contains("requestPath=/api/gateway/proxy")
                 .contains("requestPayload={\"requestId\":\"LA-001\"")
+                .contains("\"back\":{\"redacted\":\"IMAGE_BASE64\"")
+                .doesNotContain("\"back\":\"BACK\"")
                 .contains("async compensation task enqueued");
     }
 
     @Test
-    void shouldLogTraceableFieldsWhenDuplicateTaskIgnored(CapturedOutput output) {
+    void shouldLogTraceableFieldsWhenDuplicateTaskIgnored(CapturedOutput output) throws Exception {
         AsyncCompensationProperties properties = new AsyncCompensationProperties();
         properties.setPartitionCount(8);
         properties.setMaxRetryCount(5);
@@ -108,19 +103,7 @@ class AsyncCompensationEnqueueServiceTest {
                 "/api/gateway/proxy",
                 "POST",
                 null,
-                new AsyncCompensationEnqueuePayload.YunkaLoanApplyRetry(
-                        "LA-002",
-                        "/loan/apply",
-                        "APP-20260418-duplicate",
-                        "mem-001",
-                        "user-001",
-                        "BEN-001",
-                        "APP-20260418-duplicate",
-                        2026041802,
-                        300000L,
-                        3,
-                        "acc_001"
-                )
+                loanApplyRetry("LA-002", "APP-20260418-duplicate", 2026041802)
         ))).doesNotThrowAnyException();
 
         verify(taskRepository).insert(any());
@@ -132,8 +115,40 @@ class AsyncCompensationEnqueueServiceTest {
                 .contains("targetCode=YUNKA")
                 .contains("requestPath=/api/gateway/proxy")
                 .contains("requestPayload={\"requestId\":\"LA-002\"")
+                .contains("\"back\":{\"redacted\":\"IMAGE_BASE64\"")
+                .doesNotContain("\"back\":\"BACK\"")
                 .contains("errorNo=ASYNC_COMPENSATION_DUPLICATED")
                 .contains("errorMsg=Async compensation task duplicated")
                 .contains("async compensation task duplicated, ignored");
+    }
+
+    private AsyncCompensationEnqueuePayload.YunkaLoanApplyRetry loanApplyRetry(
+            String requestId,
+            String applicationId,
+            Integer loanId
+    ) throws Exception {
+        return new AsyncCompensationEnqueuePayload.YunkaLoanApplyRetry(
+                requestId,
+                "/loan/apply",
+                applicationId,
+                "mem-001",
+                "user-001",
+                "BEN-001",
+                applicationId,
+                loanId,
+                300000L,
+                3,
+                "acc_001",
+                "13800138000",
+                "310101199001011111",
+                "张三",
+                "70006",
+                objectMapper.readTree("{\"monthlyIncome\":10000}"),
+                objectMapper.readTree("{\"name\":\"张三\",\"idno\":\"310101199001011111\"}"),
+                objectMapper.readTree("[{\"name\":\"李四\",\"phone\":\"13900139000\",\"relation\":\"80003\",\"sort\":1}]"),
+                objectMapper.readTree("{\"occupation\":\"20001\"}"),
+                objectMapper.readTree("{\"maritalStatus\":\"50002\"}"),
+                objectMapper.readTree("[{\"back\":\"BACK\",\"front\":\"FRONT\",\"nature\":\"NATURE\",\"type\":\"back,front,nature\"}]")
+        );
     }
 }

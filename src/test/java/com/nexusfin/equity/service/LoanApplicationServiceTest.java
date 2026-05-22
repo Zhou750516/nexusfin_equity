@@ -84,19 +84,13 @@ class LoanApplicationServiceTest {
         when(loanApplicationGateway.findLatestPendingMapping("mem-test-001")).thenReturn(null);
         when(benefitOrderService.createLocalOrder(eq("mem-test-001"), any()))
                 .thenReturn(new CreateBenefitOrderResponse("BEN-001", "FIRST_DEDUCT_PENDING", "/redirect"));
-        when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
-                0,
-                "SUCCESS",
-                objectMapper.readTree("""
-                        {
-                          "loanId": 20260521,
-                          "status": "4002",
-                          "remark": "处理中"
-                        }
-                        """)
-        ));
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(successfulUserQueryResponse())
+                .thenReturn(successfulImageQueryResponse())
+                .thenReturn(successfulLoanApplyResponse(20260521));
 
-        LoanApplyResponse response = loanApplicationService.apply("mem-test-001", "cid-test-001", buildApplyRequest());
+        LoanApplyResponse response = loanApplicationService.apply("mem-test-001", "cid-test-001",
+                buildApplyRequestWithSparseDocumentFields("PBEN-SHOULD-NOT-BE-FORWARDED"));
 
         assertThat(response.applicationId()).startsWith("APP-");
         assertThat(response.status()).isEqualTo("pending");
@@ -112,21 +106,42 @@ class LoanApplicationServiceTest {
 
         ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> yunkaCaptor =
                 ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
-        verify(yunkaGatewayClient).proxy(yunkaCaptor.capture());
-        JsonNode forwardData = objectMapper.valueToTree(yunkaCaptor.getValue().data());
+        verify(yunkaGatewayClient, org.mockito.Mockito.times(3)).proxy(yunkaCaptor.capture());
+        assertThat(yunkaCaptor.getAllValues()).hasSize(3);
+        assertThat(yunkaCaptor.getAllValues().get(0).path()).isEqualTo("/user/query");
+        assertThat(yunkaCaptor.getAllValues().get(1).path()).isEqualTo("/credit/image/query");
+        assertThat(yunkaCaptor.getAllValues().get(2).path()).isEqualTo("/loan/apply");
+        JsonNode userQueryData = objectMapper.valueToTree(yunkaCaptor.getAllValues().get(0).data());
+        assertThat(userQueryData.path("userId").asText()).isEqualTo("mem-test-001");
+        assertThat(userQueryData.path("cid").asText()).isEqualTo("cid-test-001");
+        JsonNode imageQueryData = objectMapper.valueToTree(yunkaCaptor.getAllValues().get(1).data());
+        assertThat(imageQueryData.path("userId").asText()).isEqualTo("mem-test-001");
+        assertThat(imageQueryData.path("type").asText()).isEqualTo("back,front,nature");
+
+        JsonNode forwardData = objectMapper.valueToTree(yunkaCaptor.getAllValues().get(2).data());
         assertThat(forwardData.path("userId").asText()).isEqualTo("mem-test-001");
         assertThat(forwardData.path("userId").asText()).isNotEqualTo("cid-test-001");
         assertThat(forwardData.has("uid")).isFalse();
-        assertThat(forwardData.path("purpose").asText()).isEqualTo("rent");
-        assertThat(forwardData.path("loanReason").asText()).isEqualTo("DAILY_CONSUMPTION");
+        assertThat(forwardData.has("purpose")).isFalse();
+        assertThat(forwardData.path("loanReason").asText()).isEqualTo("70006");
         assertThat(forwardData.path("bankCardNum").asText()).isEqualTo("6222020202028648");
-        assertThat(forwardData.path("platformBenefitOrderNo").asText()).isEqualTo("PBEN-001");
+        assertThat(forwardData.path("platformBenefitOrderNo").asText()).isEqualTo(response.applicationId());
         assertThat(forwardData.path("loanId").isInt()).isTrue();
         assertThat(forwardData.path("loanId").asInt()).isPositive();
         assertThat(forwardData.path("loanAmount").decimalValue()).isEqualByComparingTo("3000.00");
-        assertThat(forwardData.path("basicInfo").path("education").asText()).isEqualTo("BACHELOR");
+        assertThat(forwardData.path("phone").asText()).isEqualTo("13800138000");
+        assertThat(forwardData.path("idno").asText()).isEqualTo("310101199001011111");
+        assertThat(forwardData.path("name").asText()).isEqualTo("张三");
+        assertThat(forwardData.path("basicInfo").path("monthlyIncome").asInt()).isEqualTo(10000);
+        assertThat(forwardData.path("idInfo").path("idno").asText()).isEqualTo("310101199001011111");
         assertThat(forwardData.path("contactInfo").isArray()).isTrue();
+        assertThat(forwardData.path("supplementInfo").path("occupation").asText()).isEqualTo("20001");
+        assertThat(forwardData.path("optionInfo").path("maritalStatus").asText()).isEqualTo("50002");
         assertThat(forwardData.path("imageInfo").isArray()).isTrue();
+        assertThat(forwardData.path("imageInfo").get(0).path("back").asText()).isEqualTo("BACK_BASE64_LONG_VALUE");
+        assertThat(forwardData.path("imageInfo").get(0).path("front").asText()).isEqualTo("FRONT_BASE64_LONG_VALUE");
+        assertThat(forwardData.path("imageInfo").get(0).path("nature").asText()).isEqualTo("NATURE_BASE64_LONG_VALUE");
+        assertThat(forwardData.path("imageInfo").get(0).path("type").asText()).isEqualTo("back,front,nature");
 
         ArgumentCaptor<LoanApplicationGateway.SaveCommand> saveCaptor =
                 ArgumentCaptor.forClass(LoanApplicationGateway.SaveCommand.class);
@@ -136,30 +151,24 @@ class LoanApplicationServiceTest {
         assertThat(saveCaptor.getValue().applicationId()).isEqualTo(response.applicationId());
         assertThat(saveCaptor.getValue().benefitOrderNo()).isEqualTo("BEN-001");
         assertThat(saveCaptor.getValue().platformLoanId()).isEqualTo(20260521);
-        assertThat(saveCaptor.getValue().purpose()).isEqualTo("rent");
+        assertThat(saveCaptor.getValue().purpose()).isEqualTo("shopping");
         assertThat(saveCaptor.getValue().mappingStatus()).isEqualTo("ACTIVE");
     }
 
     @Test
-    void shouldAllowLoanApplyWithoutPlatformBenefitOrderNoAndForwardMissingValueToYunka() throws Exception {
+    void shouldFillPlatformBenefitOrderNoFromGeneratedApplicationIdWhenRequestValueIsMissing() throws Exception {
         when(loanApplicationGateway.findLatestPendingMapping("mem-test-001")).thenReturn(null);
         when(benefitOrderService.createLocalOrder(eq("mem-test-001"), any()))
                 .thenReturn(new CreateBenefitOrderResponse("BEN-NO-PBO", "FIRST_DEDUCT_PENDING", "/redirect"));
-        when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
-                0,
-                "SUCCESS",
-                objectMapper.readTree("""
-                        {
-                          "loanId": 20260522,
-                          "remark": "处理中"
-                        }
-                        """)
-        ));
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(successfulUserQueryResponse())
+                .thenReturn(successfulImageQueryResponse())
+                .thenReturn(successfulLoanApplyResponse(20260522));
 
         LoanApplyResponse response = loanApplicationService.apply(
                 "mem-test-001",
                 "cid-test-001",
-                buildApplyRequest(null)
+                buildApplyRequestWithSparseDocumentFields(null)
         );
 
         assertThat(response.status()).isEqualTo("pending");
@@ -169,11 +178,12 @@ class LoanApplicationServiceTest {
         verify(benefitOrderService, never()).createOrder(any(), any());
         ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> yunkaCaptor =
                 ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
-        verify(yunkaGatewayClient).proxy(yunkaCaptor.capture());
-        JsonNode forwardData = objectMapper.valueToTree(yunkaCaptor.getValue().data());
+        verify(yunkaGatewayClient, org.mockito.Mockito.times(3)).proxy(yunkaCaptor.capture());
+        JsonNode forwardData = objectMapper.valueToTree(yunkaCaptor.getAllValues().get(2).data());
         assertThat(forwardData.path("userId").asText()).isEqualTo("mem-test-001");
         assertThat(forwardData.has("platformBenefitOrderNo")).isTrue();
-        assertThat(forwardData.path("platformBenefitOrderNo").isNull()).isTrue();
+        assertThat(forwardData.path("platformBenefitOrderNo").asText()).isEqualTo(response.applicationId());
+        assertThat(forwardData.path("applyId").asText()).isEqualTo(response.applicationId());
 
         ArgumentCaptor<LoanApplicationGateway.SaveCommand> saveCaptor =
                 ArgumentCaptor.forClass(LoanApplicationGateway.SaveCommand.class);
@@ -187,11 +197,14 @@ class LoanApplicationServiceTest {
         when(loanApplicationGateway.findLatestPendingMapping("mem-test-001")).thenReturn(null);
         when(benefitOrderService.createLocalOrder(eq("mem-test-001"), any()))
                 .thenReturn(new CreateBenefitOrderResponse("BEN-REJECT", "FIRST_DEDUCT_PENDING", "/redirect"));
-        when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
-                10003,
-                "invalid loan state",
-                objectMapper.readTree("{}")
-        ));
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(successfulUserQueryResponse())
+                .thenReturn(successfulImageQueryResponse())
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                        10003,
+                        "invalid loan state",
+                        objectMapper.readTree("{}")
+                ));
 
         LoanApplyResponse response = loanApplicationService.apply("mem-test-001", "cid-test-001", buildApplyRequest());
 
@@ -202,7 +215,7 @@ class LoanApplicationServiceTest {
         assertThat(output)
                 .contains("scene=loan apply")
                 .contains("errorNo=YUNKA_UPSTREAM_REJECTED")
-                .doesNotContain("yunka request success");
+                .contains("path=/loan/apply");
         assertThat(countOccurrences(output.getOut(), "errorNo=YUNKA_UPSTREAM_REJECTED")).isEqualTo(1);
     }
 
@@ -213,6 +226,8 @@ class LoanApplicationServiceTest {
         when(benefitOrderService.createLocalOrder(eq("mem-test-001"), any()))
                 .thenReturn(new CreateBenefitOrderResponse("BEN-TIMEOUT", "FIRST_DEDUCT_PENDING", "/redirect"));
         when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(successfulUserQueryResponse())
+                .thenReturn(successfulImageQueryResponse())
                 .thenThrow(new UpstreamTimeoutException("Yunka gateway timeout"));
 
         LoanApplyResponse response = loanApplicationService.apply("mem-test-001", "cid-test-001", buildApplyRequest());
@@ -252,6 +267,68 @@ class LoanApplicationServiceTest {
                 .contains("scene=loan apply")
                 .contains("errorNo=YUNKA_UPSTREAM_TIMEOUT");
         assertThat(countOccurrences(output.getOut(), "errorNo=YUNKA_UPSTREAM_TIMEOUT")).isEqualTo(1);
+    }
+
+    @Test
+    void shouldNotSendLoanApplyWhenUserQueryRequiredFieldsAreMissing(CapturedOutput output) throws Exception {
+        when(loanApplicationGateway.findLatestPendingMapping("mem-test-001")).thenReturn(null);
+        when(benefitOrderService.createLocalOrder(eq("mem-test-001"), any()))
+                .thenReturn(new CreateBenefitOrderResponse("BEN-USER-MISSING", "FIRST_DEDUCT_PENDING", "/redirect"));
+        when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                0,
+                "SUCCESS",
+                objectMapper.readTree("""
+                        {
+                          "idInfo": {"name": "张三", "idno": "310101199001011111", "phone": "13800138000"},
+                          "contactInfo": [],
+                          "supplementInfo": {"occupation": "20001"},
+                          "optionInfo": {"maritalStatus": "50002"}
+                        }
+                        """)
+        ));
+
+        LoanApplyResponse response = loanApplicationService.apply("mem-test-001", "cid-test-001",
+                buildApplyRequestWithSparseDocumentFields(null));
+
+        assertThat(response.status()).isEqualTo("loan_failed");
+        assertThat(response.message()).contains("LOAN_APPLY_USER_PROFILE_INCOMPLETE");
+        assertThat(output)
+                .contains("benefitOrderNo=BEN-USER-MISSING")
+                .contains("errorNo=LOAN_APPLY_USER_PROFILE_INCOMPLETE")
+                .contains("errorMsg=basicInfo is required for loan apply");
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> yunkaCaptor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(yunkaCaptor.capture());
+        assertThat(yunkaCaptor.getValue().path()).isEqualTo("/user/query");
+    }
+
+    @Test
+    void shouldNotSendLoanApplyWhenCreditImagesAreMissing(CapturedOutput output) throws Exception {
+        when(loanApplicationGateway.findLatestPendingMapping("mem-test-001")).thenReturn(null);
+        when(benefitOrderService.createLocalOrder(eq("mem-test-001"), any()))
+                .thenReturn(new CreateBenefitOrderResponse("BEN-IMAGE-MISSING", "FIRST_DEDUCT_PENDING", "/redirect"));
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(successfulUserQueryResponse())
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                        0,
+                        "SUCCESS",
+                        objectMapper.readTree("{}")
+                ));
+
+        LoanApplyResponse response = loanApplicationService.apply("mem-test-001", "cid-test-001",
+                buildApplyRequestWithSparseDocumentFields(null));
+
+        assertThat(response.status()).isEqualTo("loan_failed");
+        assertThat(response.message()).contains("LOAN_APPLY_IMAGE_INFO_MISSING");
+        assertThat(output)
+                .contains("benefitOrderNo=BEN-IMAGE-MISSING")
+                .contains("errorNo=LOAN_APPLY_IMAGE_INFO_MISSING")
+                .contains("errorMsg=credit image query data is required for loan apply");
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> yunkaCaptor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient, org.mockito.Mockito.times(2)).proxy(yunkaCaptor.capture());
+        assertThat(yunkaCaptor.getAllValues().get(0).path()).isEqualTo("/user/query");
+        assertThat(yunkaCaptor.getAllValues().get(1).path()).isEqualTo("/credit/image/query");
     }
 
     @Test
@@ -339,6 +416,89 @@ class LoanApplicationServiceTest {
                         [{"type":"FACE","base64":"abc"}]
                         """),
                 platformBenefitOrderNo
+        );
+    }
+
+    private LoanApplyRequest buildApplyRequestWithSparseDocumentFields(String platformBenefitOrderNo) throws Exception {
+        return new LoanApplyRequest(
+                3000L,
+                299L,
+                3,
+                "acc_001",
+                List.of("loan", "user"),
+                "shopping",
+                null,
+                "6222020202028648",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                platformBenefitOrderNo
+        );
+    }
+
+    private YunkaGatewayClient.YunkaGatewayResponse successfulUserQueryResponse() throws Exception {
+        return new YunkaGatewayClient.YunkaGatewayResponse(
+                0,
+                "SUCCESS",
+                objectMapper.readTree("""
+                        {
+                          "userId": "mem-test-001",
+                          "phone": "13800138000",
+                          "basicInfo": {
+                            "monthlyIncome": 10000,
+                            "addressProvince": "上海",
+                            "addressCity": "上海市",
+                            "addressDistrict": "浦东新区",
+                            "addressDetail": "世纪大道1号"
+                          },
+                          "idInfo": {
+                            "name": "张三",
+                            "idno": "310101199001011111",
+                            "gender": 1,
+                            "address": "上海市浦东新区",
+                            "issuedBy": "上海公安",
+                            "validStartDate": "2017.08.21",
+                            "validEndDate": "2037.08.21",
+                            "nation": "汉"
+                          },
+                          "contactInfo": [
+                            {"name": "李四", "phone": "13900139000", "relation": "80003", "sort": 1}
+                          ],
+                          "supplementInfo": {"occupation": "20001"},
+                          "optionInfo": {"maritalStatus": "50002"}
+                        }
+                        """)
+        );
+    }
+
+    private YunkaGatewayClient.YunkaGatewayResponse successfulImageQueryResponse() throws Exception {
+        return new YunkaGatewayClient.YunkaGatewayResponse(
+                0,
+                "SUCCESS",
+                objectMapper.readTree("""
+                        {
+                          "back": "BACK_BASE64_LONG_VALUE",
+                          "front": "FRONT_BASE64_LONG_VALUE",
+                          "nature": "NATURE_BASE64_LONG_VALUE"
+                        }
+                        """)
+        );
+    }
+
+    private YunkaGatewayClient.YunkaGatewayResponse successfulLoanApplyResponse(Integer loanId) throws Exception {
+        return new YunkaGatewayClient.YunkaGatewayResponse(
+                0,
+                "SUCCESS",
+                objectMapper.readTree("""
+                        {
+                          "loanId": %d,
+                          "status": "4002",
+                          "remark": "处理中"
+                        }
+                        """.formatted(loanId))
         );
     }
 

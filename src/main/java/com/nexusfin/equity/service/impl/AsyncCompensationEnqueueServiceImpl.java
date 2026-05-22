@@ -1,7 +1,10 @@
 package com.nexusfin.equity.service.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.nexusfin.equity.config.AsyncCompensationProperties;
 import com.nexusfin.equity.entity.AsyncCompensationTask;
 import com.nexusfin.equity.enums.AsyncCompensationTaskStatusEnum;
@@ -13,6 +16,8 @@ import com.nexusfin.equity.service.AsyncCompensationEnqueueService;
 import com.nexusfin.equity.util.AsyncCompensationPartitioner;
 import com.nexusfin.equity.util.RequestIdUtil;
 import com.nexusfin.equity.util.TraceIdUtil;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +62,7 @@ public class AsyncCompensationEnqueueServiceImpl implements AsyncCompensationEnq
         task.setRequestHeaders(command.requestHeaders());
         String requestPayload = serializePayload(command.requestPayload());
         task.setRequestPayload(requestPayload);
+        String logRequestPayload = sanitizePayloadForLog(requestPayload);
         task.setRetryCount(0);
         task.setMaxRetryCount(properties.getMaxRetryCount());
         task.setCreatedTs(now);
@@ -73,7 +79,7 @@ public class AsyncCompensationEnqueueServiceImpl implements AsyncCompensationEnq
                     task.getPartitionNo(),
                     task.getTargetCode(),
                     task.getRequestPath(),
-                    task.getRequestPayload());
+                    logRequestPayload);
         } catch (DuplicateKeyException exception) {
             log.warn("traceId={} bizOrderNo={} taskId={} taskType={} bizKey={} partitionNo={} targetCode={} "
                             + "requestPath={} requestPayload={} errorNo={} errorMsg={} async compensation task duplicated, ignored",
@@ -85,7 +91,7 @@ public class AsyncCompensationEnqueueServiceImpl implements AsyncCompensationEnq
                     task.getPartitionNo(),
                     task.getTargetCode(),
                     task.getRequestPath(),
-                    task.getRequestPayload(),
+                    logRequestPayload,
                     ErrorCodes.ASYNC_COMPENSATION_DUPLICATED,
                     "Async compensation task duplicated");
         }
@@ -99,6 +105,68 @@ public class AsyncCompensationEnqueueServiceImpl implements AsyncCompensationEnq
                     "ASYNC_COMPENSATION_PAYLOAD_SERIALIZE_FAILED",
                     "Failed to serialize async compensation payload"
             );
+        }
+    }
+
+    private String sanitizePayloadForLog(String requestPayload) {
+        if (requestPayload == null || requestPayload.isBlank()) {
+            return requestPayload;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(requestPayload);
+            redactImageInfo(root.path("imageInfo"));
+            return objectMapper.writeValueAsString(root);
+        } catch (JsonProcessingException exception) {
+            return requestPayload;
+        }
+    }
+
+    private void redactImageInfo(JsonNode imageInfo) {
+        if (imageInfo == null || imageInfo.isMissingNode() || imageInfo.isNull()) {
+            return;
+        }
+        if (imageInfo.isArray()) {
+            for (JsonNode item : imageInfo) {
+                redactImageFields(item);
+            }
+            return;
+        }
+        redactImageFields(imageInfo);
+    }
+
+    private void redactImageFields(JsonNode node) {
+        if (!(node instanceof ObjectNode objectNode)) {
+            return;
+        }
+        redactImageField(objectNode, "back");
+        redactImageField(objectNode, "front");
+        redactImageField(objectNode, "nature");
+    }
+
+    private void redactImageField(ObjectNode objectNode, String fieldName) {
+        JsonNode value = objectNode.path(fieldName);
+        if (value.isMissingNode() || value.isNull()) {
+            return;
+        }
+        String text = value.asText("");
+        ObjectNode summary = JsonNodeFactory.instance.objectNode();
+        summary.put("redacted", "IMAGE_BASE64");
+        summary.put("length", text.length());
+        summary.put("sha256Prefix", sha256Prefix(text));
+        objectNode.set(fieldName, summary);
+    }
+
+    private String sha256Prefix(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder();
+            for (int i = 0; i < Math.min(6, hash.length); i++) {
+                builder.append(String.format("%02x", hash[i]));
+            }
+            return builder.toString();
+        } catch (Exception exception) {
+            return "HASH_FAILED";
         }
     }
 }

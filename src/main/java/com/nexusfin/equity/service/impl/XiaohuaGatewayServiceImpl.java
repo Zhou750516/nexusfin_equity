@@ -177,7 +177,7 @@ public class XiaohuaGatewayServiceImpl implements XiaohuaGatewayService {
                 ));
             }
         }
-        return new CreditImageQueryResponse(images);
+        return new CreditImageQueryResponse(data, images);
     }
 
     @Override

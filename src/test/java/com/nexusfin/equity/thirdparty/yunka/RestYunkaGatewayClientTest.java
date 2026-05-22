@@ -155,6 +155,58 @@ class RestYunkaGatewayClientTest {
     }
 
     @Test
+    void shouldRedactLoanApplyImageInfoInLogsButSendOriginalPayload(CapturedOutput output) {
+        TraceIdUtil.bindTraceId("TRACE-IMAGE-REDACT-001");
+        String timestamp = "1746955200124";
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        server.expect(requestTo("http://127.0.0.1:18081/api/gateway/proxy"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(request -> assertThat(((MockClientHttpRequest) request).getBodyAsString())
+                        .contains("\"back\":\"BACK_FULL_BASE64_SHOULD_BE_SENT\"")
+                        .contains("\"front\":\"FRONT_FULL_BASE64_SHOULD_BE_SENT\"")
+                        .contains("\"nature\":\"NATURE_FULL_BASE64_SHOULD_BE_SENT\""))
+                .andRespond(withSuccess("""
+                        {
+                          "code": 0,
+                          "message": "OK",
+                          "requestId": "REQ-IMAGE-001",
+                          "data": {}
+                        }
+                        """, MediaType.APPLICATION_JSON));
+        RestYunkaGatewayClient client = new RestYunkaGatewayClient(
+                yunkaProperties("REST", "http://127.0.0.1:18081"),
+                restClientBuilder.baseUrl("http://127.0.0.1:18081").build(),
+                () -> timestamp
+        );
+
+        client.proxy(new YunkaGatewayClient.YunkaGatewayRequest(
+                "REQ-IMAGE-001",
+                "/loan/apply",
+                JsonNodeFactory.instance.objectNode()
+                        .put("loanId", 20260522)
+                        .set("imageInfo", JsonNodeFactory.instance.arrayNode()
+                                .add(JsonNodeFactory.instance.objectNode()
+                                        .put("type", "back,front,nature")
+                                        .put("back", "BACK_FULL_BASE64_SHOULD_BE_SENT")
+                                        .put("front", "FRONT_FULL_BASE64_SHOULD_BE_SENT")
+                                        .put("nature", "NATURE_FULL_BASE64_SHOULD_BE_SENT")))
+        ));
+
+        assertThat(output).contains("requestBodyJson=");
+        assertThat(output).contains("\"imageInfo\"");
+        assertThat(output).contains("\"back\":{\"redacted\":\"IMAGE_BASE64\"");
+        assertThat(output).contains("\"front\":{\"redacted\":\"IMAGE_BASE64\"");
+        assertThat(output).contains("\"nature\":{\"redacted\":\"IMAGE_BASE64\"");
+        assertThat(output).contains("\"length\":31");
+        assertThat(output).contains("\"sha256Prefix\":");
+        assertThat(output).doesNotContain("BACK_FULL_BASE64_SHOULD_BE_SENT");
+        assertThat(output).doesNotContain("FRONT_FULL_BASE64_SHOULD_BE_SENT");
+        assertThat(output).doesNotContain("NATURE_FULL_BASE64_SHOULD_BE_SENT");
+        server.verify();
+    }
+
+    @Test
     void shouldRejectUnsupportedModeAtConstructionTime() {
         assertThatThrownBy(() -> new RestYunkaGatewayClient(
                 yunkaProperties("BROKEN", "http://127.0.0.1:18081"),
