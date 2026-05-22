@@ -784,6 +784,8 @@ class QwBenefitClientImplTest {
         Object restClient = readField(client, "restClient");
 
         assertThat(requestFactory).isInstanceOf(SimpleClientHttpRequestFactory.class);
+        assertThat(readField(requestFactory, "connectTimeout")).isEqualTo(5000);
+        assertThat(readField(requestFactory, "readTimeout")).isEqualTo(5000);
         assertThat(restClient).isInstanceOf(RestClient.class);
     }
 

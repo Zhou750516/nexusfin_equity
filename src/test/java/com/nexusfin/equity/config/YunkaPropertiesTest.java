@@ -37,6 +37,14 @@ class YunkaPropertiesTest {
     }
 
     @Test
+    void shouldBindDefaultTimeoutsFromApplicationYaml() throws IOException {
+        YunkaProperties properties = bindApplicationDefaults();
+
+        assertThat(properties.connectTimeoutMs()).isEqualTo(5000);
+        assertThat(properties.readTimeoutMs()).isEqualTo(5000);
+    }
+
+    @Test
     void shouldKeepApplicationDefaultsAlignedWithLocalStubContractPaths() throws IOException {
         YunkaProperties.Paths paths = bindApplicationDefaults().paths();
 

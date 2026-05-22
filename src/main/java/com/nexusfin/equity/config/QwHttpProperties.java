@@ -7,8 +7,8 @@ public class QwHttpProperties {
 
     private String baseUrl = "https://t-api.test.qweimobile.com";
     private String methodPath = "/api/abs/method";
-    private int connectTimeoutMs = 2000;
-    private int readTimeoutMs = 3000;
+    private int connectTimeoutMs = OutboundHttpTimeoutDefaults.FIVE_SECONDS_MS;
+    private int readTimeoutMs = OutboundHttpTimeoutDefaults.FIVE_SECONDS_MS;
     private boolean logPlaintextPayload = false;
     private boolean logFullPlaintextPayload = false;
     private List<String> logFullPlaintextPayloadAllowedProfiles = new ArrayList<>(List.of("test", "mysql-it", "local"));

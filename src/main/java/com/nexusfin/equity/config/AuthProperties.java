@@ -9,8 +9,8 @@ public class AuthProperties {
 
     private String techPlatformBaseUrl;
     private String techPlatformUserMePath;
-    private int connectTimeoutMs = 2000;
-    private int readTimeoutMs = 3000;
+    private int connectTimeoutMs = OutboundHttpTimeoutDefaults.FIVE_SECONDS_MS;
+    private int readTimeoutMs = OutboundHttpTimeoutDefaults.FIVE_SECONDS_MS;
     private int retryMaxAttempts = 2;
     private String defaultChannelCode = "KJ";
     private String defaultRedirectUrl = "/equity/index";

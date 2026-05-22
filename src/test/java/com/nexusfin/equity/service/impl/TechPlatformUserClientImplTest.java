@@ -4,6 +4,7 @@ import com.nexusfin.equity.config.AuthProperties;
 import com.nexusfin.equity.dto.response.TechPlatformUserProfileResponse;
 import com.nexusfin.equity.exception.BizException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.lang.reflect.Method;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -11,6 +12,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -59,6 +61,16 @@ class TechPlatformUserClientImplTest {
 
         assertThat(response.userId()).isEqualTo("tech-user-001");
         server.verify();
+    }
+
+    @Test
+    void shouldConfigureDefaultRequestFactoryTimeoutsToFiveSeconds() throws Exception {
+        AuthProperties authProperties = new AuthProperties();
+
+        SimpleClientHttpRequestFactory requestFactory = invokeRequestFactory(authProperties);
+
+        assertThat(readField(requestFactory, "connectTimeout")).isEqualTo(5000);
+        assertThat(readField(requestFactory, "readTimeout")).isEqualTo(5000);
     }
 
     @Test
@@ -119,8 +131,18 @@ class TechPlatformUserClientImplTest {
         AuthProperties authProperties = new AuthProperties();
         authProperties.setTechPlatformBaseUrl("https://tech-platform.test");
         authProperties.setTechPlatformUserMePath("/api/users/me");
-        authProperties.setConnectTimeoutMs(2000);
-        authProperties.setReadTimeoutMs(3000);
         return authProperties;
+    }
+
+    private SimpleClientHttpRequestFactory invokeRequestFactory(AuthProperties properties) throws Exception {
+        Method method = TechPlatformUserClientImpl.class.getDeclaredMethod("requestFactory", AuthProperties.class);
+        method.setAccessible(true);
+        return (SimpleClientHttpRequestFactory) method.invoke(null, properties);
+    }
+
+    private Object readField(Object target, String fieldName) throws Exception {
+        var field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.get(target);
     }
 }

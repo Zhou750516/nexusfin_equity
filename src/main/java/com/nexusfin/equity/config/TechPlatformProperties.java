@@ -16,8 +16,8 @@ public class TechPlatformProperties {
     private String aesAlgorithm = "AES/ECB/PKCS5Padding";
     private int gcmTagBits = 128;
     private int ivLengthBytes = 12;
-    private int connectTimeoutMs = 2000;
-    private int readTimeoutMs = 3000;
+    private int connectTimeoutMs = OutboundHttpTimeoutDefaults.FIVE_SECONDS_MS;
+    private int readTimeoutMs = OutboundHttpTimeoutDefaults.FIVE_SECONDS_MS;
     private Paths paths = new Paths();
 
     public boolean isEnabled() {

@@ -4,12 +4,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.config.TechPlatformProperties;
 import com.nexusfin.equity.exception.BizException;
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.mock.http.client.MockClientHttpRequest;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -73,6 +75,16 @@ class TechPlatformClientTest {
         assertThat(response.code()).isEqualTo("0");
         assertThat(response.msg()).isEqualTo("ok");
         server.verify();
+    }
+
+    @Test
+    void shouldConfigureDefaultRequestFactoryTimeoutsToFiveSeconds() throws Exception {
+        TechPlatformProperties properties = new TechPlatformProperties();
+
+        SimpleClientHttpRequestFactory requestFactory = invokeRequestFactory(properties);
+
+        assertThat(readField(requestFactory, "connectTimeout")).isEqualTo(5000);
+        assertThat(readField(requestFactory, "readTimeout")).isEqualTo(5000);
     }
 
     @Test
@@ -242,12 +254,22 @@ class TechPlatformClientTest {
         properties.setSignAlgorithm(TechPlatformProperties.SignAlgorithm.HMAC_SHA256);
         properties.setAesKeyBase64("MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=");
         properties.setAesAlgorithm("AES/ECB/PKCS5Padding");
-        properties.setConnectTimeoutMs(2000);
-        properties.setReadTimeoutMs(3000);
         properties.getPaths().setCreditStatusNotice("/guide/api/creditStatusNotice");
         properties.getPaths().setLoanInfoNotice("/guide/api/loanInfoNotice");
         properties.getPaths().setRepayInfoNotice("/guide/api/repayInfoNotice");
         properties.getPaths().setBenefitOrderNotice("/huijuapi/vip/orderNotice");
         return properties;
+    }
+
+    private SimpleClientHttpRequestFactory invokeRequestFactory(TechPlatformProperties properties) throws Exception {
+        Method method = TechPlatformClientImpl.class.getDeclaredMethod("requestFactory", TechPlatformProperties.class);
+        method.setAccessible(true);
+        return (SimpleClientHttpRequestFactory) method.invoke(null, properties);
+    }
+
+    private Object readField(Object target, String fieldName) throws Exception {
+        var field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.get(target);
     }
 }

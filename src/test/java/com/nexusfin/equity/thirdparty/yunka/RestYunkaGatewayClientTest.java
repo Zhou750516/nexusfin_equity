@@ -3,6 +3,7 @@ package com.nexusfin.equity.thirdparty.yunka;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.util.TraceIdUtil;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import javax.crypto.Mac;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.mock.http.client.MockClientHttpRequest;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -54,6 +56,16 @@ class RestYunkaGatewayClientTest {
         assertThat(response.message()).isEqualTo("MOCK");
         assertThat(output).contains("yunka gateway client initialized");
         assertThat(output).contains("mode=MOCK");
+    }
+
+    @Test
+    void shouldConfigureRequestFactoryTimeoutsToFiveSeconds() throws Exception {
+        SimpleClientHttpRequestFactory requestFactory = invokeRequestFactory(
+                yunkaProperties("REST", "http://127.0.0.1:18081")
+        );
+
+        assertThat(readField(requestFactory, "connectTimeout")).isEqualTo(5000);
+        assertThat(readField(requestFactory, "readTimeout")).isEqualTo(5000);
     }
 
     @Test
@@ -289,8 +301,8 @@ class RestYunkaGatewayClientTest {
                 mode,
                 baseUrl,
                 "/api/gateway/proxy",
-                2000,
-                3000,
+                5000,
+                5000,
                 new YunkaProperties.Paths(
                         "/loan/trial",
                         "/loan/query",
@@ -312,6 +324,18 @@ class RestYunkaGatewayClientTest {
                 TEST_APP_ID,
                 TEST_APP_SECRET
         );
+    }
+
+    private SimpleClientHttpRequestFactory invokeRequestFactory(YunkaProperties properties) throws Exception {
+        Method method = RestYunkaGatewayClient.class.getDeclaredMethod("requestFactory", YunkaProperties.class);
+        method.setAccessible(true);
+        return (SimpleClientHttpRequestFactory) method.invoke(null, properties);
+    }
+
+    private Object readField(Object target, String fieldName) throws Exception {
+        var field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.get(target);
     }
 
     private String sign(String dataJson, String requestId, String timestamp, String secret) {

@@ -43,6 +43,16 @@ class QwPropertiesTest {
     }
 
     @Test
+    void shouldDefaultHttpTimeoutsToFiveSeconds() {
+        QwProperties properties = new QwProperties();
+
+        assertThat(properties.getHttp().getConnectTimeoutMs()).isEqualTo(5000);
+        assertThat(properties.getHttp().getReadTimeoutMs()).isEqualTo(5000);
+        assertThat(properties.getDirect().getConnectTimeoutMs()).isEqualTo(5000);
+        assertThat(properties.getDirect().getReadTimeoutMs()).isEqualTo(5000);
+    }
+
+    @Test
     void shouldBindHttpPlaintextPayloadLogSwitch() {
         QwProperties properties = bind(Map.of(
                 "nexusfin.third-party.qw.http.log-plaintext-payload", "true"

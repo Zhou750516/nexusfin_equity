@@ -12,8 +12,8 @@ public class QwDirectProperties {
     private String pkcs12Path;
     private String pkcs12Password;
     private String verifyCertPath;
-    private int connectTimeoutMs = 3000;
-    private int readTimeoutMs = 5000;
+    private int connectTimeoutMs = OutboundHttpTimeoutDefaults.FIVE_SECONDS_MS;
+    private int readTimeoutMs = OutboundHttpTimeoutDefaults.FIVE_SECONDS_MS;
     private String memberSyncServiceCode;
     private String exerciseUrlServiceCode;
     private String deductionNotifyServiceCode;

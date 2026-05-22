@@ -129,8 +129,8 @@ nexusfin:
       mode: ${YUNKA_MODE:MOCK}
       base-url: ${YUNKA_BASE_URL:https://yunka.local}
       gateway-path: ${YUNKA_GATEWAY_PATH:/api/gateway/proxy}
-      connect-timeout-ms: ${YUNKA_CONNECT_TIMEOUT_MS:2000}
-      read-timeout-ms: ${YUNKA_READ_TIMEOUT_MS:3000}
+      connect-timeout-ms: ${YUNKA_CONNECT_TIMEOUT_MS:5000}
+      read-timeout-ms: ${YUNKA_READ_TIMEOUT_MS:5000}
       channel-code: ${YUNKA_CHANNEL_CODE:}
       app-id: ${YUNKA_APP_ID:}
       app-secret: ${YUNKA_APP_SECRET:${YUNKA_SIGN_SECRET:}}
@@ -162,8 +162,8 @@ nexusfin:
       aes-algorithm: ${TECH_PLATFORM_API_AES_ALGORITHM:AES/ECB/PKCS5Padding}
       gcm-tag-bits: ${TECH_PLATFORM_API_GCM_TAG_BITS:128}
       iv-length-bytes: ${TECH_PLATFORM_API_IV_LENGTH_BYTES:12}
-      connect-timeout-ms: ${TECH_PLATFORM_API_CONNECT_TIMEOUT_MS:2000}
-      read-timeout-ms: ${TECH_PLATFORM_API_READ_TIMEOUT_MS:3000}
+      connect-timeout-ms: ${TECH_PLATFORM_API_CONNECT_TIMEOUT_MS:5000}
+      read-timeout-ms: ${TECH_PLATFORM_API_READ_TIMEOUT_MS:5000}
       paths:
         credit-status-notice: ${TECH_PLATFORM_API_CREDIT_STATUS_NOTICE_PATH:/guide/api/creditStatusNotice}
         loan-info-notice: ${TECH_PLATFORM_API_LOAN_INFO_NOTICE_PATH:/guide/api/loanInfoNotice}
@@ -177,8 +177,8 @@ nexusfin:
       partner-no: ${QW_PARTNER_NO:abs}
       version: ${QW_VERSION:v1.0}
       sign-key: ${QW_SIGN_KEY:abs-secret-key}
-      connect-timeout-ms: ${QW_CONNECT_TIMEOUT_MS:2000}
-      read-timeout-ms: ${QW_READ_TIMEOUT_MS:3000}
+      connect-timeout-ms: ${QW_CONNECT_TIMEOUT_MS:5000}
+      read-timeout-ms: ${QW_READ_TIMEOUT_MS:5000}
       http:
         log-plaintext-payload: ${QW_HTTP_LOG_PLAINTEXT_PAYLOAD:false}
         log-full-plaintext-payload: ${QW_HTTP_LOG_FULL_PLAINTEXT_PAYLOAD:false}
@@ -208,7 +208,7 @@ nexusfin:
         pkcs12-path: ${QW_DIRECT_PKCS12_PATH:}
         pkcs12-password: ${QW_DIRECT_PKCS12_PASSWORD:}
         verify-cert-path: ${QW_DIRECT_VERIFY_CERT_PATH:}
-        connect-timeout-ms: ${QW_DIRECT_CONNECT_TIMEOUT_MS:3000}
+        connect-timeout-ms: ${QW_DIRECT_CONNECT_TIMEOUT_MS:5000}
         read-timeout-ms: ${QW_DIRECT_READ_TIMEOUT_MS:5000}
         member-sync-service-code: ${QW_DIRECT_MEMBER_SYNC_SERVICE_CODE:}
         exercise-url-service-code: ${QW_DIRECT_EXERCISE_URL_SERVICE_CODE:}
@@ -234,8 +234,8 @@ nexusfin:
   auth:
     tech-platform-base-url: ${TECH_PLATFORM_BASE_URL:http://localhost:18080}
     tech-platform-user-me-path: ${TECH_PLATFORM_USER_ME_PATH:/api/users/me}
-    connect-timeout-ms: ${TECH_PLATFORM_CONNECT_TIMEOUT_MS:2000}
-    read-timeout-ms: ${TECH_PLATFORM_READ_TIMEOUT_MS:3000}
+    connect-timeout-ms: ${TECH_PLATFORM_CONNECT_TIMEOUT_MS:5000}
+    read-timeout-ms: ${TECH_PLATFORM_READ_TIMEOUT_MS:5000}
     retry-max-attempts: ${TECH_PLATFORM_RETRY_MAX_ATTEMPTS:2}
     default-channel-code: ${AUTH_DEFAULT_CHANNEL_CODE:KJ}
     default-redirect-url: ${AUTH_DEFAULT_REDIRECT_URL:/equity/index}
