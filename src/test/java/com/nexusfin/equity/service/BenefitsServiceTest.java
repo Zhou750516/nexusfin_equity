@@ -125,15 +125,15 @@ class BenefitsServiceTest {
         when(memberReceivingAccountRepository.selectActiveByMemberId("mem-local-card"))
                 .thenReturn(List.of(
                         receivingAccount("mem-local-card", "old-card-001", "旧用户卡", "7568", 0),
-                        receivingAccount("mem-local-card", "622908328976881119", "齐为联调测试卡", "8119", 1)
+                        receivingAccount("mem-local-card", "6222000000000000001", "测试联调卡", "0001", 1)
                 ));
 
         BenefitsCardDetailResponse response = localCardService.getCardDetail("mem-local-card", "cid-local-card");
 
         assertThat(response.userCards()).hasSize(2);
-        assertThat(response.userCards().get(0).cardId()).isEqualTo("622908328976881119");
-        assertThat(response.userCards().get(0).bankName()).isEqualTo("齐为联调测试卡");
-        assertThat(response.userCards().get(0).cardLastFour()).isEqualTo("8119");
+        assertThat(response.userCards().get(0).cardId()).isEqualTo("6222000000000000001");
+        assertThat(response.userCards().get(0).bankName()).isEqualTo("测试联调卡");
+        assertThat(response.userCards().get(0).cardLastFour()).isEqualTo("0001");
         assertThat(response.userCards().get(0).defaultCard()).isTrue();
         assertThat(response.userCards().get(1).cardLastFour()).isEqualTo("7568");
         verify(xiaohuaGatewayService, never()).queryUserCards(any(), any(), any());

@@ -232,12 +232,12 @@ class JointLoginServiceTest {
                 new JointLoginTargetPageResolver()
         );
         MemberInfo existing = existingMember("mem-preserve", "old-cid");
-        String localPhoneHash = SensitiveDataUtil.sha256("18518628442");
-        String localIdCardHash = SensitiveDataUtil.sha256("130682199109264075");
-        String localRealNameEncrypted = sensitiveDataCipher.encrypt("张蒙");
-        existing.setMobileEncrypted(sensitiveDataCipher.encrypt("18518628442"));
+        String localPhoneHash = SensitiveDataUtil.sha256("19900000001");
+        String localIdCardHash = SensitiveDataUtil.sha256("110101199001010011");
+        String localRealNameEncrypted = sensitiveDataCipher.encrypt("测试用户甲");
+        existing.setMobileEncrypted(sensitiveDataCipher.encrypt("19900000001"));
         existing.setMobileHash(localPhoneHash);
-        existing.setIdCardEncrypted(sensitiveDataCipher.encrypt("130682199109264075"));
+        existing.setIdCardEncrypted(sensitiveDataCipher.encrypt("110101199001010011"));
         existing.setIdCardHash(localIdCardHash);
         existing.setRealNameEncrypted(localRealNameEncrypted);
         var previousUpdatedTs = java.time.LocalDateTime.now().minusDays(1);
@@ -274,9 +274,9 @@ class JointLoginServiceTest {
         assertThat(updated.getMobileHash()).isEqualTo(localPhoneHash);
         assertThat(updated.getIdCardHash()).isEqualTo(localIdCardHash);
         assertThat(updated.getRealNameEncrypted()).isEqualTo(localRealNameEncrypted);
-        assertThat(sensitiveDataCipher.decrypt(updated.getMobileEncrypted())).isEqualTo("18518628442");
-        assertThat(sensitiveDataCipher.decrypt(updated.getIdCardEncrypted())).isEqualTo("130682199109264075");
-        assertThat(sensitiveDataCipher.decrypt(updated.getRealNameEncrypted())).isEqualTo("张蒙");
+        assertThat(sensitiveDataCipher.decrypt(updated.getMobileEncrypted())).isEqualTo("19900000001");
+        assertThat(sensitiveDataCipher.decrypt(updated.getIdCardEncrypted())).isEqualTo("110101199001010011");
+        assertThat(sensitiveDataCipher.decrypt(updated.getRealNameEncrypted())).isEqualTo("测试用户甲");
         assertThat(updated.getExternalUserId()).isEqualTo("xh-cid-preserve");
         assertThat(updated.getTechPlatformUserId()).isEqualTo("xh-cid-preserve");
         assertThat(updated.getUpdatedTs()).isAfter(previousUpdatedTs);
@@ -284,9 +284,9 @@ class JointLoginServiceTest {
                 .contains("refreshExistingProfile=false")
                 .contains("reason=joint_login_existing_profile_preserved")
                 .contains("joint login existing member profile preserved")
-                .doesNotContain("18518628442")
-                .doesNotContain("130682199109264075")
-                .doesNotContain("张蒙");
+                .doesNotContain("19900000001")
+                .doesNotContain("110101199001010011")
+                .doesNotContain("测试用户甲");
     }
 
     @Test
@@ -350,11 +350,11 @@ class JointLoginServiceTest {
                 new JointLoginTargetPageResolver()
         );
         MemberInfo existing = existingMember("mem-refresh", "xh-cid-refresh");
-        existing.setMobileEncrypted(sensitiveDataCipher.encrypt("18518628442"));
-        existing.setMobileHash(SensitiveDataUtil.sha256("18518628442"));
-        existing.setIdCardEncrypted(sensitiveDataCipher.encrypt("130682199109264075"));
-        existing.setIdCardHash(SensitiveDataUtil.sha256("130682199109264075"));
-        existing.setRealNameEncrypted(sensitiveDataCipher.encrypt("张蒙"));
+        existing.setMobileEncrypted(sensitiveDataCipher.encrypt("19900000001"));
+        existing.setMobileHash(SensitiveDataUtil.sha256("19900000001"));
+        existing.setIdCardEncrypted(sensitiveDataCipher.encrypt("110101199001010011"));
+        existing.setIdCardHash(SensitiveDataUtil.sha256("110101199001010011"));
+        existing.setRealNameEncrypted(sensitiveDataCipher.encrypt("测试用户甲"));
         JointLoginRequest request = new JointLoginRequest(
                 "joint-token-refresh",
                 "push",

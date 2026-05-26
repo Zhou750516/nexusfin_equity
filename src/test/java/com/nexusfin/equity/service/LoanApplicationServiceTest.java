@@ -319,7 +319,7 @@ class LoanApplicationServiceTest {
         when(benefitOrderService.createLocalOrder(eq("mem-test-001"), any()))
                 .thenReturn(new CreateBenefitOrderResponse("BEN-LOCAL-IDENTITY", "FIRST_DEDUCT_PENDING", "/redirect"));
         when(memberInfoRepository.selectById("mem-test-001")).thenReturn(localMemberInfo());
-        when(sensitiveDataCipher.decrypt("local-mobile")).thenReturn("18518628442");
+        when(sensitiveDataCipher.decrypt("local-mobile")).thenReturn("19900000001");
         when(sensitiveDataCipher.decrypt("local-id-card")).thenReturn("110101199001011234");
         when(sensitiveDataCipher.decrypt("local-real-name")).thenReturn("本地用户");
         when(yunkaGatewayClient.proxy(any()))
@@ -339,7 +339,7 @@ class LoanApplicationServiceTest {
         assertThat(yunkaCaptor.getAllValues().get(2).path()).isEqualTo("/loan/apply");
 
         JsonNode forwardData = objectMapper.valueToTree(yunkaCaptor.getAllValues().get(2).data());
-        assertThat(forwardData.path("phone").asText()).isEqualTo("18518628442");
+        assertThat(forwardData.path("phone").asText()).isEqualTo("19900000001");
         assertThat(forwardData.path("idno").asText()).isEqualTo("110101199001011234");
         assertThat(forwardData.path("name").asText()).isEqualTo("本地用户");
         assertThat(forwardData.path("platformBenefitOrderNo").asText()).isEqualTo(response.applicationId());

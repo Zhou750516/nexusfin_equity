@@ -109,16 +109,16 @@ class BankCardSignServiceTest {
         memberChannel.setExternalUserId("tech-user-1");
         when(memberInfoRepository.selectById("mem-1")).thenReturn(memberInfo);
         when(memberChannelRepository.selectLatestByMemberId("mem-1")).thenReturn(memberChannel);
-        when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("18518628442");
-        when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("张蒙");
+        when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("19900000001");
+        when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户甲");
         when(qwProperties.getDirect()).thenReturn(qwDirectProperties);
         when(qwDirectProperties.getMerchantId()).thenReturn("46186385");
         when(qwBenefitClient.querySignStatus(any()))
                 .thenReturn(new QwSignStatusResponse(-1, 2605203409909L, "2026-05-20 11:30:27"));
 
-        BankCardSignStatusResponse response = bankCardSignService.getSignStatus("mem-1", "622908328976881119");
+        BankCardSignStatusResponse response = bankCardSignService.getSignStatus("mem-1", "6222000000000000001");
 
-        assertThat(response.accountNo()).isEqualTo("622908328976881119");
+        assertThat(response.accountNo()).isEqualTo("6222000000000000001");
         assertThat(response.signed()).isTrue();
         assertThat(response.status()).isEqualTo("QW_SIGN_QUERY_REUSE");
         assertThat(response.userSignId()).isEqualTo(2605203409909L);
@@ -133,9 +133,9 @@ class BankCardSignServiceTest {
         assertThat(protocolCaptor.getValue().signRequestNo()).isEqualTo("2605203409909");
         assertThat(output).contains("status=QW_SIGN_QUERY_REUSE");
         assertThat(output).contains("reason=qw_sign_query_user_sign_id_reused");
-        assertThat(output).doesNotContain("622908328976881119");
-        assertThat(output).doesNotContain("18518628442");
-        assertThat(output).doesNotContain("张蒙");
+        assertThat(output).doesNotContain("6222000000000000001");
+        assertThat(output).doesNotContain("19900000001");
+        assertThat(output).doesNotContain("测试用户甲");
     }
 
     @Test
