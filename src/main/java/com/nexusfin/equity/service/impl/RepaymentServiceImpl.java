@@ -29,6 +29,8 @@ import com.nexusfin.equity.service.XiaohuaGatewayService;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.CardSmsConfirmRequest;
 import com.nexusfin.equity.thirdparty.yunka.CardSmsSendRequest;
+import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanItem;
+import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserCardListRequest;
 import com.nexusfin.equity.thirdparty.yunka.UserCardSummary;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
@@ -46,7 +48,9 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
@@ -58,8 +62,9 @@ public class RepaymentServiceImpl implements RepaymentService {
     private static final Logger log = LoggerFactory.getLogger(RepaymentServiceImpl.class);
     private static final int REPAY_TYPE_CURRENT = 2;
     private static final int REPAY_TYPE_EARLY_SETTLE = 5;
-    private static final String DEFAULT_REPAY_PERIODS = "";
     private static final int REPAYMENT_SMS_TYPE = 2;
+    private static final int REPAY_PLAN_STATUS_CURRENT_DUE = 1;
+    private static final String REPAYMENT_REPAY_PLAN_UNAVAILABLE = "REPAYMENT_REPAY_PLAN_UNAVAILABLE";
     private static final String REPAYMENT_AMOUNT_EXCEEDED = "REPAYMENT_AMOUNT_EXCEEDED";
     private static final String REPAYMENT_SUBMIT_DUPLICATED = "REPAYMENT_SUBMIT_DUPLICATED";
     private static final String REPAYMENT_SUBMIT_BIZ_TYPE = "REPAYMENT_SUBMIT";
@@ -105,7 +110,8 @@ public class RepaymentServiceImpl implements RepaymentService {
 
     @Override
     public RepaymentInfoResponse getInfo(String memberId, Integer loanId) {
-        validateKnownLoanId(memberId, loanId);
+        LoanApplicationMapping mapping = validateKnownLoanId(memberId, loanId);
+        String periods = resolveCurrentDuePeriods(mapping);
         String requestId = next("RT");
         JsonNode data = yunkaCallTemplate.executeForData(
                 YunkaCallTemplate.YunkaCall.of(
@@ -113,7 +119,7 @@ public class RepaymentServiceImpl implements RepaymentService {
                         requestId,
                         yunkaProperties.paths().repayTrial(),
                         String.valueOf(loanId),
-                        new RepayTrialForwardData(memberId, loanId, REPAY_TYPE_CURRENT, DEFAULT_REPAY_PERIODS)
+                        new RepayTrialForwardData(memberId, loanId, REPAY_TYPE_CURRENT, periods)
                 )
         );
         List<BankAccountResponse> bankCards = queryRepaymentCards(memberId, String.valueOf(loanId));
@@ -185,11 +191,12 @@ public class RepaymentServiceImpl implements RepaymentService {
     @Override
     public RepaymentSubmitResponse submit(String memberId, RepaymentSubmitRequest request) {
         String requestId = next("RS");
-        validateKnownLoanId(memberId, request.loanId());
+        LoanApplicationMapping mapping = validateKnownLoanId(memberId, request.loanId());
+        String periods = resolveCurrentDuePeriods(mapping);
         long requestedRepayAmount = yuanToCent(request.amount());
         JsonNode data;
         try {
-            validateRepaymentAmount(memberId, request.loanId(), request.repaymentType(), requestedRepayAmount);
+            validateRepaymentAmount(memberId, request.loanId(), request.repaymentType(), periods, requestedRepayAmount);
             reserveRepaymentSubmit(memberId, request.loanId(), requestedRepayAmount);
             String bankCardNum = resolveBankCardNumber(memberId, request.loanId(), request.bankCardId());
             data = yunkaCallTemplate.executeForData(
@@ -202,7 +209,7 @@ public class RepaymentServiceImpl implements RepaymentService {
                                     memberId,
                                     request.loanId(),
                                     mapRepayType(request.repaymentType()),
-                                    DEFAULT_REPAY_PERIODS,
+                                    periods,
                                     bankCardNum,
                                     request.amount().setScale(2)
                             )
@@ -219,14 +226,20 @@ public class RepaymentServiceImpl implements RepaymentService {
         );
     }
 
-    private void validateRepaymentAmount(String memberId, Integer loanId, String repaymentType, long requestedRepayAmount) {
+    private void validateRepaymentAmount(
+            String memberId,
+            Integer loanId,
+            String repaymentType,
+            String periods,
+            long requestedRepayAmount
+    ) {
         JsonNode trialData = yunkaCallTemplate.executeForData(
                 YunkaCallTemplate.YunkaCall.of(
                         "repayment submit amount validation",
                         next("RTS"),
                         yunkaProperties.paths().repayTrial(),
                         String.valueOf(loanId),
-                        new RepayTrialForwardData(memberId, loanId, mapRepayType(repaymentType), DEFAULT_REPAY_PERIODS)
+                        new RepayTrialForwardData(memberId, loanId, mapRepayType(repaymentType), periods)
                 )
         );
         long repayableAmount = yuanToCent(readDecimal(trialData, "repayAmount", "amount"));
@@ -384,10 +397,41 @@ public class RepaymentServiceImpl implements RepaymentService {
                 .orElse(bankCardId);
     }
 
-    private void validateKnownLoanId(String memberId, Integer loanId) {
-        if (findLoanMapping(memberId, loanId) == null) {
+    private LoanApplicationMapping validateKnownLoanId(String memberId, Integer loanId) {
+        LoanApplicationMapping mapping = findLoanMapping(memberId, loanId);
+        if (mapping == null) {
             throw new BizException(404, "repayment loan reference not found");
         }
+        return mapping;
+    }
+
+    private String resolveCurrentDuePeriods(LoanApplicationMapping mapping) {
+        Integer loanId = mapping.getPlatformLoanId();
+        var response = xiaohuaGatewayService.queryLoanRepayPlan(
+                next("LRP"),
+                String.valueOf(loanId),
+                new LoanRepayPlanRequest(mapping.getMemberId(), loanId)
+        );
+        List<LoanRepayPlanItem> repayPlan = response == null || response.repayPlan() == null
+                ? List.of()
+                : response.repayPlan();
+        String periods = repayPlan.stream()
+                .filter(item -> Objects.equals(item.status(), REPAY_PLAN_STATUS_CURRENT_DUE))
+                .map(LoanRepayPlanItem::periodNo)
+                .filter(Objects::nonNull)
+                .sorted(Comparator.naturalOrder())
+                .map(String::valueOf)
+                .reduce((left, right) -> left + "," + right)
+                .orElse("");
+        if (!periods.isBlank()) {
+            return periods;
+        }
+        log.warn("traceId={} bizOrderNo={} errorNo={} errorMsg={}",
+                TraceIdUtil.getTraceId(),
+                loanId,
+                REPAYMENT_REPAY_PLAN_UNAVAILABLE,
+                "No current due periods found for repayment");
+        throw new BizException(REPAYMENT_REPAY_PLAN_UNAVAILABLE, "No current due periods found for repayment");
     }
 
     private Integer validateAndResolveLoanId(String memberId, String repaymentId) {

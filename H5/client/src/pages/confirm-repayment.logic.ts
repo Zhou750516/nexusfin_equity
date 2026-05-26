@@ -12,6 +12,12 @@ export interface RepaymentCardOption {
   accountId?: string;
 }
 
+export interface RepaymentUnavailableFeedback {
+  titleKey: string;
+  messageKey: string;
+  retryKey: string;
+}
+
 export function resolveRepaymentInfoUrl(loanId: number | null | undefined): string | null {
   return loanId ? `/repayment/info/${loanId}` : null;
 }
@@ -58,4 +64,12 @@ export function resolveSelectedRepaymentCardId(
   }
 
   return cardIds[0] ?? null;
+}
+
+export function resolveRepaymentUnavailableFeedback(): RepaymentUnavailableFeedback {
+  return {
+    titleKey: "repaymentConfirm.unavailableTitle",
+    messageKey: "repaymentConfirm.unavailable",
+    retryKey: "common.retry",
+  };
 }

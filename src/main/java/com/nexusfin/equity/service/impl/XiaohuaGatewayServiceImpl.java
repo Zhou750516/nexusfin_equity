@@ -131,7 +131,9 @@ public class XiaohuaGatewayServiceImpl implements XiaohuaGatewayService {
         if (listNode.isArray()) {
             for (JsonNode item : listNode) {
                 items.add(new LoanRepayPlanItem(
-                        firstInteger(item, "termNo", "period"),
+                        firstInteger(item, "termNo", "periodNo", "period"),
+                        firstInteger(item, "periodNo", "termNo", "period"),
+                        firstInteger(item, "status"),
                         firstText(item, "repayDate", "date"),
                         firstAmountAsInternalCent(item, "repayPrincipal", "principal"),
                         firstAmountAsInternalCent(item, "repayInterest", "interest"),

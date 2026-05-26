@@ -24,6 +24,8 @@ import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient.YunkaGatewayReque
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
 import com.nexusfin.equity.thirdparty.yunka.CardSmsConfirmResponse;
 import com.nexusfin.equity.thirdparty.yunka.CardSmsSendResponse;
+import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanItem;
+import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanResponse;
 import com.nexusfin.equity.thirdparty.yunka.UserCardListResponse;
 import com.nexusfin.equity.thirdparty.yunka.UserCardSummary;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
@@ -103,6 +105,8 @@ class RepaymentServiceTest {
     @Test
     void shouldReturnBoundCardsAndDefaultCardInRepaymentInfo() throws Exception {
         when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", 20260501));
+        when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("20260501"), any()))
+                .thenReturn(repayPlanWithDuePeriods());
         when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
                 0,
                 "SUCCESS",
@@ -151,9 +155,32 @@ class RepaymentServiceTest {
         assertThat(payload.path("loanId").asInt()).isEqualTo(20260501);
         assertThat(payload.path("repayType").isInt()).isTrue();
         assertThat(payload.path("repayType").asInt()).isEqualTo(2);
-        assertThat(payload.path("periods").asText()).isEmpty();
+        assertThat(payload.path("periods").asText()).isEqualTo("1,2,3");
         assertThat(payload.path("userId").asText()).isNotEqualTo("cid-test-001");
         assertThat(payload.has("uid")).isFalse();
+    }
+
+    @Test
+    void shouldRejectRepaymentInfoWhenRepayPlanHasNoDuePeriods() {
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", 20260501));
+        when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("20260501"), any()))
+                .thenReturn(new LoanRepayPlanResponse(List.of(
+                        new LoanRepayPlanItem(1, 1, 2, "2026-05-07", 100000L, 4500L, 104500L),
+                        new LoanRepayPlanItem(2, 2, 3, "2026-06-07", 100000L, 3000L, 103000L)
+                )));
+
+        assertThatThrownBy(() -> repaymentService.getInfo("mem-test-001", 20260501))
+                .isInstanceOf(BizException.class)
+                .extracting(
+                        throwable -> ((BizException) throwable).getErrorNo(),
+                        throwable -> ((BizException) throwable).getErrorMsg()
+                )
+                .containsExactly(
+                        "REPAYMENT_REPAY_PLAN_UNAVAILABLE",
+                        "No current due periods found for repayment"
+                );
+
+        verifyNoInteractions(yunkaGatewayClient);
     }
 
     @Test
@@ -273,6 +300,8 @@ class RepaymentServiceTest {
     @Test
     void shouldTranslateRepaymentSubmitTimeoutToBizException() {
         when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", 20260504));
+        when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("20260504"), any()))
+                .thenReturn(repayPlanWithDuePeriods());
         when(yunkaGatewayClient.proxy(any()))
                 .thenAnswer(invocation -> {
                     YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
@@ -306,6 +335,8 @@ class RepaymentServiceTest {
     @Test
     void shouldRejectRepaymentSubmitWhenAmountExceedsCurrentRepayableAmount() throws Exception {
         when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", 20260505));
+        when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("20260505"), any()))
+                .thenReturn(repayPlanWithDuePeriods());
         when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
                 0,
                 "SUCCESS",
@@ -336,6 +367,8 @@ class RepaymentServiceTest {
     @Test
     void shouldRejectDuplicateRepaymentSubmitBeforeSecondRepayApplyCall() throws Exception {
         when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", 20260506));
+        when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("20260506"), any()))
+                .thenReturn(repayPlanWithDuePeriods());
         when(yunkaGatewayClient.proxy(any()))
                 .thenAnswer(invocation -> {
                     YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
@@ -389,6 +422,8 @@ class RepaymentServiceTest {
     @Test
     void shouldSendRepaymentAmountToYunkaInYuanAtBoundary() throws Exception {
         when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", 20260507));
+        when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("20260507"), any()))
+                .thenReturn(repayPlanWithDuePeriods());
         when(yunkaGatewayClient.proxy(any()))
                 .thenAnswer(invocation -> {
                     YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
@@ -431,14 +466,25 @@ class RepaymentServiceTest {
         assertThat(repayTrialPayload.path("userId").asText()).isEqualTo("mem-test-001");
         assertThat(repayTrialPayload.path("loanId").isInt()).isTrue();
         assertThat(repayTrialPayload.path("loanId").asInt()).isEqualTo(20260507);
+        assertThat(repayTrialPayload.path("periods").asText()).isEqualTo("1,2,3");
         assertThat(repayTrialPayload.path("userId").asText()).isNotEqualTo("cid-test-001");
         assertThat(repayTrialPayload.has("uid")).isFalse();
         assertThat(repayApplyPayload.path("userId").asText()).isEqualTo("mem-test-001");
         assertThat(repayApplyPayload.path("loanId").isInt()).isTrue();
         assertThat(repayApplyPayload.path("loanId").asInt()).isEqualTo(20260507);
+        assertThat(repayApplyPayload.path("periods").asText()).isEqualTo("1,2,3");
         assertThat(repayApplyPayload.path("userId").asText()).isNotEqualTo("cid-test-001");
         assertThat(repayApplyPayload.has("uid")).isFalse();
         assertThat(repayApplyPayload.path("repayAmount").decimalValue()).isEqualByComparingTo("1018.50");
+    }
+
+    private LoanRepayPlanResponse repayPlanWithDuePeriods() {
+        return new LoanRepayPlanResponse(List.of(
+                new LoanRepayPlanItem(3, 3, 1, "2026-07-07", 100000L, 3000L, 103000L),
+                new LoanRepayPlanItem(1, 1, 1, "2026-05-07", 100000L, 4500L, 104500L),
+                new LoanRepayPlanItem(2, 2, 2, "2026-06-07", 100000L, 3000L, 103000L),
+                new LoanRepayPlanItem(2, 2, 1, "2026-06-07", 100000L, 3000L, 103000L)
+        ));
     }
 
     private LoanApplicationMapping loanMapping(String memberId, String externalUserId, Integer loanId) {

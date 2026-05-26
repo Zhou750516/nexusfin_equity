@@ -17,6 +17,7 @@ import {
   canProceedRepaymentAction,
   resolveDefaultRepaymentSubmitType,
   resolveRepaymentActionStage,
+  resolveRepaymentUnavailableFeedback,
   resolveSelectedRepaymentCardId,
 } from "@/pages/confirm-repayment.logic";
 import type { RepaymentInfo } from "@/types/loan.types";
@@ -375,9 +376,15 @@ export default function ConfirmRepaymentPage() {
   }
 
   if (error && !info) {
+    const unavailableFeedback = resolveRepaymentUnavailableFeedback();
     return (
       <MobileLayout>
-        <PageError message={error} onAction={() => void loadInfo(loanId)} />
+        <PageError
+          title={t(unavailableFeedback.titleKey)}
+          message={t(unavailableFeedback.messageKey)}
+          onAction={() => void loadInfo(loanId)}
+          actionLabel={t(unavailableFeedback.retryKey)}
+        />
       </MobileLayout>
     );
   }
@@ -575,5 +582,8 @@ function parseLoanId(value: string | null): number | null {
 }
 
 function readErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Request failed";
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Request failed";
 }

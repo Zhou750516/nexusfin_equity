@@ -46,19 +46,20 @@ export function PageLoading({ lines = 4 }: PageLoadingProps) {
 }
 
 interface PageErrorProps {
+  title?: string;
   message: string;
   onAction?: () => void;
   actionLabel?: string;
 }
 
-export function PageError({ message, onAction, actionLabel }: PageErrorProps) {
+export function PageError({ title, message, onAction, actionLabel }: PageErrorProps) {
   const { locale } = useI18n();
   const copy = FEEDBACK_COPY[locale];
 
   return (
     <div className="px-4 pt-4">
       <div className="h5-card text-center">
-        <p className="mb-2 text-base font-semibold text-h5-text-primary">{copy.failedTitle}</p>
+        <p className="mb-2 text-base font-semibold text-h5-text-primary">{title ?? copy.failedTitle}</p>
         <p className="mb-4 text-sm leading-6 text-h5-text-secondary">{message}</p>
         {onAction ? (
           <button onClick={onAction} className="h5-primary-button min-w-[120px]">

@@ -4,6 +4,7 @@ import {
   resolveDefaultRepaymentSubmitType,
   resolveRepaymentInfoUrl,
   resolveRepaymentActionStage,
+  resolveRepaymentUnavailableFeedback,
   resolveSelectedRepaymentCardId,
 } from "./confirm-repayment.logic";
 
@@ -19,6 +20,14 @@ describe("confirm repayment page entry", () => {
 
   it("defaults repayment submit type to scheduled for current due repayment", () => {
     expect(resolveDefaultRepaymentSubmitType()).toBe("scheduled");
+  });
+
+  it("uses a friendly unavailable copy for repayment info failures", () => {
+    expect(resolveRepaymentUnavailableFeedback()).toEqual({
+      titleKey: "repaymentConfirm.unavailableTitle",
+      messageKey: "repaymentConfirm.unavailable",
+      retryKey: "common.retry",
+    });
   });
 });
 

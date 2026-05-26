@@ -15,11 +15,14 @@ import com.nexusfin.equity.repository.MemberPaymentProtocolRepository;
 import com.nexusfin.equity.repository.MemberReceivingAccountRepository;
 import com.nexusfin.equity.repository.SignTaskRepository;
 import com.nexusfin.equity.support.AbstractYunkaXiaohuaIT;
+import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanItem;
+import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanResponse;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import com.nexusfin.equity.util.JwtUtil;
 import com.nexusfin.equity.util.SensitiveDataCipher;
 import jakarta.servlet.http.Cookie;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +36,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -100,6 +104,13 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         MemberInfo memberInfo = createMember("mem-repay-info", "user-repay-info");
         insertReceivingAccount(memberInfo.getMemberId(), "acc-repay-info-001", "招商银行", "8648");
         createApplicationMapping(memberInfo, "APP-REPAY-INFO-001", 2026041301);
+        when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("2026041301"), any()))
+                .thenReturn(new LoanRepayPlanResponse(List.of(
+                        new LoanRepayPlanItem(3, 3, 1, "2026-07-07", 100000L, 3000L, 103000L),
+                        new LoanRepayPlanItem(1, 1, 1, "2026-05-07", 100000L, 4500L, 104500L),
+                        new LoanRepayPlanItem(2, 2, 1, "2026-06-07", 100000L, 3000L, 103000L),
+                        new LoanRepayPlanItem(2, 2, 2, "2026-06-07", 100000L, 3000L, 103000L)
+                )));
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "repayAmount": 1018.50,
@@ -139,7 +150,7 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         assertThat(data.get("loanId").asInt()).isEqualTo(2026041301);
         assertThat(data.get("repayType").isInt()).isTrue();
         assertThat(data.get("repayType").asInt()).isEqualTo(2);
-        assertThat(data.get("periods").asText()).isEmpty();
+        assertThat(data.get("periods").asText()).isEqualTo("1,2,3");
         assertThat(output).contains("repayment info yunka request begin");
         assertThat(output).contains("scene=repayment info elapsedMs=");
         assertThat(output).contains("yunka request success");
@@ -152,6 +163,12 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         MemberInfo memberInfo = createMember("mem-repay-submit", "user-repay-submit");
         insertReceivingAccount(memberInfo.getMemberId(), "acc-repay-submit-001", "招商银行", "8648");
         createApplicationMapping(memberInfo, "APP-REPAY-SUBMIT-001", 2026041302);
+        when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("2026041302"), any()))
+                .thenReturn(new LoanRepayPlanResponse(List.of(
+                        new LoanRepayPlanItem(1, 1, 1, "2026-05-07", 100000L, 4500L, 104500L),
+                        new LoanRepayPlanItem(2, 2, 1, "2026-06-07", 100000L, 3000L, 103000L),
+                        new LoanRepayPlanItem(3, 3, 1, "2026-07-07", 100000L, 3000L, 103000L)
+                )));
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "status": "PROCESSING",
@@ -252,6 +269,12 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         MemberInfo memberInfo = createMember("mem-repay-info-en", "user-repay-info-en");
         insertReceivingAccount(memberInfo.getMemberId(), "acc-repay-info-en-001", "招商银行", "8648");
         createApplicationMapping(memberInfo, "APP-REPAY-INFO-EN-001", 2026041309);
+        when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("2026041309"), any()))
+                .thenReturn(new LoanRepayPlanResponse(List.of(
+                        new LoanRepayPlanItem(1, 1, 1, "2026-05-07", 100000L, 4500L, 104500L),
+                        new LoanRepayPlanItem(2, 2, 1, "2026-06-07", 100000L, 3000L, 103000L),
+                        new LoanRepayPlanItem(3, 3, 1, "2026-07-07", 100000L, 3000L, 103000L)
+                )));
         JsonNode yunkaData = objectMapper.readTree("""
                 {
                   "repayAmount": 1018.50,
