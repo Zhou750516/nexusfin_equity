@@ -56,7 +56,9 @@ import org.springframework.stereotype.Service;
 public class RepaymentServiceImpl implements RepaymentService {
 
     private static final Logger log = LoggerFactory.getLogger(RepaymentServiceImpl.class);
-    private static final String DEFAULT_REPAY_TYPE = "EARLY";
+    private static final int REPAY_TYPE_CURRENT = 2;
+    private static final int REPAY_TYPE_EARLY_SETTLE = 5;
+    private static final String DEFAULT_REPAY_PERIODS = "";
     private static final int REPAYMENT_SMS_TYPE = 2;
     private static final String REPAYMENT_AMOUNT_EXCEEDED = "REPAYMENT_AMOUNT_EXCEEDED";
     private static final String REPAYMENT_SUBMIT_DUPLICATED = "REPAYMENT_SUBMIT_DUPLICATED";
@@ -111,11 +113,16 @@ public class RepaymentServiceImpl implements RepaymentService {
                         requestId,
                         yunkaProperties.paths().repayTrial(),
                         String.valueOf(loanId),
-                        new RepayTrialForwardData(memberId, loanId, DEFAULT_REPAY_TYPE, List.of())
+                        new RepayTrialForwardData(memberId, loanId, REPAY_TYPE_EARLY_SETTLE, DEFAULT_REPAY_PERIODS)
                 )
         );
         List<BankAccountResponse> bankCards = queryRepaymentCards(memberId, String.valueOf(loanId));
         BankAccountResponse selectedCard = bankCards.stream().findFirst().orElseGet(() -> fallbackBankAccount(memberId));
+        String defaultTip = h5I18nService.text(
+                "repayment.tip.info",
+                "还款后将立即生效，剩余期数对应的利息将不再收取。请确认银行卡余额充足。"
+        );
+        String remark = readText(data, "remark", "");
         return new RepaymentInfoResponse(
                 loanId,
                 readDecimal(data, "repayAmount", "amount"),
@@ -123,10 +130,9 @@ public class RepaymentServiceImpl implements RepaymentService {
                 selectedCard,
                 bankCards,
                 true,
-                h5I18nService.text(
-                        "repayment.tip.info",
-                        "还款后将立即生效，剩余期数对应的利息将不再收取。请确认银行卡余额充足。"
-                )
+                remark,
+                trialFeeDetails(data),
+                defaultText(remark, defaultTip)
         );
     }
 
@@ -196,7 +202,7 @@ public class RepaymentServiceImpl implements RepaymentService {
                                     memberId,
                                     request.loanId(),
                                     mapRepayType(request.repaymentType()),
-                                    List.of(),
+                                    DEFAULT_REPAY_PERIODS,
                                     bankCardNum,
                                     request.amount().setScale(2)
                             )
@@ -220,7 +226,7 @@ public class RepaymentServiceImpl implements RepaymentService {
                         next("RTS"),
                         yunkaProperties.paths().repayTrial(),
                         String.valueOf(loanId),
-                        new RepayTrialForwardData(memberId, loanId, mapRepayType(repaymentType), List.of())
+                        new RepayTrialForwardData(memberId, loanId, mapRepayType(repaymentType), DEFAULT_REPAY_PERIODS)
                 )
         );
         long repayableAmount = yuanToCent(readDecimal(trialData, "repayAmount", "amount"));
@@ -437,11 +443,25 @@ public class RepaymentServiceImpl implements RepaymentService {
         );
     }
 
-    private String mapRepayType(String repaymentType) {
+    private int mapRepayType(String repaymentType) {
         if ("scheduled".equalsIgnoreCase(repaymentType)) {
-            return "SCHEDULED";
+            return REPAY_TYPE_CURRENT;
         }
-        return DEFAULT_REPAY_TYPE;
+        return REPAY_TYPE_EARLY_SETTLE;
+    }
+
+    private RepaymentInfoResponse.TrialFeeDetails trialFeeDetails(JsonNode data) {
+        return new RepaymentInfoResponse.TrialFeeDetails(
+                readDecimal(data, "repayPrincipal"),
+                readDecimal(data, "repayInterest"),
+                readDecimal(data, "repayPenaltyInt"),
+                readDecimal(data, "repayBreakFee"),
+                readDecimal(data, "repayOtherCharge"),
+                readDecimal(data, "repaySvcFee"),
+                readDecimal(data, "repayGuaranteeFee"),
+                readDecimal(data, "discount"),
+                readDecimal(data, "originalRepay")
+        );
     }
 
     private String mapSubmitStatus(String status) {
@@ -509,16 +529,16 @@ public class RepaymentServiceImpl implements RepaymentService {
     private record RepayTrialForwardData(
             String userId,
             Integer loanId,
-            String repayType,
-            List<Integer> periods
+            int repayType,
+            String periods
     ) {
     }
 
     private record RepayApplyForwardData(
             String userId,
             Integer loanId,
-            String repayType,
-            List<Integer> periods,
+            int repayType,
+            String periods,
             String bankCardNo,
             BigDecimal repayAmount
     ) {

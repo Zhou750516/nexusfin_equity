@@ -203,7 +203,21 @@ export interface RepaymentInfo {
   bankCard: BankAccount;
   bankCards: BankAccount[];
   smsRequired: boolean;
+  remark?: string | null;
+  fees: RepaymentTrialFees;
   tip: string;
+}
+
+export interface RepaymentTrialFees {
+  repayPrincipal: number;
+  repayInterest: number;
+  repayPenaltyInt: number;
+  repayBreakFee: number;
+  repayOtherCharge: number;
+  repaySvcFee: number;
+  repayGuaranteeFee: number;
+  discount: number;
+  originalRepay: number;
 }
 
 export interface RepaymentParams {

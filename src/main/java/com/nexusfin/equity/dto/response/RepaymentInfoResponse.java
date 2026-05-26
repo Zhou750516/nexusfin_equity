@@ -9,6 +9,20 @@ public record RepaymentInfoResponse(
         BankAccountResponse bankCard,
         java.util.List<BankAccountResponse> bankCards,
         boolean smsRequired,
+        String remark,
+        TrialFeeDetails fees,
         String tip
 ) {
+    public record TrialFeeDetails(
+            BigDecimal repayPrincipal,
+            BigDecimal repayInterest,
+            BigDecimal repayPenaltyInt,
+            BigDecimal repayBreakFee,
+            BigDecimal repayOtherCharge,
+            BigDecimal repaySvcFee,
+            BigDecimal repayGuaranteeFee,
+            BigDecimal discount,
+            BigDecimal originalRepay
+    ) {
+    }
 }

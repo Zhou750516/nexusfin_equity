@@ -12,6 +12,10 @@ export interface RepaymentCardOption {
   accountId?: string;
 }
 
+export function resolveRepaymentInfoUrl(loanId: number | null | undefined): string | null {
+  return loanId ? `/repayment/info/${loanId}` : null;
+}
+
 export function resolveRepaymentActionStage(state: RepaymentActionState): RepaymentActionStage {
   if (!state.smsRequired || state.smsVerified) {
     return "submit";

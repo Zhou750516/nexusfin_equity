@@ -1,9 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
   canProceedRepaymentAction,
+  resolveRepaymentInfoUrl,
   resolveRepaymentActionStage,
   resolveSelectedRepaymentCardId,
 } from "./confirm-repayment.logic";
+
+describe("confirm repayment page entry", () => {
+  it("does not build a backend request url when loanId is missing", () => {
+    expect(resolveRepaymentInfoUrl(null)).toBeNull();
+    expect(resolveRepaymentInfoUrl(undefined)).toBeNull();
+  });
+
+  it("builds the repayment info backend url when loanId is valid", () => {
+    expect(resolveRepaymentInfoUrl(20260501)).toBe("/repayment/info/20260501");
+  });
+});
 
 describe("confirm repayment sms flow", () => {
   it("requires sending sms before repayment submit when sms verification is required", () => {

@@ -107,7 +107,20 @@ class RepaymentServiceTest {
                 0,
                 "SUCCESS",
                 objectMapper.readTree("""
-                        {"repayAmount":1018.50}
+                        {
+                          "status": 5004,
+                          "remark": "试算成功，请确认还款",
+                          "repayAmount": 1018.50,
+                          "repayPrincipal": 1000.00,
+                          "repayInterest": 18.50,
+                          "repayPenaltyInt": 0,
+                          "repayBreakFee": 0,
+                          "repayOtherCharge": 0,
+                          "repaySvcFee": 0,
+                          "repayGuaranteeFee": 0,
+                          "discount": 26.50,
+                          "originalRepay": 1045.00
+                        }
                         """)
         ));
         when(xiaohuaGatewayService.queryUserCards(any(), eq("20260501"), any()))
@@ -122,6 +135,12 @@ class RepaymentServiceTest {
         assertThat(response.bankCard().accountId()).isEqualTo("card-001");
         assertThat(response.bankCards()).hasSize(2);
         assertThat(response.smsRequired()).isTrue();
+        assertThat(response.remark()).isEqualTo("试算成功，请确认还款");
+        assertThat(response.fees().repayPrincipal()).isEqualByComparingTo("1000.00");
+        assertThat(response.fees().repayInterest()).isEqualByComparingTo("18.50");
+        assertThat(response.fees().discount()).isEqualByComparingTo("26.50");
+        assertThat(response.fees().originalRepay()).isEqualByComparingTo("1045.00");
+        assertThat(response.tip()).isEqualTo("试算成功，请确认还款");
 
         ArgumentCaptor<YunkaGatewayRequest> captor = ArgumentCaptor.forClass(YunkaGatewayRequest.class);
         verify(yunkaGatewayClient).proxy(captor.capture());
@@ -130,6 +149,9 @@ class RepaymentServiceTest {
         assertThat(payload.path("userId").asText()).isEqualTo("mem-test-001");
         assertThat(payload.path("loanId").isInt()).isTrue();
         assertThat(payload.path("loanId").asInt()).isEqualTo(20260501);
+        assertThat(payload.path("repayType").isInt()).isTrue();
+        assertThat(payload.path("repayType").asInt()).isEqualTo(5);
+        assertThat(payload.path("periods").asText()).isEmpty();
         assertThat(payload.path("userId").asText()).isNotEqualTo("cid-test-001");
         assertThat(payload.has("uid")).isFalse();
     }

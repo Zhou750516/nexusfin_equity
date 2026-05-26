@@ -88,6 +88,65 @@ const SMS_STATUS_COPY: Record<Locale, Record<"idle" | "sent" | "verified", strin
   },
 };
 
+const TRIAL_DETAIL_LABELS: Record<Locale, Record<keyof RepaymentInfo["fees"], string>> = {
+  "zh-CN": {
+    repayPrincipal: "应还本金",
+    repayInterest: "应还利息",
+    repayPenaltyInt: "罚息",
+    repayBreakFee: "违约金",
+    repayOtherCharge: "其他费用",
+    repaySvcFee: "服务费",
+    repayGuaranteeFee: "担保费",
+    discount: "优惠金额",
+    originalRepay: "减免前应还",
+  },
+  "zh-TW": {
+    repayPrincipal: "應還本金",
+    repayInterest: "應還利息",
+    repayPenaltyInt: "罰息",
+    repayBreakFee: "違約金",
+    repayOtherCharge: "其他費用",
+    repaySvcFee: "服務費",
+    repayGuaranteeFee: "擔保費",
+    discount: "優惠金額",
+    originalRepay: "減免前應還",
+  },
+  "en-US": {
+    repayPrincipal: "Principal",
+    repayInterest: "Interest",
+    repayPenaltyInt: "Penalty interest",
+    repayBreakFee: "Break fee",
+    repayOtherCharge: "Other charges",
+    repaySvcFee: "Service fee",
+    repayGuaranteeFee: "Guarantee fee",
+    discount: "Discount",
+    originalRepay: "Original payable",
+  },
+  "vi-VN": {
+    repayPrincipal: "Gốc phải trả",
+    repayInterest: "Lãi phải trả",
+    repayPenaltyInt: "Lãi phạt",
+    repayBreakFee: "Phí phạt",
+    repayOtherCharge: "Phí khác",
+    repaySvcFee: "Phí dịch vụ",
+    repayGuaranteeFee: "Phí bảo lãnh",
+    discount: "Ưu đãi",
+    originalRepay: "Số phải trả ban đầu",
+  },
+};
+
+const TRIAL_DETAIL_KEYS: Array<keyof RepaymentInfo["fees"]> = [
+  "repayPrincipal",
+  "repayInterest",
+  "repayPenaltyInt",
+  "repayBreakFee",
+  "repayOtherCharge",
+  "repaySvcFee",
+  "repayGuaranteeFee",
+  "discount",
+  "originalRepay",
+];
+
 const ACTION_COPY: Record<Locale, Record<"send_sms" | "confirm_sms" | "submit", string>> = {
   "zh-CN": {
     send_sms: "发送验证码",
@@ -413,6 +472,31 @@ export default function ConfirmRepaymentPage() {
                       );
                     })}
                   </div>
+                </div>
+              </section>
+
+              <section className="bg-white rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-[#e5e6eb]">
+                  <p className="text-[#1d2129] text-base font-semibold tracking-tight">
+                    {t("repaymentConfirm.trialDetailTitle")}
+                  </p>
+                  {info.remark ? (
+                    <p className="mt-1 text-[#86909c] text-[13px] leading-[21.125px]">
+                      {info.remark}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="px-5 py-2">
+                  {TRIAL_DETAIL_KEYS.map((key) => (
+                    <div key={key} className="flex items-center justify-between py-2">
+                      <span className="text-[#4e5969] text-[14px] tracking-tight">
+                        {TRIAL_DETAIL_LABELS[locale][key]}
+                      </span>
+                      <span className="text-[#1d2129] text-[14px] font-medium tracking-tight">
+                        {formatCurrency(info.fees[key], locale)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </section>
 

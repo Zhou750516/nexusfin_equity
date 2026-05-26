@@ -104,7 +104,20 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
         MemberInfo memberInfo = createMember("mem-repay-cards", "user-repay-cards");
         createApplicationMapping(memberInfo, "APP-REPAY-001", 20260501);
         JsonNode yunkaData = objectMapper.readTree("""
-                {"repayAmount":101850}
+                {
+                  "status": 5004,
+                  "remark": "试算成功，请确认还款",
+                  "repayAmount": 1018.50,
+                  "repayPrincipal": 1000.00,
+                  "repayInterest": 18.50,
+                  "repayPenaltyInt": 0,
+                  "repayBreakFee": 0,
+                  "repayOtherCharge": 0,
+                  "repaySvcFee": 0,
+                  "repayGuaranteeFee": 0,
+                  "discount": 26.50,
+                  "originalRepay": 1045.00
+                }
                 """);
         when(yunkaGatewayClient.proxy(any()))
                 .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", yunkaData));
@@ -118,9 +131,27 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                         .cookie(authCookie(memberInfo)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.repaymentAmount").value(1018.5))
+                .andExpect(jsonPath("$.data.remark").value("试算成功，请确认还款"))
+                .andExpect(jsonPath("$.data.tip").value("试算成功，请确认还款"))
+                .andExpect(jsonPath("$.data.fees.repayPrincipal").value(1000.0))
+                .andExpect(jsonPath("$.data.fees.repayInterest").value(18.5))
+                .andExpect(jsonPath("$.data.fees.discount").value(26.5))
+                .andExpect(jsonPath("$.data.fees.originalRepay").value(1045.0))
                 .andExpect(jsonPath("$.data.bankCard.accountId").value("card-001"))
                 .andExpect(jsonPath("$.data.bankCards[1].bankName").value("建设银行"))
                 .andExpect(jsonPath("$.data.smsRequired").value(true));
+
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> requestCaptor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(requestCaptor.capture());
+        JsonNode payload = objectMapper.valueToTree(requestCaptor.getValue().data());
+        org.assertj.core.api.Assertions.assertThat(requestCaptor.getValue().path()).isEqualTo("/repay/trial");
+        org.assertj.core.api.Assertions.assertThat(payload.path("loanId").isInt()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(payload.path("loanId").asInt()).isEqualTo(20260501);
+        org.assertj.core.api.Assertions.assertThat(payload.path("repayType").isInt()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(payload.path("repayType").asInt()).isEqualTo(5);
+        org.assertj.core.api.Assertions.assertThat(payload.path("periods").asText()).isEmpty();
     }
 
     @Test

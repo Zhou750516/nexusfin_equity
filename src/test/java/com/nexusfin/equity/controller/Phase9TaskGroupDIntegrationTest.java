@@ -106,7 +106,8 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
                   "repayPrincipal": 1000.00,
                   "repayInterest": 18.50,
                   "repayPenaltyInt": 0,
-                  "discount": 26.50
+                  "discount": 26.50,
+                  "remark": "试算成功，请确认还款"
                 }
                 """);
         when(yunkaGatewayClient.proxy(any()))
@@ -119,6 +120,11 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(jsonPath("$.data.loanId").value(2026041301))
                 .andExpect(jsonPath("$.data.repaymentAmount").value(1018.5))
                 .andExpect(jsonPath("$.data.repaymentType").value("提前还款"))
+                .andExpect(jsonPath("$.data.remark").value("试算成功，请确认还款"))
+                .andExpect(jsonPath("$.data.tip").value("试算成功，请确认还款"))
+                .andExpect(jsonPath("$.data.fees.repayPrincipal").value(1000.0))
+                .andExpect(jsonPath("$.data.fees.repayInterest").value(18.5))
+                .andExpect(jsonPath("$.data.fees.discount").value(26.5))
                 .andExpect(jsonPath("$.data.bankCard.bankName").value("招商银行"))
                 .andExpect(jsonPath("$.data.bankCard.lastFour").value("8648"));
 
@@ -131,7 +137,9 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         assertThat(data.has("uid")).isFalse();
         assertThat(data.get("loanId").isInt()).isTrue();
         assertThat(data.get("loanId").asInt()).isEqualTo(2026041301);
-        assertThat(data.get("repayType").asText()).isEqualTo("EARLY");
+        assertThat(data.get("repayType").isInt()).isTrue();
+        assertThat(data.get("repayType").asInt()).isEqualTo(5);
+        assertThat(data.get("periods").asText()).isEmpty();
         assertThat(output).contains("repayment info yunka request begin");
         assertThat(output).contains("scene=repayment info elapsedMs=");
         assertThat(output).contains("yunka request success");

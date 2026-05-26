@@ -24,6 +24,7 @@ import type {
   RepaymentSubmitResult,
   RepaymentParams,
 } from "@/types/loan.types";
+import { resolveRepaymentInfoUrl } from "@/pages/confirm-repayment.logic";
 
 export function getCalculatorConfig() {
   return apiRequest<CalculatorConfig>({
@@ -101,9 +102,13 @@ export function getApprovalResult(applicationId: string) {
 }
 
 export function getRepaymentInfo(loanId: number) {
+  const url = resolveRepaymentInfoUrl(loanId);
+  if (!url) {
+    throw new Error("Missing loan ID. Repayment cannot be submitted right now.");
+  }
   return apiRequest<RepaymentInfo>({
     method: "GET",
-    url: `/repayment/info/${loanId}`,
+    url,
   });
 }
 
