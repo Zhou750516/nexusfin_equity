@@ -16,6 +16,10 @@ export function resolveRepaymentInfoUrl(loanId: number | null | undefined): stri
   return loanId ? `/repayment/info/${loanId}` : null;
 }
 
+export function resolveDefaultRepaymentSubmitType(): "scheduled" {
+  return "scheduled";
+}
+
 export function resolveRepaymentActionStage(state: RepaymentActionState): RepaymentActionStage {
   if (!state.smsRequired || state.smsVerified) {
     return "submit";

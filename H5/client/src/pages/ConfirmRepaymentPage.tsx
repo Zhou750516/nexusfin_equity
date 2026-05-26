@@ -15,6 +15,7 @@ import { shouldRequestLocalizedData } from "@/lib/localized-request";
 import { buildPath, getQueryParam } from "@/lib/route";
 import {
   canProceedRepaymentAction,
+  resolveDefaultRepaymentSubmitType,
   resolveRepaymentActionStage,
   resolveSelectedRepaymentCardId,
 } from "@/pages/confirm-repayment.logic";
@@ -307,7 +308,7 @@ export default function ConfirmRepaymentPage() {
         loanId: info.loanId,
         amount: info.repaymentAmount,
         bankCardId,
-        repaymentType: "early",
+        repaymentType: resolveDefaultRepaymentSubmitType(),
       });
       loan.setRepaymentId(response.repaymentId);
       navigate(buildPath("/repayment-success", { repaymentId: response.repaymentId }));
@@ -381,9 +382,7 @@ export default function ConfirmRepaymentPage() {
     );
   }
 
-  const repaymentTypeLabel = info?.repaymentType === "early"
-    ? t("repaymentConfirm.earlyRepayment")
-    : info?.repaymentType ?? "";
+  const repaymentTypeLabel = info?.repaymentType ?? "";
   const smsStatus = smsVerified ? "verified" : smsSeq ? "sent" : "idle";
 
   return (

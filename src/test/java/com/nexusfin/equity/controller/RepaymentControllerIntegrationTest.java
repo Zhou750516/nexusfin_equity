@@ -150,7 +150,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
         org.assertj.core.api.Assertions.assertThat(payload.path("loanId").isInt()).isTrue();
         org.assertj.core.api.Assertions.assertThat(payload.path("loanId").asInt()).isEqualTo(20260501);
         org.assertj.core.api.Assertions.assertThat(payload.path("repayType").isInt()).isTrue();
-        org.assertj.core.api.Assertions.assertThat(payload.path("repayType").asInt()).isEqualTo(5);
+        org.assertj.core.api.Assertions.assertThat(payload.path("repayType").asInt()).isEqualTo(2);
         org.assertj.core.api.Assertions.assertThat(payload.path("periods").asText()).isEmpty();
     }
 
@@ -272,7 +272,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                                   "loanId": 20260504,
                                   "amount": 1018.50,
                                   "bankCardId": "acc-mem-repay-timeout",
-                                  "repaymentType": "early"
+                                  "repaymentType": "scheduled"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -302,7 +302,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                                   "loanId": 20260505,
                                   "amount": 2000.00,
                                   "bankCardId": "acc-mem-repay-overpay",
-                                  "repaymentType": "early"
+                                  "repaymentType": "scheduled"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -343,7 +343,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                   "loanId": 20260506,
                   "amount": 1018.50,
                   "bankCardId": "acc-mem-repay-duplicate",
-                  "repaymentType": "early"
+                  "repaymentType": "scheduled"
                 }
                 """;
 

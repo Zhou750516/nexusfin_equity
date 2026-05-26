@@ -119,7 +119,7 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.loanId").value(2026041301))
                 .andExpect(jsonPath("$.data.repaymentAmount").value(1018.5))
-                .andExpect(jsonPath("$.data.repaymentType").value("提前还款"))
+                .andExpect(jsonPath("$.data.repaymentType").value("当前应还"))
                 .andExpect(jsonPath("$.data.remark").value("试算成功，请确认还款"))
                 .andExpect(jsonPath("$.data.tip").value("试算成功，请确认还款"))
                 .andExpect(jsonPath("$.data.fees.repayPrincipal").value(1000.0))
@@ -138,7 +138,7 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         assertThat(data.get("loanId").isInt()).isTrue();
         assertThat(data.get("loanId").asInt()).isEqualTo(2026041301);
         assertThat(data.get("repayType").isInt()).isTrue();
-        assertThat(data.get("repayType").asInt()).isEqualTo(5);
+        assertThat(data.get("repayType").asInt()).isEqualTo(2);
         assertThat(data.get("periods").asText()).isEmpty();
         assertThat(output).contains("repayment info yunka request begin");
         assertThat(output).contains("scene=repayment info elapsedMs=");
@@ -182,7 +182,7 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
                                   "loanId": 2026041302,
                                   "amount": 1018.50,
                                   "bankCardId": "acc-repay-submit-001",
-                                  "repaymentType": "early"
+                                  "repaymentType": "scheduled"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -270,7 +270,7 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.loanId").value(2026041309))
-                .andExpect(jsonPath("$.data.repaymentType").value("Early repayment"))
+                .andExpect(jsonPath("$.data.repaymentType").value("Current due"))
                 .andExpect(jsonPath("$.data.tip").value("Repayment takes effect immediately, and interest for the remaining terms will no longer be charged. Please make sure your bank card has sufficient balance."))
                 .andExpect(header().string("Content-Language", "en-US"));
     }

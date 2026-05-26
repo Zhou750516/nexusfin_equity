@@ -150,7 +150,7 @@ class RepaymentServiceTest {
         assertThat(payload.path("loanId").isInt()).isTrue();
         assertThat(payload.path("loanId").asInt()).isEqualTo(20260501);
         assertThat(payload.path("repayType").isInt()).isTrue();
-        assertThat(payload.path("repayType").asInt()).isEqualTo(5);
+        assertThat(payload.path("repayType").asInt()).isEqualTo(2);
         assertThat(payload.path("periods").asText()).isEmpty();
         assertThat(payload.path("userId").asText()).isNotEqualTo("cid-test-001");
         assertThat(payload.has("uid")).isFalse();

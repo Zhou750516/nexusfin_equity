@@ -113,7 +113,7 @@ public class RepaymentServiceImpl implements RepaymentService {
                         requestId,
                         yunkaProperties.paths().repayTrial(),
                         String.valueOf(loanId),
-                        new RepayTrialForwardData(memberId, loanId, REPAY_TYPE_EARLY_SETTLE, DEFAULT_REPAY_PERIODS)
+                        new RepayTrialForwardData(memberId, loanId, REPAY_TYPE_CURRENT, DEFAULT_REPAY_PERIODS)
                 )
         );
         List<BankAccountResponse> bankCards = queryRepaymentCards(memberId, String.valueOf(loanId));
@@ -126,7 +126,7 @@ public class RepaymentServiceImpl implements RepaymentService {
         return new RepaymentInfoResponse(
                 loanId,
                 readDecimal(data, "repayAmount", "amount"),
-                h5I18nService.text("repayment.type.early", "提前还款"),
+                h5I18nService.text("repayment.type.current", "当前应还"),
                 selectedCard,
                 bankCards,
                 true,
@@ -444,7 +444,9 @@ public class RepaymentServiceImpl implements RepaymentService {
     }
 
     private int mapRepayType(String repaymentType) {
-        if ("scheduled".equalsIgnoreCase(repaymentType)) {
+        if ("scheduled".equalsIgnoreCase(repaymentType)
+                || "current".equalsIgnoreCase(repaymentType)
+                || "current_due".equalsIgnoreCase(repaymentType)) {
             return REPAY_TYPE_CURRENT;
         }
         return REPAY_TYPE_EARLY_SETTLE;

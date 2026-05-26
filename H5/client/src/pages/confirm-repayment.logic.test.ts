@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canProceedRepaymentAction,
+  resolveDefaultRepaymentSubmitType,
   resolveRepaymentInfoUrl,
   resolveRepaymentActionStage,
   resolveSelectedRepaymentCardId,
@@ -14,6 +15,10 @@ describe("confirm repayment page entry", () => {
 
   it("builds the repayment info backend url when loanId is valid", () => {
     expect(resolveRepaymentInfoUrl(20260501)).toBe("/repayment/info/20260501");
+  });
+
+  it("defaults repayment submit type to scheduled for current due repayment", () => {
+    expect(resolveDefaultRepaymentSubmitType()).toBe("scheduled");
   });
 });
 
