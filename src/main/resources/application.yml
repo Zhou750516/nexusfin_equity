@@ -200,11 +200,11 @@ nexusfin:
       direct:
         base-url: ${QW_DIRECT_BASE_URL:https://tlt-test.allinpay.com}
         process-path: ${QW_DIRECT_PROCESS_PATH:/aipg/ProcessServlet}
-        merchant-id: ${QW_DIRECT_MERCHANT_ID:}
+        merchant-id: ${QW_DIRECT_MERCHANT_ID:200000000007804}
         user-name: ${QW_DIRECT_USER_NAME:}
         user-password: ${QW_DIRECT_USER_PASSWORD:}
         channel-code: ${QW_DIRECT_CHANNEL_CODE:}
-        account-no: ${QW_DIRECT_ACCOUNT_NO:}
+        account-no: ${QW_DIRECT_ACCOUNT_NO:200000000007804}
         pkcs12-path: ${QW_DIRECT_PKCS12_PATH:}
         pkcs12-password: ${QW_DIRECT_PKCS12_PASSWORD:}
         verify-cert-path: ${QW_DIRECT_VERIFY_CERT_PATH:}

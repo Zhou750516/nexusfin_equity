@@ -1,11 +1,16 @@
 package com.nexusfin.equity.thirdparty.qw;
 
 import com.nexusfin.equity.config.QwProperties;
+import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.ConfigurationPropertySource;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.env.PropertySource;
+import org.springframework.core.io.FileSystemResource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -53,6 +58,14 @@ class QwPropertiesTest {
     }
 
     @Test
+    void shouldBindQwDirectTestShengpayAccountDefaultsFromApplicationYaml() throws IOException {
+        QwProperties properties = bindApplicationDefaults();
+
+        assertThat(properties.getDirect().getMerchantId()).isEqualTo("200000000007804");
+        assertThat(properties.getDirect().getAccountNo()).isEqualTo("200000000007804");
+    }
+
+    @Test
     void shouldBindHttpPlaintextPayloadLogSwitch() {
         QwProperties properties = bind(Map.of(
                 "nexusfin.third-party.qw.http.log-plaintext-payload", "true"
@@ -79,5 +92,30 @@ class QwPropertiesTest {
         return new Binder(new ConfigurationPropertySource[]{source})
                 .bind("nexusfin.third-party.qw", QwProperties.class)
                 .orElseThrow(IllegalStateException::new);
+    }
+
+    private QwProperties bindApplicationDefaults() throws IOException {
+        YamlPropertySourceLoader loader = new YamlPropertySourceLoader();
+        List<PropertySource<?>> sources = loader.load("application.yml",
+                new FileSystemResource("src/main/resources/application.yml"));
+        Map<String, Object> flattened = new java.util.LinkedHashMap<>();
+        for (PropertySource<?> source : sources) {
+            if (source.getSource() instanceof Map<?, ?> map) {
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    flattened.put(String.valueOf(entry.getKey()), resolveDefaultPlaceholder(String.valueOf(entry.getValue())));
+                }
+            }
+        }
+        MapConfigurationPropertySource source = new MapConfigurationPropertySource(flattened);
+        return new Binder(new ConfigurationPropertySource[]{source})
+                .bind("nexusfin.third-party.qw", QwProperties.class)
+                .orElseThrow(IllegalStateException::new);
+    }
+
+    private String resolveDefaultPlaceholder(String value) {
+        if (value.startsWith("${") && value.endsWith("}") && value.contains(":")) {
+            return value.substring(value.indexOf(':') + 1, value.length() - 1);
+        }
+        return value;
     }
 }

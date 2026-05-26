@@ -695,7 +695,7 @@ class QwBenefitClientImplTest {
         TraceIdUtil.bindTraceId("TRACE-QW-FULL-PLAINTEXT-001");
         List<CapturedQwRequest> capturedRequests = new ArrayList<>();
         Map<String, Object> businessRequest = new LinkedHashMap<>();
-        businessRequest.put("merchantId", "46186385");
+        businessRequest.put("merchantId", "200000000007804");
         businessRequest.put("phone", "19912345678");
         businessRequest.put("name", "完整测试用户");
         businessRequest.put("accountNo", "6222020202021234");
@@ -734,7 +734,7 @@ class QwBenefitClientImplTest {
         assertThat(output).contains("FULL");
         assertThat(output).contains("requestPlaintextJson");
         assertThat(output).contains("responsePlaintextJson");
-        assertThat(output).contains("46186385");
+        assertThat(output).contains("200000000007804");
         assertThat(output).contains("19912345678");
         assertThat(output).contains("完整测试用户");
         assertThat(output).contains("6222020202021234");

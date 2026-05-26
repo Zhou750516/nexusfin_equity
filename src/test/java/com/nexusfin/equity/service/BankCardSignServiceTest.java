@@ -112,7 +112,7 @@ class BankCardSignServiceTest {
         when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("19900000001");
         when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户甲");
         when(qwProperties.getDirect()).thenReturn(qwDirectProperties);
-        when(qwDirectProperties.getMerchantId()).thenReturn("46186385");
+        when(qwDirectProperties.getMerchantId()).thenReturn("200000000007804");
         when(qwBenefitClient.querySignStatus(any()))
                 .thenReturn(new QwSignStatusResponse(-1, 2605203409909L, "2026-05-20 11:30:27"));
 
