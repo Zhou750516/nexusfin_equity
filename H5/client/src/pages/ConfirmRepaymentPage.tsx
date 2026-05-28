@@ -19,6 +19,8 @@ import {
   resolveRepaymentActionStage,
   resolveRepaymentUnavailableFeedback,
   resolveSelectedRepaymentCardId,
+  shouldNavigateAfterRepaymentSubmit,
+  shouldShowRepaymentSmsSection,
 } from "@/pages/confirm-repayment.logic";
 import type { RepaymentInfo } from "@/types/loan.types";
 import { CheckCircle2, ChevronLeft, CreditCard, Info } from "lucide-react";
@@ -311,6 +313,10 @@ export default function ConfirmRepaymentPage() {
         bankCardId,
         repaymentType: resolveDefaultRepaymentSubmitType(),
       });
+      if (!shouldNavigateAfterRepaymentSubmit(response)) {
+        setError(response.message);
+        return;
+      }
       loan.setRepaymentId(response.repaymentId);
       navigate(buildPath("/repayment-success", { repaymentId: response.repaymentId }));
     } catch (submitError) {
@@ -341,6 +347,7 @@ export default function ConfirmRepaymentPage() {
     })
     : false;
   const isBusy = isSendingSms || isSubmitting;
+  const showSmsSection = shouldShowRepaymentSmsSection(info);
 
   const payButtonText = useMemo(() => {
     if (!info) {
@@ -506,7 +513,7 @@ export default function ConfirmRepaymentPage() {
                 </div>
               </section>
 
-              {info.smsRequired ? (
+              {showSmsSection ? (
                 <section className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)] px-5 pt-5 pb-5">
                   <div className="flex items-center justify-between gap-3">
                     <div>

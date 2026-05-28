@@ -221,7 +221,14 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         assertThat(data.has("uid")).isFalse();
         assertThat(data.get("loanId").isInt()).isTrue();
         assertThat(data.get("loanId").asInt()).isEqualTo(2026041302);
-        assertThat(data.get("bankCardNo").asText()).isEqualTo("acc-repay-submit-001");
+        assertThat(data.get("repayType").asInt()).isEqualTo(2);
+        assertThat(data.get("periods").asText()).isEqualTo("1,2,3");
+        assertThat(data.get("bankCardNum").asText()).isEqualTo("acc-repay-submit-001");
+        assertThat(data.has("bankCardNo")).isFalse();
+        assertThat(data.get("phone").asText()).isEqualTo("13800138000");
+        assertThat(data.get("cid").asText()).isEqualTo("user-repay-submit");
+        assertThat(data.get("idno").asText()).isEqualTo("110101199003071234");
+        assertThat(data.get("name").asText()).isEqualTo("测试用户");
         assertThat(data.get("repayAmount").decimalValue()).isEqualByComparingTo("1018.50");
     }
 

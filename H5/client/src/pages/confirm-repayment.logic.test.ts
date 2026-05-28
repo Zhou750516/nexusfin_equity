@@ -6,6 +6,8 @@ import {
   resolveRepaymentActionStage,
   resolveRepaymentUnavailableFeedback,
   resolveSelectedRepaymentCardId,
+  shouldNavigateAfterRepaymentSubmit,
+  shouldShowRepaymentSmsSection,
 } from "./confirm-repayment.logic";
 
 describe("confirm repayment page entry", () => {
@@ -88,6 +90,19 @@ describe("confirm repayment sms flow", () => {
       smsVerified: false,
       captcha: "",
     })).toBe("submit");
+  });
+
+  it("does not show the sms section when backend marks sms as optional", () => {
+    expect(shouldShowRepaymentSmsSection({ smsRequired: false })).toBe(false);
+  });
+
+  it("keeps the sms section available when backend requires sms", () => {
+    expect(shouldShowRepaymentSmsSection({ smsRequired: true })).toBe(true);
+  });
+
+  it("does not navigate to success page when repayment submit returns failed", () => {
+    expect(shouldNavigateAfterRepaymentSubmit({ status: "failed" })).toBe(false);
+    expect(shouldNavigateAfterRepaymentSubmit({ status: "processing" })).toBe(true);
   });
 
   it("keeps the user's selected repayment card when it still exists in the latest card list", () => {

@@ -149,7 +149,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(jsonPath("$.data.fees.originalRepay").value(1045.0))
                 .andExpect(jsonPath("$.data.bankCard.accountId").value("card-001"))
                 .andExpect(jsonPath("$.data.bankCards[1].bankName").value("建设银行"))
-                .andExpect(jsonPath("$.data.smsRequired").value(true));
+                .andExpect(jsonPath("$.data.smsRequired").value(false));
 
         ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> requestCaptor =
                 ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);

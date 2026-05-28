@@ -18,6 +18,14 @@ export interface RepaymentUnavailableFeedback {
   retryKey: string;
 }
 
+export interface RepaymentSmsSectionState {
+  smsRequired: boolean;
+}
+
+export interface RepaymentSubmitOutcome {
+  status: "processing" | "failed";
+}
+
 export function resolveRepaymentInfoUrl(loanId: number | null | undefined): string | null {
   return loanId ? `/repayment/info/${loanId}` : null;
 }
@@ -44,6 +52,14 @@ export function canProceedRepaymentAction(state: RepaymentActionState): boolean 
   }
 
   return resolveRepaymentActionStage(state) !== "confirm_sms" || state.captcha.trim().length > 0;
+}
+
+export function shouldShowRepaymentSmsSection(state: RepaymentSmsSectionState | null | undefined): boolean {
+  return Boolean(state?.smsRequired);
+}
+
+export function shouldNavigateAfterRepaymentSubmit(outcome: RepaymentSubmitOutcome): boolean {
+  return outcome.status !== "failed";
 }
 
 export function resolveSelectedRepaymentCardId(

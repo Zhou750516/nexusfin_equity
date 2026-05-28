@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.nexusfin.equity.entity.IdempotencyRecord;
 import com.nexusfin.equity.config.H5LoanProperties;
+import com.nexusfin.equity.config.H5RepaymentProperties;
 import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.dto.request.RepaymentSmsConfirmRequest;
 import com.nexusfin.equity.dto.request.RepaymentSmsSendRequest;
@@ -71,6 +72,7 @@ public class RepaymentServiceImpl implements RepaymentService {
     private static final int REPAYMENT_SUBMIT_DUPLICATE_WINDOW_SECONDS = 120;
 
     private final H5LoanProperties h5LoanProperties;
+    private final H5RepaymentProperties h5RepaymentProperties;
     private final YunkaProperties yunkaProperties;
     private final YunkaGatewayClient yunkaGatewayClient;
     private final H5I18nService h5I18nService;
@@ -84,6 +86,7 @@ public class RepaymentServiceImpl implements RepaymentService {
 
     public RepaymentServiceImpl(
             H5LoanProperties h5LoanProperties,
+            H5RepaymentProperties h5RepaymentProperties,
             YunkaProperties yunkaProperties,
             YunkaGatewayClient yunkaGatewayClient,
             H5I18nService h5I18nService,
@@ -96,6 +99,7 @@ public class RepaymentServiceImpl implements RepaymentService {
             YunkaCallTemplate yunkaCallTemplate
     ) {
         this.h5LoanProperties = h5LoanProperties;
+        this.h5RepaymentProperties = h5RepaymentProperties;
         this.yunkaProperties = yunkaProperties;
         this.yunkaGatewayClient = yunkaGatewayClient;
         this.h5I18nService = h5I18nService;
@@ -135,7 +139,7 @@ public class RepaymentServiceImpl implements RepaymentService {
                 h5I18nService.text("repayment.type.current", "当前应还"),
                 selectedCard,
                 bankCards,
-                true,
+                h5RepaymentProperties.smsRequired(),
                 remark,
                 trialFeeDetails(data),
                 defaultText(remark, defaultTip)
@@ -199,6 +203,7 @@ public class RepaymentServiceImpl implements RepaymentService {
             validateRepaymentAmount(memberId, request.loanId(), request.repaymentType(), periods, requestedRepayAmount);
             reserveRepaymentSubmit(memberId, request.loanId(), requestedRepayAmount);
             String bankCardNum = resolveBankCardNumber(memberId, request.loanId(), request.bankCardId());
+            MemberProfile memberProfile = loadMemberProfile(memberId);
             data = yunkaCallTemplate.executeForData(
                     YunkaCallTemplate.YunkaCall.of(
                             "repayment submit",
@@ -211,6 +216,10 @@ public class RepaymentServiceImpl implements RepaymentService {
                                     mapRepayType(request.repaymentType()),
                                     periods,
                                     bankCardNum,
+                                    memberProfile.mobile(),
+                                    defaultText(mapping.getExternalUserId(), memberId),
+                                    memberProfile.idCardNo(),
+                                    memberProfile.realName(),
                                     request.amount().setScale(2)
                             )
                     )
@@ -219,9 +228,18 @@ public class RepaymentServiceImpl implements RepaymentService {
             throw new BizException(ErrorCodes.YUNKA_UPSTREAM_TIMEOUT, "Repayment submit temporarily unavailable");
         }
         String swiftNumber = readText(data, "swiftNumber", String.valueOf(request.loanId()));
+        String status = mapSubmitStatus(readText(data, "status", ""));
+        if ("failed".equals(status)) {
+            log.warn("traceId={} bizOrderNo={} requestId={} errorNo={} errorMsg={}",
+                    TraceIdUtil.getTraceId(),
+                    request.loanId(),
+                    requestId,
+                    "REPAYMENT_SUBMIT_FAILED",
+                    readRemark(data, "Repayment submit failed"));
+        }
         return new RepaymentSubmitResponse(
                 swiftNumber,
-                mapSubmitStatus(readText(data, "status", "")),
+                status,
                 readRemark(data, "还款请求已提交，正在处理中")
         );
     }
@@ -585,7 +603,11 @@ public class RepaymentServiceImpl implements RepaymentService {
             Integer loanId,
             int repayType,
             String periods,
-            String bankCardNo,
+            String bankCardNum,
+            String phone,
+            String cid,
+            String idno,
+            String name,
             BigDecimal repayAmount
     ) {
     }

@@ -3,6 +3,7 @@ package com.nexusfin.equity.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusfin.equity.config.H5LoanProperties;
+import com.nexusfin.equity.config.H5RepaymentProperties;
 import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.dto.request.RepaymentSmsConfirmRequest;
 import com.nexusfin.equity.dto.request.RepaymentSmsSendRequest;
@@ -87,8 +88,17 @@ class RepaymentServiceTest {
         lenient().when(h5I18nService.text(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
         lenient().when(memberReceivingAccountService.getDefaultReceivingAccount("mem-test-001"))
                 .thenReturn(new MemberReceivingAccountService.ReceivingAccountDetails("acc_001", "招商银行", "8648"));
-        repaymentService = new RepaymentServiceImpl(
+        lenient().when(memberInfoRepository.selectById("mem-test-001")).thenReturn(memberInfo());
+        lenient().when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
+        lenient().when(sensitiveDataCipher.decrypt("id-cipher")).thenReturn("110101199003071234");
+        lenient().when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户");
+        repaymentService = repaymentService(false);
+    }
+
+    private RepaymentService repaymentService(boolean smsRequired) {
+        return new RepaymentServiceImpl(
                 h5LoanProperties(),
+                new H5RepaymentProperties(smsRequired),
                 yunkaProperties(),
                 yunkaGatewayClient,
                 h5I18nService,
@@ -138,7 +148,7 @@ class RepaymentServiceTest {
         assertThat(response.bankCard().bankName()).isEqualTo("招商银行");
         assertThat(response.bankCard().accountId()).isEqualTo("card-001");
         assertThat(response.bankCards()).hasSize(2);
-        assertThat(response.smsRequired()).isTrue();
+        assertThat(response.smsRequired()).isFalse();
         assertThat(response.remark()).isEqualTo("试算成功，请确认还款");
         assertThat(response.fees().repayPrincipal()).isEqualByComparingTo("1000.00");
         assertThat(response.fees().repayInterest()).isEqualByComparingTo("18.50");
@@ -158,6 +168,25 @@ class RepaymentServiceTest {
         assertThat(payload.path("periods").asText()).isEqualTo("1,2,3");
         assertThat(payload.path("userId").asText()).isNotEqualTo("cid-test-001");
         assertThat(payload.has("uid")).isFalse();
+    }
+
+    @Test
+    void shouldReturnSmsRequiredWhenRepaymentSmsIsEnabledByConfig() throws Exception {
+        repaymentService = repaymentService(true);
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", 20260501));
+        when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("20260501"), any()))
+                .thenReturn(repayPlanWithDuePeriods());
+        when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                0,
+                "SUCCESS",
+                objectMapper.readTree("""
+                        {"status":5004,"repayAmount":1018.50}
+                        """)
+        ));
+
+        RepaymentInfoResponse response = repaymentService.getInfo("mem-test-001", 20260501);
+
+        assertThat(response.smsRequired()).isTrue();
     }
 
     @Test
@@ -424,6 +453,10 @@ class RepaymentServiceTest {
         when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", 20260507));
         when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("20260507"), any()))
                 .thenReturn(repayPlanWithDuePeriods());
+        when(memberInfoRepository.selectById("mem-test-001")).thenReturn(memberInfo());
+        when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
+        when(sensitiveDataCipher.decrypt("id-cipher")).thenReturn("110101199003071234");
+        when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户");
         when(yunkaGatewayClient.proxy(any()))
                 .thenAnswer(invocation -> {
                     YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
@@ -448,7 +481,7 @@ class RepaymentServiceTest {
 
         repaymentService.submit(
                 "mem-test-001",
-                new RepaymentSubmitRequest(20260507, BigDecimal.valueOf(1018.50), "acc_001", "early")
+                new RepaymentSubmitRequest(20260507, BigDecimal.valueOf(1018.50), "acc_001", "scheduled")
         );
 
         ArgumentCaptor<YunkaGatewayRequest> captor = ArgumentCaptor.forClass(YunkaGatewayRequest.class);
@@ -472,10 +505,57 @@ class RepaymentServiceTest {
         assertThat(repayApplyPayload.path("userId").asText()).isEqualTo("mem-test-001");
         assertThat(repayApplyPayload.path("loanId").isInt()).isTrue();
         assertThat(repayApplyPayload.path("loanId").asInt()).isEqualTo(20260507);
+        assertThat(repayApplyPayload.path("repayType").asInt()).isEqualTo(2);
         assertThat(repayApplyPayload.path("periods").asText()).isEqualTo("1,2,3");
+        assertThat(repayApplyPayload.path("bankCardNum").asText()).isEqualTo("acc_001");
+        assertThat(repayApplyPayload.has("bankCardNo")).isFalse();
+        assertThat(repayApplyPayload.path("phone").asText()).isEqualTo("13800138000");
+        assertThat(repayApplyPayload.path("cid").asText()).isEqualTo("cid-test-001");
+        assertThat(repayApplyPayload.path("idno").asText()).isEqualTo("110101199003071234");
+        assertThat(repayApplyPayload.path("name").asText()).isEqualTo("测试用户");
         assertThat(repayApplyPayload.path("userId").asText()).isNotEqualTo("cid-test-001");
         assertThat(repayApplyPayload.has("uid")).isFalse();
         assertThat(repayApplyPayload.path("repayAmount").decimalValue()).isEqualByComparingTo("1018.50");
+    }
+
+    @Test
+    void shouldMapRepayApplyFailureStatusToFailed() throws Exception {
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", 20260508));
+        when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("20260508"), any()))
+                .thenReturn(repayPlanWithDuePeriods());
+        when(memberInfoRepository.selectById("mem-test-001")).thenReturn(memberInfo());
+        when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
+        when(sensitiveDataCipher.decrypt("id-cipher")).thenReturn("110101199003071234");
+        when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户");
+        when(yunkaGatewayClient.proxy(any()))
+                .thenAnswer(invocation -> {
+                    YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
+                    if ("/repay/trial".equals(gatewayRequest.path())) {
+                        return new YunkaGatewayClient.YunkaGatewayResponse(
+                                0,
+                                "SUCCESS",
+                                objectMapper.readTree("""
+                                        {"repayAmount":1018.50}
+                                        """)
+                        );
+                    }
+                    return new YunkaGatewayClient.YunkaGatewayResponse(
+                            0,
+                            "SUCCESS",
+                            objectMapper.readTree("""
+                                    {"status":"5002","remark":"还款请求处理失败"}
+                                    """)
+                    );
+                });
+        when(idempotencyRecordRepository.insert(any())).thenReturn(1);
+
+        var response = repaymentService.submit(
+                "mem-test-001",
+                new RepaymentSubmitRequest(20260508, BigDecimal.valueOf(1018.50), "acc_001", "scheduled")
+        );
+
+        assertThat(response.status()).isEqualTo("failed");
+        assertThat(response.message()).isEqualTo("还款请求处理失败");
     }
 
     private LoanRepayPlanResponse repayPlanWithDuePeriods() {

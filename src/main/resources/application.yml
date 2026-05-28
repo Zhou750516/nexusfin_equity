@@ -66,6 +66,8 @@ nexusfin:
           value: 3
       annual-rate: 0.18
       lender: XX商业银行
+    repayment:
+      sms-required: ${H5_REPAYMENT_SMS_REQUIRED:false}
     benefits:
       product-code: ${H5_BENEFITS_PRODUCT_CODE:abs001}
       protocol-link-required: ${H5_BENEFITS_PROTOCOL_LINK_REQUIRED:true}

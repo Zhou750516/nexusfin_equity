@@ -36,6 +36,8 @@ nexusfin:
           value: 3
       annual-rate: 0.18
       lender: XX商业银行
+    repayment:
+      sms-required: false
     benefits:
       product-code: HUXUAN_CARD
       benefit-redirect-public-base-url: https://benefits.test
