@@ -64,7 +64,8 @@ public class RepaymentServiceImpl implements RepaymentService {
     private static final int REPAY_TYPE_CURRENT = 2;
     private static final int REPAY_TYPE_EARLY_SETTLE = 5;
     private static final int REPAYMENT_SMS_TYPE = 2;
-    private static final int REPAY_PLAN_STATUS_CURRENT_DUE = 1;
+    private static final int REPAY_PLAN_STATUS_UNPAID = 1;
+    private static final int REPAY_PLAN_STATUS_OVERDUE = 3;
     private static final String REPAYMENT_REPAY_PLAN_UNAVAILABLE = "REPAYMENT_REPAY_PLAN_UNAVAILABLE";
     private static final String REPAYMENT_AMOUNT_EXCEEDED = "REPAYMENT_AMOUNT_EXCEEDED";
     private static final String REPAYMENT_SUBMIT_DUPLICATED = "REPAYMENT_SUBMIT_DUPLICATED";
@@ -433,16 +434,17 @@ public class RepaymentServiceImpl implements RepaymentService {
         List<LoanRepayPlanItem> repayPlan = response == null || response.repayPlan() == null
                 ? List.of()
                 : response.repayPlan();
-        String periods = repayPlan.stream()
-                .filter(item -> Objects.equals(item.status(), REPAY_PLAN_STATUS_CURRENT_DUE))
+        String period = repayPlan.stream()
+                .filter(item -> Objects.equals(item.status(), REPAY_PLAN_STATUS_UNPAID)
+                        || Objects.equals(item.status(), REPAY_PLAN_STATUS_OVERDUE))
                 .map(LoanRepayPlanItem::periodNo)
                 .filter(Objects::nonNull)
                 .sorted(Comparator.naturalOrder())
                 .map(String::valueOf)
-                .reduce((left, right) -> left + "," + right)
+                .findFirst()
                 .orElse("");
-        if (!periods.isBlank()) {
-            return periods;
+        if (!period.isBlank()) {
+            return period;
         }
         log.warn("traceId={} bizOrderNo={} errorNo={} errorMsg={}",
                 TraceIdUtil.getTraceId(),

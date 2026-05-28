@@ -165,7 +165,7 @@ class RepaymentServiceTest {
         assertThat(payload.path("loanId").asInt()).isEqualTo(20260501);
         assertThat(payload.path("repayType").isInt()).isTrue();
         assertThat(payload.path("repayType").asInt()).isEqualTo(2);
-        assertThat(payload.path("periods").asText()).isEqualTo("1,2,3");
+        assertThat(payload.path("periods").asText()).isEqualTo("2");
         assertThat(payload.path("userId").asText()).isNotEqualTo("cid-test-001");
         assertThat(payload.has("uid")).isFalse();
     }
@@ -190,12 +190,37 @@ class RepaymentServiceTest {
     }
 
     @Test
+    void shouldUseEarliestOverdueOrUnpaidPeriodWhenResolvingRepaymentInfo() throws Exception {
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", 20260509));
+        when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("20260509"), any()))
+                .thenReturn(new LoanRepayPlanResponse(List.of(
+                        new LoanRepayPlanItem(3, 3, 1, "2026-07-07", 100000L, 3000L, 103000L),
+                        new LoanRepayPlanItem(2, 2, 3, "2026-06-07", 100000L, 3000L, 103000L)
+                )));
+        when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                0,
+                "SUCCESS",
+                objectMapper.readTree("""
+                        {"status":5004,"repayAmount":1018.50}
+                        """)
+        ));
+
+        repaymentService.getInfo("mem-test-001", 20260509);
+
+        ArgumentCaptor<YunkaGatewayRequest> captor = ArgumentCaptor.forClass(YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(captor.capture());
+        JsonNode payload = objectMapper.valueToTree(captor.getValue().data());
+        assertThat(payload.path("periods").asText()).isEqualTo("2");
+    }
+
+    @Test
     void shouldRejectRepaymentInfoWhenRepayPlanHasNoDuePeriods() {
         when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", 20260501));
         when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("20260501"), any()))
                 .thenReturn(new LoanRepayPlanResponse(List.of(
                         new LoanRepayPlanItem(1, 1, 2, "2026-05-07", 100000L, 4500L, 104500L),
-                        new LoanRepayPlanItem(2, 2, 3, "2026-06-07", 100000L, 3000L, 103000L)
+                        new LoanRepayPlanItem(2, 2, 2, "2026-06-07", 100000L, 3000L, 103000L),
+                        new LoanRepayPlanItem(3, null, 1, "2026-07-07", 100000L, 3000L, 103000L)
                 )));
 
         assertThatThrownBy(() -> repaymentService.getInfo("mem-test-001", 20260501))
@@ -499,14 +524,14 @@ class RepaymentServiceTest {
         assertThat(repayTrialPayload.path("userId").asText()).isEqualTo("mem-test-001");
         assertThat(repayTrialPayload.path("loanId").isInt()).isTrue();
         assertThat(repayTrialPayload.path("loanId").asInt()).isEqualTo(20260507);
-        assertThat(repayTrialPayload.path("periods").asText()).isEqualTo("1,2,3");
+        assertThat(repayTrialPayload.path("periods").asText()).isEqualTo("2");
         assertThat(repayTrialPayload.path("userId").asText()).isNotEqualTo("cid-test-001");
         assertThat(repayTrialPayload.has("uid")).isFalse();
         assertThat(repayApplyPayload.path("userId").asText()).isEqualTo("mem-test-001");
         assertThat(repayApplyPayload.path("loanId").isInt()).isTrue();
         assertThat(repayApplyPayload.path("loanId").asInt()).isEqualTo(20260507);
         assertThat(repayApplyPayload.path("repayType").asInt()).isEqualTo(2);
-        assertThat(repayApplyPayload.path("periods").asText()).isEqualTo("1,2,3");
+        assertThat(repayApplyPayload.path("periods").asText()).isEqualTo("2");
         assertThat(repayApplyPayload.path("bankCardNum").asText()).isEqualTo("acc_001");
         assertThat(repayApplyPayload.has("bankCardNo")).isFalse();
         assertThat(repayApplyPayload.path("phone").asText()).isEqualTo("13800138000");
@@ -561,7 +586,7 @@ class RepaymentServiceTest {
     private LoanRepayPlanResponse repayPlanWithDuePeriods() {
         return new LoanRepayPlanResponse(List.of(
                 new LoanRepayPlanItem(3, 3, 1, "2026-07-07", 100000L, 3000L, 103000L),
-                new LoanRepayPlanItem(1, 1, 1, "2026-05-07", 100000L, 4500L, 104500L),
+                new LoanRepayPlanItem(1, 1, 2, "2026-05-07", 100000L, 4500L, 104500L),
                 new LoanRepayPlanItem(2, 2, 2, "2026-06-07", 100000L, 3000L, 103000L),
                 new LoanRepayPlanItem(2, 2, 1, "2026-06-07", 100000L, 3000L, 103000L)
         ));

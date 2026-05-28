@@ -107,8 +107,8 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("2026041301"), any()))
                 .thenReturn(new LoanRepayPlanResponse(List.of(
                         new LoanRepayPlanItem(3, 3, 1, "2026-07-07", 100000L, 3000L, 103000L),
-                        new LoanRepayPlanItem(1, 1, 1, "2026-05-07", 100000L, 4500L, 104500L),
-                        new LoanRepayPlanItem(2, 2, 1, "2026-06-07", 100000L, 3000L, 103000L),
+                        new LoanRepayPlanItem(1, 1, 2, "2026-05-07", 100000L, 4500L, 104500L),
+                        new LoanRepayPlanItem(2, 2, 3, "2026-06-07", 100000L, 3000L, 103000L),
                         new LoanRepayPlanItem(2, 2, 2, "2026-06-07", 100000L, 3000L, 103000L)
                 )));
         JsonNode yunkaData = objectMapper.readTree("""
@@ -150,7 +150,7 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         assertThat(data.get("loanId").asInt()).isEqualTo(2026041301);
         assertThat(data.get("repayType").isInt()).isTrue();
         assertThat(data.get("repayType").asInt()).isEqualTo(2);
-        assertThat(data.get("periods").asText()).isEqualTo("1,2,3");
+        assertThat(data.get("periods").asText()).isEqualTo("2");
         assertThat(output).contains("repayment info yunka request begin");
         assertThat(output).contains("scene=repayment info elapsedMs=");
         assertThat(output).contains("yunka request success");
@@ -165,7 +165,7 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         createApplicationMapping(memberInfo, "APP-REPAY-SUBMIT-001", 2026041302);
         when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("2026041302"), any()))
                 .thenReturn(new LoanRepayPlanResponse(List.of(
-                        new LoanRepayPlanItem(1, 1, 1, "2026-05-07", 100000L, 4500L, 104500L),
+                        new LoanRepayPlanItem(1, 1, 2, "2026-05-07", 100000L, 4500L, 104500L),
                         new LoanRepayPlanItem(2, 2, 1, "2026-06-07", 100000L, 3000L, 103000L),
                         new LoanRepayPlanItem(3, 3, 1, "2026-07-07", 100000L, 3000L, 103000L)
                 )));
@@ -222,7 +222,7 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         assertThat(data.get("loanId").isInt()).isTrue();
         assertThat(data.get("loanId").asInt()).isEqualTo(2026041302);
         assertThat(data.get("repayType").asInt()).isEqualTo(2);
-        assertThat(data.get("periods").asText()).isEqualTo("1,2,3");
+        assertThat(data.get("periods").asText()).isEqualTo("2");
         assertThat(data.get("bankCardNum").asText()).isEqualTo("acc-repay-submit-001");
         assertThat(data.has("bankCardNo")).isFalse();
         assertThat(data.get("phone").asText()).isEqualTo("13800138000");

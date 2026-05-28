@@ -108,7 +108,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
         when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("20260501"), any()))
                 .thenReturn(new LoanRepayPlanResponse(List.of(
                         new LoanRepayPlanItem(3, 3, 1, "2026-07-07", 100000L, 3000L, 103000L),
-                        new LoanRepayPlanItem(1, 1, 1, "2026-05-07", 100000L, 4500L, 104500L),
+                        new LoanRepayPlanItem(1, 1, 2, "2026-05-07", 100000L, 4500L, 104500L),
                         new LoanRepayPlanItem(2, 2, 1, "2026-06-07", 100000L, 3000L, 103000L),
                         new LoanRepayPlanItem(2, 2, 2, "2026-06-07", 100000L, 3000L, 103000L)
                 )));
@@ -160,7 +160,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
         org.assertj.core.api.Assertions.assertThat(payload.path("loanId").asInt()).isEqualTo(20260501);
         org.assertj.core.api.Assertions.assertThat(payload.path("repayType").isInt()).isTrue();
         org.assertj.core.api.Assertions.assertThat(payload.path("repayType").asInt()).isEqualTo(2);
-        org.assertj.core.api.Assertions.assertThat(payload.path("periods").asText()).isEqualTo("1,2,3");
+        org.assertj.core.api.Assertions.assertThat(payload.path("periods").asText()).isEqualTo("2");
     }
 
     @Test
