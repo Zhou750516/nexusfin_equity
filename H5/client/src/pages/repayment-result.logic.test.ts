@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { resolveRepaymentResultTime, shouldPollRepaymentResult } from "./repayment-result.logic";
+import {
+  resolveRepaymentResultSubtitle,
+  resolveRepaymentResultTime,
+  shouldPollRepaymentResult,
+} from "./repayment-result.logic";
 
 describe("repayment result page logic", () => {
   it("keeps polling while the repayment result is still processing", () => {
@@ -18,5 +22,12 @@ describe("repayment result page logic", () => {
       .toBe("2026-04-28T08:30:00+08:00");
     expect(resolveRepaymentResultTime("2026-04-28T08:30:00+08:00", "failed"))
       .toBe("2026-04-28T08:30:00+08:00");
+  });
+
+  it("prefers backend remark as the visible subtitle when present", () => {
+    expect(resolveRepaymentResultSubtitle("failed", "fallback", "  还款已受理  "))
+      .toBe("还款已受理");
+    expect(resolveRepaymentResultSubtitle("success", "", ""))
+      .toBe("");
   });
 });

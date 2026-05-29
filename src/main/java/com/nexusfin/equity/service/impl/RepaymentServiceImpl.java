@@ -376,6 +376,7 @@ public class RepaymentServiceImpl implements RepaymentService {
                 resolveRepaymentTime(data),
                 bankCard,
                 readDecimal(data, "discount"),
+                readRemark(data, ""),
                 repaymentTips()
         );
     }

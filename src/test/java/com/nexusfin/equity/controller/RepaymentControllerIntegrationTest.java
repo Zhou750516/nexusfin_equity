@@ -314,6 +314,7 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(jsonPath("$.data.repaymentId").value("xhqbapi20260529163815470019"))
                 .andExpect(jsonPath("$.data.swiftNumber").value("xhqbapi20260529163815470019"))
                 .andExpect(jsonPath("$.data.status").value("processing"))
+                .andExpect(jsonPath("$.data.remark").value("还款处理中"))
                 .andExpect(jsonPath("$.data.amount").value(1018.5));
 
         ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> requestCaptor =

@@ -5,11 +5,15 @@ import { useI18n } from "@/i18n/I18nProvider";
 import type { Locale } from "@/i18n/locale";
 import { formatBankCard, formatCurrency, formatDateTime } from "@/lib/format";
 import { getRepaymentResult } from "@/lib/loan-api";
-import { resolveRepaymentResultTime, shouldPollRepaymentResult } from "@/pages/repayment-result.logic";
+import {
+  resolveRepaymentResultSubtitle,
+  resolveRepaymentResultTime,
+  shouldPollRepaymentResult,
+} from "@/pages/repayment-result.logic";
 import { shouldRequestLocalizedData } from "@/lib/localized-request";
 import { getQueryParam } from "@/lib/route";
 import type { RepaymentResult } from "@/types/loan.types";
-import { Calendar, CheckCircle2, CircleAlert, Clock3, CreditCard, TrendingDown, XCircle } from "lucide-react";
+import { Calendar, CheckCircle2, CircleAlert, Clock3, CreditCard, Info, TrendingDown, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -26,6 +30,7 @@ const RESULT_COPY: Record<Locale, {
   failedTitle: string;
   failedSubtitle: string;
   successTitle: string;
+  remarkLabel: string;
   refresh: string;
   backHome: string;
 }> = {
@@ -35,6 +40,7 @@ const RESULT_COPY: Record<Locale, {
     failedTitle: "还款失败",
     failedSubtitle: "本次还款暂未完成，请稍后重试或联系客服处理。",
     successTitle: "还款成功",
+    remarkLabel: "结果说明",
     refresh: "刷新结果",
     backHome: "返回首页",
   },
@@ -44,6 +50,7 @@ const RESULT_COPY: Record<Locale, {
     failedTitle: "還款失敗",
     failedSubtitle: "本次還款暫未完成，請稍後重試或聯繫客服處理。",
     successTitle: "還款成功",
+    remarkLabel: "結果說明",
     refresh: "刷新結果",
     backHome: "返回首頁",
   },
@@ -53,6 +60,7 @@ const RESULT_COPY: Record<Locale, {
     failedTitle: "Repayment Failed",
     failedSubtitle: "This repayment did not complete. Please try again later or contact support.",
     successTitle: "Repayment Successful",
+    remarkLabel: "Result Note",
     refresh: "Refresh Result",
     backHome: "Back to Home",
   },
@@ -62,6 +70,7 @@ const RESULT_COPY: Record<Locale, {
     failedTitle: "Trả nợ thất bại",
     failedSubtitle: "Lần trả nợ này chưa hoàn tất. Vui lòng thử lại sau hoặc liên hệ CSKH.",
     successTitle: "Trả nợ thành công",
+    remarkLabel: "Ghi chú kết quả",
     refresh: "Làm mới kết quả",
     backHome: "Về trang chủ",
   },
@@ -165,7 +174,12 @@ export default function RepaymentSuccessPage() {
     );
   }
 
-  const header = resolveResultHeader(result?.status ?? "success", locale, t("repaymentSuccess.title"));
+  const header = resolveResultHeader(
+    result?.status ?? "success",
+    locale,
+    t("repaymentSuccess.title"),
+    result?.remark,
+  );
   const displayTime = result ? resolveRepaymentResultTime(result.repaymentTime, result.status) : "--";
   const primaryActionLabel = result?.status === "processing"
     ? RESULT_COPY[locale].refresh
@@ -226,6 +240,13 @@ export default function RepaymentSuccessPage() {
                     value={formatCurrency(result.interestSaved, locale)}
                     valueClassName={result.status === "success" ? "text-[#00b42a]" : ""}
                   />
+                  {result.remark ? (
+                    <DetailRow
+                      icon={<Info className="size-5 text-[#165dff]" strokeWidth={2} />}
+                      label={RESULT_COPY[locale].remarkLabel}
+                      value={result.remark}
+                    />
+                  ) : null}
                 </div>
               </section>
 
@@ -294,28 +315,33 @@ async function handlePrimaryAction({
   navigate("/calculator");
 }
 
-function resolveResultHeader(status: RepaymentResult["status"], locale: Locale, successTitle: string) {
+function resolveResultHeader(
+  status: RepaymentResult["status"],
+  locale: Locale,
+  successTitle: string,
+  remark: string | null | undefined,
+) {
   const copy = RESULT_COPY[locale];
 
   switch (status) {
     case "processing":
       return {
         title: copy.processingTitle,
-        subtitle: copy.processingSubtitle,
+        subtitle: resolveRepaymentResultSubtitle(status, copy.processingSubtitle, remark),
         background: "linear-gradient(138deg, #fbaf19 0%, #ff9500 100%)",
         Icon: Clock3,
       };
     case "failed":
       return {
         title: copy.failedTitle,
-        subtitle: copy.failedSubtitle,
+        subtitle: resolveRepaymentResultSubtitle(status, copy.failedSubtitle, remark),
         background: "linear-gradient(138deg, #f53f3f 0%, #ff7d00 100%)",
         Icon: XCircle,
       };
     default:
       return {
         title: successTitle || copy.successTitle,
-        subtitle: "",
+        subtitle: resolveRepaymentResultSubtitle(status, "", remark),
         background: "linear-gradient(138deg, #165dff 0%, #3d8aff 100%)",
         Icon: CheckCircle2,
       };

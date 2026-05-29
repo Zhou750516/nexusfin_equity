@@ -261,6 +261,7 @@ export interface RepaymentResult {
   repaymentTime: string;
   bankCard: BankAccount;
   interestSaved: number;
+  remark: string;
   tips: string[];
 }
 

@@ -322,6 +322,7 @@ class RepaymentServiceTest {
 
         assertThat(response.status()).isEqualTo("processing");
         assertThat(response.swiftNumber()).isEqualTo("RP-20260501");
+        assertThat(response.remark()).isEmpty();
         assertThat(response.interestSaved()).isEqualByComparingTo("26.50");
         assertThat(response.bankCard().lastFour()).isEqualTo("8648");
 
@@ -363,6 +364,7 @@ class RepaymentServiceTest {
         assertThat(response.repaymentId()).isEqualTo(swiftNumber);
         assertThat(response.swiftNumber()).isEqualTo(swiftNumber);
         assertThat(response.status()).isEqualTo("processing");
+        assertThat(response.remark()).isEqualTo("还款已受理");
 
         ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> captor =
                 ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);

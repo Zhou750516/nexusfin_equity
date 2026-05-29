@@ -11,6 +11,7 @@ public record RepaymentResultResponse(
         String repaymentTime,
         BankAccountResponse bankCard,
         BigDecimal interestSaved,
+        String remark,
         List<String> tips
 ) {
 }

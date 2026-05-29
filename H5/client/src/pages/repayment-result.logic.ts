@@ -14,3 +14,16 @@ export function resolveRepaymentResultTime(
 
   return repaymentTime && repaymentTime.trim().length > 0 ? repaymentTime : "--";
 }
+
+export function resolveRepaymentResultSubtitle(
+  status: RepaymentResultStatus,
+  fallbackSubtitle: string,
+  remark: string | null | undefined,
+) {
+  const normalizedRemark = remark?.trim();
+  if (normalizedRemark) {
+    return normalizedRemark;
+  }
+
+  return fallbackSubtitle;
+}
