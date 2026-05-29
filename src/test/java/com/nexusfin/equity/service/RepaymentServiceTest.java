@@ -11,6 +11,7 @@ import com.nexusfin.equity.dto.response.RepaymentInfoResponse;
 import com.nexusfin.equity.dto.response.RepaymentResultResponse;
 import com.nexusfin.equity.dto.response.RepaymentSmsConfirmResponse;
 import com.nexusfin.equity.dto.response.RepaymentSmsSendResponse;
+import com.nexusfin.equity.entity.IdempotencyRecord;
 import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.exception.BizException;
@@ -338,6 +339,42 @@ class RepaymentServiceTest {
     }
 
     @Test
+    void shouldQueryRepaymentResultUsingStoredSwiftNumberReference() throws Exception {
+        String swiftNumber = "xhqbapi20260529163815470019";
+        IdempotencyRecord repaymentReference = new IdempotencyRecord();
+        repaymentReference.setResponseBody("20260501");
+        when(idempotencyRecordRepository.selectById(any())).thenReturn(repaymentReference);
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", 20260501));
+        when(yunkaGatewayClient.proxy(any())).thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                0,
+                "SUCCESS",
+                objectMapper.readTree("""
+                        {
+                          "status": "8004",
+                          "amount": 1018.50,
+                          "swiftNumber": "xhqbapi20260529163815470019",
+                          "remark": "还款已受理"
+                        }
+                        """)
+        ));
+
+        RepaymentResultResponse response = repaymentService.getResult("mem-test-001", swiftNumber);
+
+        assertThat(response.repaymentId()).isEqualTo(swiftNumber);
+        assertThat(response.swiftNumber()).isEqualTo(swiftNumber);
+        assertThat(response.status()).isEqualTo("processing");
+
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> captor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(captor.capture());
+        JsonNode data = objectMapper.valueToTree(captor.getValue().data());
+        assertThat(captor.getValue().path()).isEqualTo("/repay/query");
+        assertThat(data.get("userId").asText()).isEqualTo("mem-test-001");
+        assertThat(data.get("loanId").asInt()).isEqualTo(20260501);
+        assertThat(data.get("swiftNumber").asText()).isEqualTo(swiftNumber);
+    }
+
+    @Test
     void shouldRejectUnknownRepaymentIdBeforeCallingYunka() {
         when(loanApplicationMappingRepository.selectOne(any())).thenReturn(null);
 
@@ -581,6 +618,58 @@ class RepaymentServiceTest {
 
         assertThat(response.status()).isEqualTo("failed");
         assertThat(response.message()).isEqualTo("还款请求处理失败");
+    }
+
+    @Test
+    void shouldPersistSwiftNumberReferenceAfterRepayApplyAccepted() throws Exception {
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", 20260510));
+        when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("20260510"), any()))
+                .thenReturn(repayPlanWithDuePeriods());
+        when(memberInfoRepository.selectById("mem-test-001")).thenReturn(memberInfo());
+        when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
+        when(sensitiveDataCipher.decrypt("id-cipher")).thenReturn("110101199003071234");
+        when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户");
+        when(yunkaGatewayClient.proxy(any()))
+                .thenAnswer(invocation -> {
+                    YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
+                    if ("/repay/trial".equals(gatewayRequest.path())) {
+                        return new YunkaGatewayClient.YunkaGatewayResponse(
+                                0,
+                                "SUCCESS",
+                                objectMapper.readTree("""
+                                        {"repayAmount":1018.50}
+                                        """)
+                        );
+                    }
+                    return new YunkaGatewayClient.YunkaGatewayResponse(
+                            0,
+                            "SUCCESS",
+                            objectMapper.readTree("""
+                                    {
+                                      "swiftNumber":"xhqbapi20260529163815470019",
+                                      "status":"5001",
+                                      "remark":"还款已受理"
+                                    }
+                                    """)
+                    );
+                });
+        when(idempotencyRecordRepository.insert(any())).thenReturn(1);
+
+        var response = repaymentService.submit(
+                "mem-test-001",
+                new RepaymentSubmitRequest(20260510, BigDecimal.valueOf(1018.50), "acc_001", "scheduled")
+        );
+
+        assertThat(response.repaymentId()).isEqualTo("xhqbapi20260529163815470019");
+
+        ArgumentCaptor<IdempotencyRecord> captor = ArgumentCaptor.forClass(IdempotencyRecord.class);
+        verify(idempotencyRecordRepository, times(2)).insert(captor.capture());
+        IdempotencyRecord reference = captor.getAllValues().stream()
+                .filter(record -> "REPAYMENT_RESULT".equals(record.getBizType()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(reference.getBizKey()).isEqualTo("mem-test-001:xhqbapi20260529163815470019");
+        assertThat(reference.getResponseBody()).isEqualTo("20260510");
     }
 
     private LoanRepayPlanResponse repayPlanWithDuePeriods() {

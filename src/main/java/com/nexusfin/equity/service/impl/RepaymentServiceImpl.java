@@ -70,6 +70,7 @@ public class RepaymentServiceImpl implements RepaymentService {
     private static final String REPAYMENT_AMOUNT_EXCEEDED = "REPAYMENT_AMOUNT_EXCEEDED";
     private static final String REPAYMENT_SUBMIT_DUPLICATED = "REPAYMENT_SUBMIT_DUPLICATED";
     private static final String REPAYMENT_SUBMIT_BIZ_TYPE = "REPAYMENT_SUBMIT";
+    private static final String REPAYMENT_RESULT_BIZ_TYPE = "REPAYMENT_RESULT";
     private static final int REPAYMENT_SUBMIT_DUPLICATE_WINDOW_SECONDS = 120;
 
     private final H5LoanProperties h5LoanProperties;
@@ -229,6 +230,7 @@ public class RepaymentServiceImpl implements RepaymentService {
             throw new BizException(ErrorCodes.YUNKA_UPSTREAM_TIMEOUT, "Repayment submit temporarily unavailable");
         }
         String swiftNumber = readText(data, "swiftNumber", String.valueOf(request.loanId()));
+        persistRepaymentResultReference(memberId, request.loanId(), swiftNumber);
         String status = mapSubmitStatus(readText(data, "status", ""));
         if ("failed".equals(status)) {
             log.warn("traceId={} bizOrderNo={} requestId={} errorNo={} errorMsg={}",
@@ -321,6 +323,34 @@ public class RepaymentServiceImpl implements RepaymentService {
     private String repaymentSubmitGuardRequestId(String bizKey, LocalDateTime now) {
         long bucket = now.atZone(ZoneOffset.UTC).toEpochSecond() / REPAYMENT_SUBMIT_DUPLICATE_WINDOW_SECONDS;
         return "repay-submit-" + bucket + "-" + SensitiveDataUtil.sha256(bizKey).substring(0, 24);
+    }
+
+    private void persistRepaymentResultReference(String memberId, Integer loanId, String swiftNumber) {
+        if (swiftNumber == null || swiftNumber.isBlank() || loanId == null) {
+            return;
+        }
+        IdempotencyRecord record = new IdempotencyRecord();
+        record.setRequestId(repaymentResultReferenceRequestId(memberId, swiftNumber));
+        record.setBizType(REPAYMENT_RESULT_BIZ_TYPE);
+        record.setBizKey(repaymentResultBizKey(memberId, swiftNumber));
+        record.setResponseBody(String.valueOf(loanId));
+        record.setProcessedTs(LocalDateTime.now());
+        try {
+            idempotencyRecordRepository.insert(record);
+        } catch (DuplicateKeyException exception) {
+            log.info("traceId={} bizOrderNo={} requestId={} repayment result reference already exists",
+                    TraceIdUtil.getTraceId(),
+                    loanId,
+                    record.getRequestId());
+        }
+    }
+
+    private String repaymentResultReferenceRequestId(String memberId, String swiftNumber) {
+        return "repay-result-" + SensitiveDataUtil.sha256(repaymentResultBizKey(memberId, swiftNumber)).substring(0, 32);
+    }
+
+    private String repaymentResultBizKey(String memberId, String swiftNumber) {
+        return memberId + ":" + swiftNumber;
     }
 
     @Override
@@ -455,6 +485,10 @@ public class RepaymentServiceImpl implements RepaymentService {
     }
 
     private Integer validateAndResolveLoanId(String memberId, String repaymentId) {
+        Integer storedLoanId = resolveStoredRepaymentLoanId(memberId, repaymentId);
+        if (storedLoanId != null && findLoanMapping(memberId, storedLoanId) != null) {
+            return storedLoanId;
+        }
         String loanIdText = extractLoanId(repaymentId);
         if (loanIdText != null) {
             Integer numericLoanId = parseLoanId(loanIdText);
@@ -463,6 +497,17 @@ public class RepaymentServiceImpl implements RepaymentService {
             }
         }
         throw new BizException(404, "repayment reference not found");
+    }
+
+    private Integer resolveStoredRepaymentLoanId(String memberId, String repaymentId) {
+        if (repaymentId == null || repaymentId.isBlank()) {
+            return null;
+        }
+        IdempotencyRecord record = idempotencyRecordRepository.selectById(repaymentResultReferenceRequestId(memberId, repaymentId));
+        if (record == null) {
+            return null;
+        }
+        return parseLoanId(record.getResponseBody());
     }
 
     private LoanApplicationMapping findLoanMapping(String memberId, Integer loanId) {

@@ -243,6 +243,94 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
     }
 
     @Test
+    void shouldQueryRepaymentResultWithSwiftNumberReturnedBySubmit() throws Exception {
+        MemberInfo memberInfo = createMember("mem-repay-swift-result", "user-repay-swift-result");
+        insertReceivingAccount(memberInfo.getMemberId(), "acc-mem-repay-swift-result", "招商银行", "8648");
+        createApplicationMapping(memberInfo, "APP-REPAY-SWIFT-RESULT-001", 20260509);
+        when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("20260509"), any()))
+                .thenReturn(new LoanRepayPlanResponse(List.of(
+                        new LoanRepayPlanItem(1, 1, 2, "2026-05-07", 100000L, 4500L, 104500L),
+                        new LoanRepayPlanItem(2, 2, 1, "2026-06-07", 100000L, 3000L, 103000L)
+                )));
+        when(yunkaGatewayClient.proxy(any()))
+                .thenAnswer(invocation -> {
+                    YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
+                    if ("/repay/trial".equals(gatewayRequest.path())) {
+                        return new YunkaGatewayClient.YunkaGatewayResponse(
+                                0,
+                                "SUCCESS",
+                                objectMapper.readTree("""
+                                        {"repayAmount":1018.50}
+                                        """)
+                        );
+                    }
+                    if ("/repay/apply".equals(gatewayRequest.path())) {
+                        return new YunkaGatewayClient.YunkaGatewayResponse(
+                                0,
+                                "SUCCESS",
+                                objectMapper.readTree("""
+                                        {
+                                          "status": "5001",
+                                          "swiftNumber": "xhqbapi20260529163815470019",
+                                          "remark": "还款已受理"
+                                        }
+                                        """)
+                        );
+                    }
+                    return new YunkaGatewayClient.YunkaGatewayResponse(
+                            0,
+                            "SUCCESS",
+                            objectMapper.readTree("""
+                                    {
+                                      "status": "8004",
+                                      "amount": 1018.50,
+                                      "swiftNumber": "xhqbapi20260529163815470019",
+                                      "remark": "还款处理中"
+                                    }
+                                    """)
+                    );
+                });
+
+        mockMvc.perform(post("/api/repayment/submit")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "loanId": 20260509,
+                                  "amount": 1018.50,
+                                  "bankCardId": "acc-mem-repay-swift-result",
+                                  "repaymentType": "scheduled"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.repaymentId").value("xhqbapi20260529163815470019"))
+                .andExpect(jsonPath("$.data.status").value("processing"));
+
+        mockMvc.perform(get("/api/repayment/result/xhqbapi20260529163815470019")
+                        .cookie(authCookie(memberInfo)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.repaymentId").value("xhqbapi20260529163815470019"))
+                .andExpect(jsonPath("$.data.swiftNumber").value("xhqbapi20260529163815470019"))
+                .andExpect(jsonPath("$.data.status").value("processing"))
+                .andExpect(jsonPath("$.data.amount").value(1018.5));
+
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> requestCaptor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient, times(3)).proxy(requestCaptor.capture());
+        YunkaGatewayClient.YunkaGatewayRequest queryRequest = requestCaptor.getAllValues().stream()
+                .filter(request -> "/repay/query".equals(request.path()))
+                .findFirst()
+                .orElseThrow();
+        JsonNode queryData = objectMapper.valueToTree(queryRequest.data());
+        org.assertj.core.api.Assertions.assertThat(queryData.path("userId").asText()).isEqualTo("mem-repay-swift-result");
+        org.assertj.core.api.Assertions.assertThat(queryData.path("loanId").asInt()).isEqualTo(20260509);
+        org.assertj.core.api.Assertions.assertThat(queryData.path("swiftNumber").asText())
+                .isEqualTo("xhqbapi20260529163815470019");
+    }
+
+    @Test
     void shouldReturnControlledErrorWhenRepaymentIdIsUnknown() throws Exception {
         MemberInfo memberInfo = createMember("mem-repay-unknown-result", "user-repay-unknown-result");
 
