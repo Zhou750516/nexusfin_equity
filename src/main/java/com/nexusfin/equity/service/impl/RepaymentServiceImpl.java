@@ -66,6 +66,7 @@ public class RepaymentServiceImpl implements RepaymentService {
     private static final int REPAYMENT_SMS_TYPE = 2;
     private static final int REPAY_PLAN_STATUS_UNPAID = 1;
     private static final int REPAY_PLAN_STATUS_OVERDUE = 3;
+    private static final long MAX_REASONABLE_EPOCH_SECONDS = 9_999_999_999L;
     private static final String REPAYMENT_REPAY_PLAN_UNAVAILABLE = "REPAYMENT_REPAY_PLAN_UNAVAILABLE";
     private static final String REPAYMENT_AMOUNT_EXCEEDED = "REPAYMENT_AMOUNT_EXCEEDED";
     private static final String REPAYMENT_SUBMIT_DUPLICATED = "REPAYMENT_SUBMIT_DUPLICATED";
@@ -603,15 +604,28 @@ public class RepaymentServiceImpl implements RepaymentService {
     private String resolveRepaymentTime(JsonNode data) {
         JsonNode successTime = data.path("successTime");
         if (successTime.isNumber()) {
-            long epochSeconds = successTime.asLong();
-            if (epochSeconds <= 0) {
-                return "";
-            }
-            return Instant.ofEpochSecond(epochSeconds)
-                    .atOffset(ZoneOffset.ofHours(8))
-                    .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+            return formatSuccessTime(successTime.asLong());
         }
-        return successTime.asText("");
+        String successTimeText = successTime.asText("");
+        if (successTimeText.matches("-?\\d+")) {
+            try {
+                return formatSuccessTime(Long.parseLong(successTimeText));
+            } catch (NumberFormatException exception) {
+                return successTimeText;
+            }
+        }
+        return successTimeText;
+    }
+
+    private String formatSuccessTime(long timestamp) {
+        if (timestamp <= 0) {
+            return "";
+        }
+        Instant instant = timestamp > MAX_REASONABLE_EPOCH_SECONDS
+                ? Instant.ofEpochMilli(timestamp)
+                : Instant.ofEpochSecond(timestamp);
+        return instant.atOffset(ZoneOffset.ofHours(8))
+                .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
     }
 
     private List<String> repaymentTips() {

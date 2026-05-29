@@ -377,6 +377,29 @@ class RepaymentServiceTest {
     }
 
     @Test
+    void shouldParseRepayQuerySuccessTimeByTimestampUnit() throws Exception {
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", 20260501));
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(repaymentQueryWithSuccessTime("1780044935000"))
+                .thenReturn(repaymentQueryWithSuccessTime("1780044935"))
+                .thenReturn(repaymentQueryWithSuccessTime("\"1780044935000\""))
+                .thenReturn(repaymentQueryWithSuccessTime("0"))
+                .thenReturn(repaymentQueryWithSuccessTime("-1"))
+                .thenReturn(repaymentQueryWithSuccessTime("\"2026-05-29T16:55:35+08:00\""));
+
+        assertThat(repaymentService.getResult("mem-test-001", "RP-20260501").repaymentTime())
+                .isEqualTo("2026-05-29T16:55:35+08:00");
+        assertThat(repaymentService.getResult("mem-test-001", "RP-20260501").repaymentTime())
+                .isEqualTo("2026-05-29T16:55:35+08:00");
+        assertThat(repaymentService.getResult("mem-test-001", "RP-20260501").repaymentTime())
+                .isEqualTo("2026-05-29T16:55:35+08:00");
+        assertThat(repaymentService.getResult("mem-test-001", "RP-20260501").repaymentTime()).isEmpty();
+        assertThat(repaymentService.getResult("mem-test-001", "RP-20260501").repaymentTime()).isEmpty();
+        assertThat(repaymentService.getResult("mem-test-001", "RP-20260501").repaymentTime())
+                .isEqualTo("2026-05-29T16:55:35+08:00");
+    }
+
+    @Test
     void shouldRejectUnknownRepaymentIdBeforeCallingYunka() {
         when(loanApplicationMappingRepository.selectOne(any())).thenReturn(null);
 
@@ -388,6 +411,21 @@ class RepaymentServiceTest {
 
         verifyNoInteractions(yunkaGatewayClient);
         verify(xiaohuaGatewayService, never()).queryUserCards(any(), any(), any());
+    }
+
+    private YunkaGatewayClient.YunkaGatewayResponse repaymentQueryWithSuccessTime(String successTimeJson) throws Exception {
+        return new YunkaGatewayClient.YunkaGatewayResponse(
+                0,
+                "SUCCESS",
+                objectMapper.readTree("""
+                        {
+                          "status": "8001",
+                          "amount": 1040.26,
+                          "swiftNumber": "RP-20260501",
+                          "successTime": %s
+                        }
+                        """.formatted(successTimeJson))
+        );
     }
 
     @Test
