@@ -2,6 +2,7 @@ package com.nexusfin.equity.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.nexusfin.equity.config.YunkaProperties;
 import com.nexusfin.equity.service.XiaohuaGatewayService;
 import com.nexusfin.equity.service.support.YunkaCallTemplate;
@@ -17,6 +18,7 @@ import com.nexusfin.equity.thirdparty.yunka.CreditImageSummary;
 import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanItem;
 import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanRequest;
 import com.nexusfin.equity.thirdparty.yunka.LoanRepayPlanResponse;
+import com.nexusfin.equity.thirdparty.yunka.PlainBigDecimalNumberSerializer;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolLink;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryRequest;
 import com.nexusfin.equity.thirdparty.yunka.ProtocolQueryResponse;
@@ -273,6 +275,7 @@ public class XiaohuaGatewayServiceImpl implements XiaohuaGatewayService {
             String platformBenefitOrderNo,
             String benefitOrderNo,
             Integer loanId,
+            @JsonSerialize(using = PlainBigDecimalNumberSerializer.class)
             BigDecimal orderAmount,
             Integer status,
             Long createTime,

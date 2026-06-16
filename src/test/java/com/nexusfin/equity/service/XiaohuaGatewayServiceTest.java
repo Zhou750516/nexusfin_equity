@@ -28,9 +28,13 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.reflect.Constructor;
+import java.math.BigDecimal;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -322,6 +326,111 @@ class XiaohuaGatewayServiceTest {
         assertThat(forwarded.has("userId")).isFalse();
         assertThat(forwarded.has("benefitStatus")).isFalse();
         assertThat(forwarded.has("benefitAmount")).isFalse();
+    }
+
+    @Test
+    void shouldSerializeBenefitOrderAmountWithoutScientificNotation() throws Exception {
+        JsonNode data = objectMapper.readTree("""
+                {
+                  "status": "SUCCESS",
+                  "message": "ok"
+                }
+                """);
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(0, "SUCCESS", data));
+
+        assertBenefitOrderAmountJson(30000L, "300.00");
+        assertBenefitOrderAmountJson(29900L, "299.00");
+        assertBenefitOrderAmountJson(1L, "0.01");
+    }
+
+    @Test
+    void shouldSerializeScientificBenefitOrderAmountAsPlainDecimalNumber() throws Exception {
+        Object payload = benefitOrderSyncForwardData(new BigDecimal("3E+2"));
+
+        String payloadJson = objectMapper.writeValueAsString(payload);
+
+        assertThat(payloadJson).contains("\"orderAmount\":300");
+        assertThat(payloadJson).doesNotContain("3E+2");
+        assertThat(payloadJson).doesNotContain("E+");
+        assertThat(payloadJson).doesNotContain("E-");
+        JsonNode forwarded = objectMapper.readTree(payloadJson);
+        assertThat(forwarded.path("orderAmount").isNumber()).isTrue();
+        assertThat(forwarded.path("orderAmount").decimalValue()).isEqualByComparingTo("300.00");
+    }
+
+    private void assertBenefitOrderAmountJson(long cents, String expectedAmountJson) throws Exception {
+        clearInvocations(yunkaGatewayClient);
+        gatewayService.syncBenefitOrder(
+                "REQ-SYNC-AMOUNT-" + cents,
+                "BIZ-SYNC-AMOUNT-" + cents,
+                new BenefitOrderSyncRequest(
+                        "BEN-" + cents,
+                        "QW-ORDER-" + cents,
+                        20260521,
+                        cents,
+                        2,
+                        1779335976232L,
+                        1779335976232L,
+                        1781927976232L,
+                        "QW",
+                        "QW-ORDER-" + cents,
+                        "齐为",
+                        "https://benefits.test/api/auth/redrect_benefit_url?benefitOrderNo=QW-ORDER-" + cents
+                )
+        );
+
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> captor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(captor.capture());
+        String requestJson = objectMapper.writeValueAsString(captor.getValue());
+        String payloadJson = objectMapper.writeValueAsString(captor.getValue().data());
+        assertThat(requestJson).contains("\"orderAmount\":" + expectedAmountJson);
+        assertThat(requestJson).doesNotContain("3E+2");
+        assertThat(requestJson).doesNotContain("E+");
+        assertThat(requestJson).doesNotContain("E-");
+        assertThat(payloadJson).contains("\"orderAmount\":" + expectedAmountJson);
+        assertThat(payloadJson).doesNotContain("3E+2");
+        assertThat(payloadJson).doesNotContain("E+");
+        assertThat(payloadJson).doesNotContain("E-");
+        JsonNode forwarded = objectMapper.readTree(payloadJson);
+        assertThat(forwarded.path("orderAmount").isNumber()).isTrue();
+        assertThat(forwarded.path("orderAmount").decimalValue()).isEqualByComparingTo(expectedAmountJson);
+    }
+
+    private Object benefitOrderSyncForwardData(BigDecimal orderAmount) throws Exception {
+        Class<?> payloadClass = Class.forName(
+                "com.nexusfin.equity.service.impl.XiaohuaGatewayServiceImpl$BenefitOrderSyncForwardData"
+        );
+        Constructor<?> constructor = payloadClass.getDeclaredConstructor(
+                String.class,
+                String.class,
+                Integer.class,
+                BigDecimal.class,
+                Integer.class,
+                Long.class,
+                Long.class,
+                Long.class,
+                String.class,
+                String.class,
+                String.class,
+                String.class
+        );
+        constructor.setAccessible(true);
+        return constructor.newInstance(
+                "BEN-001",
+                "QW-ORDER-001",
+                20260521,
+                orderAmount,
+                2,
+                1779335976232L,
+                1779335976232L,
+                1781927976232L,
+                "QW",
+                "QW-ORDER-001",
+                "齐为",
+                "https://benefits.test/api/auth/redrect_benefit_url?benefitOrderNo=QW-ORDER-001"
+        );
     }
 
     private YunkaProperties yunkaProperties() {
