@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildConfirmRepaymentCleanPath,
   canProceedRepaymentAction,
+  parseConfirmRepaymentEntry,
   resolveDefaultRepaymentSubmitType,
   resolveRepaymentInfoUrl,
   resolveRepaymentActionStage,
   resolveRepaymentUnavailableFeedback,
   resolveSelectedRepaymentCardId,
+  shouldRunRepaymentLogin,
   shouldNavigateAfterRepaymentSubmit,
   shouldShowRepaymentSmsSection,
 } from "./confirm-repayment.logic";
@@ -18,6 +21,23 @@ describe("confirm repayment page entry", () => {
 
   it("builds the repayment info backend url when loanId is valid", () => {
     expect(resolveRepaymentInfoUrl(20260501)).toBe("/repayment/info/20260501");
+  });
+
+  it("parses repayment deep link token and loanId", () => {
+    expect(parseConfirmRepaymentEntry("?token=joint-token-001&loanId=1781594032")).toEqual({
+      token: "joint-token-001",
+      loanId: 1781594032,
+    });
+  });
+
+  it("requires repayment login only when token and loanId are both present", () => {
+    expect(shouldRunRepaymentLogin({ token: "joint-token-001", loanId: 1781594032 })).toBe(true);
+    expect(shouldRunRepaymentLogin({ token: "joint-token-001", loanId: null })).toBe(false);
+    expect(shouldRunRepaymentLogin({ token: null, loanId: 1781594032 })).toBe(false);
+  });
+
+  it("builds a clean confirm repayment path without token after repayment login", () => {
+    expect(buildConfirmRepaymentCleanPath(1781594032)).toBe("/confirm-repayment?loanId=1781594032");
   });
 
   it("defaults repayment submit type to scheduled for current due repayment", () => {

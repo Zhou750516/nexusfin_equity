@@ -292,3 +292,13 @@ export interface JointLoginResult {
   externalUserId?: string | null;
   localUserReady: boolean;
 }
+
+export interface RepaymentLoginParams {
+  token: string;
+  loanId: number;
+}
+
+export interface RepaymentLoginResult {
+  authenticated: boolean;
+  loanId: number;
+}

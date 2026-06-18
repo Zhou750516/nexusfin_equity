@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { useLoan } from "@/contexts/LoanContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { Locale } from "@/i18n/locale";
+import { repaymentLogin } from "@/lib/auth-api";
 import { formatBankCard, formatCurrency } from "@/lib/format";
 import {
   confirmRepaymentSms,
@@ -12,13 +13,16 @@ import {
   submitRepayment,
 } from "@/lib/loan-api";
 import { shouldRequestLocalizedData } from "@/lib/localized-request";
-import { buildPath, getQueryParam } from "@/lib/route";
+import { buildPath, getQueryParam, resolveAppHref } from "@/lib/route";
 import {
+  buildConfirmRepaymentCleanPath,
   canProceedRepaymentAction,
+  parseConfirmRepaymentEntry,
   resolveDefaultRepaymentSubmitType,
   resolveRepaymentActionStage,
   resolveRepaymentUnavailableFeedback,
   resolveSelectedRepaymentCardId,
+  shouldRunRepaymentLogin,
   shouldNavigateAfterRepaymentSubmit,
   shouldShowRepaymentSmsSection,
 } from "@/pages/confirm-repayment.logic";
@@ -213,8 +217,12 @@ export default function ConfirmRepaymentPage() {
   const [isSendingSms, setIsSendingSms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loginStatus, setLoginStatus] = useState<"idle" | "pending" | "succeeded" | "failed">("idle");
 
-  const loanId = parseLoanId(getQueryParam("loanId")) ?? loan.loanId;
+  const entry = parseConfirmRepaymentEntry(typeof window === "undefined" ? "" : window.location.search);
+  const shouldLoginFromEntry = shouldRunRepaymentLogin(entry);
+  const hasEntryToken = Boolean(entry.token);
+  const loanId = hasEntryToken ? entry.loanId : entry.loanId ?? parseLoanId(getQueryParam("loanId")) ?? loan.loanId;
   const approvalResultPath = loan.applicationId
     ? buildPath("/approval-result", { applicationId: loan.applicationId })
     : "/approval-result";
@@ -226,8 +234,41 @@ export default function ConfirmRepaymentPage() {
   }, [loanId]);
 
   useEffect(() => {
+    if (!shouldLoginFromEntry || !entry.token || !entry.loanId) {
+      return;
+    }
+    let cancelled = false;
+    setLoginStatus("pending");
+    setIsLoading(true);
+    setError(null);
+    repaymentLogin({ token: entry.token, loanId: entry.loanId })
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
+        setLoginStatus("succeeded");
+        const cleanPath = buildConfirmRepaymentCleanPath(result.loanId);
+        window.history.replaceState(null, "", resolveAppHref(cleanPath));
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+        setLoginStatus("failed");
+        setIsLoading(false);
+        setError(t("repaymentConfirm.loginExpired"));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [entry.loanId, entry.token, shouldLoginFromEntry, t]);
+
+  useEffect(() => {
     if (!loanId) {
       setIsLoading(false);
+      return;
+    }
+    if (shouldLoginFromEntry && loginStatus !== "succeeded") {
       return;
     }
     if (!shouldRequestLocalizedData({
@@ -239,7 +280,7 @@ export default function ConfirmRepaymentPage() {
       return;
     }
     void loadInfo(loanId);
-  }, [loadedLoanId, loadedLocale, loanId, locale]);
+  }, [loadedLoanId, loadedLocale, loanId, locale, loginStatus, shouldLoginFromEntry]);
 
   async function loadInfo(currentLoanId: number) {
     setIsLoading(true);
@@ -378,6 +419,22 @@ export default function ConfirmRepaymentPage() {
     return (
       <MobileLayout>
         <PageLoading lines={4} />
+      </MobileLayout>
+    );
+  }
+
+  if (loginStatus === "failed" && !info) {
+    return (
+      <MobileLayout>
+        <PageError
+          title={t("repaymentConfirm.loginExpiredTitle")}
+          message={error ?? t("repaymentConfirm.loginExpired")}
+          onAction={() => {
+            loan.reset();
+            navigate("/calculator");
+          }}
+          actionLabel={t("repaymentSuccess.backHome")}
+        />
       </MobileLayout>
     );
   }

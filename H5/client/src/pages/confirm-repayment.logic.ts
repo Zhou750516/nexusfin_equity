@@ -26,8 +26,29 @@ export interface RepaymentSubmitOutcome {
   status: "processing" | "failed";
 }
 
+export interface ConfirmRepaymentEntry {
+  token: string | null;
+  loanId: number | null;
+}
+
 export function resolveRepaymentInfoUrl(loanId: number | null | undefined): string | null {
   return loanId ? `/repayment/info/${loanId}` : null;
+}
+
+export function parseConfirmRepaymentEntry(search: string): ConfirmRepaymentEntry {
+  const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+  return {
+    token: normalizeToken(params.get("token")),
+    loanId: parsePositiveInteger(params.get("loanId")),
+  };
+}
+
+export function shouldRunRepaymentLogin(entry: ConfirmRepaymentEntry): boolean {
+  return Boolean(entry.token && entry.loanId);
+}
+
+export function buildConfirmRepaymentCleanPath(loanId: number): string {
+  return `/confirm-repayment?loanId=${loanId}`;
 }
 
 export function resolveDefaultRepaymentSubmitType(): "scheduled" {
@@ -88,4 +109,20 @@ export function resolveRepaymentUnavailableFeedback(): RepaymentUnavailableFeedb
     messageKey: "repaymentConfirm.unavailable",
     retryKey: "common.retry",
   };
+}
+
+function normalizeToken(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  const normalized = value.trim();
+  return normalized ? normalized : null;
+}
+
+function parsePositiveInteger(value: string | null): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
