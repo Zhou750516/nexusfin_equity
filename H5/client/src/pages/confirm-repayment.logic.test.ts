@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildConfirmRepaymentCleanPath,
+  buildRepaymentSuccessPath,
   canProceedRepaymentAction,
   parseConfirmRepaymentEntry,
   resolveDefaultRepaymentSubmitType,
@@ -38,6 +39,11 @@ describe("confirm repayment page entry", () => {
 
   it("builds a clean confirm repayment path without token after repayment login", () => {
     expect(buildConfirmRepaymentCleanPath(1781594032)).toBe("/confirm-repayment?loanId=1781594032");
+  });
+
+  it("builds repayment success path with repaymentId and submitted amount", () => {
+    expect(buildRepaymentSuccessPath("xhqbapi20260618181657154625", 1040.26))
+      .toBe("/repayment-success?repaymentId=xhqbapi20260618181657154625&amount=1040.26");
   });
 
   it("defaults repayment submit type to scheduled for current due repayment", () => {

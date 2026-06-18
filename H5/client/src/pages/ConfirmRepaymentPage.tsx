@@ -13,9 +13,11 @@ import {
   submitRepayment,
 } from "@/lib/loan-api";
 import { shouldRequestLocalizedData } from "@/lib/localized-request";
+import { saveSubmittedRepaymentAmount } from "@/lib/repayment-result-cache";
 import { buildPath, getQueryParam, resolveAppHref } from "@/lib/route";
 import {
   buildConfirmRepaymentCleanPath,
+  buildRepaymentSuccessPath,
   canProceedRepaymentAction,
   parseConfirmRepaymentEntry,
   resolveDefaultRepaymentSubmitType,
@@ -359,7 +361,8 @@ export default function ConfirmRepaymentPage() {
         return;
       }
       loan.setRepaymentId(response.repaymentId);
-      navigate(buildPath("/repayment-success", { repaymentId: response.repaymentId }));
+      saveSubmittedRepaymentAmount(response.repaymentId, info.repaymentAmount);
+      navigate(buildRepaymentSuccessPath(response.repaymentId, info.repaymentAmount));
     } catch (submitError) {
       setError(readErrorMessage(submitError));
     } finally {

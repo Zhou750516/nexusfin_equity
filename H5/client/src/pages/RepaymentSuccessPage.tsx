@@ -5,13 +5,15 @@ import { useI18n } from "@/i18n/I18nProvider";
 import type { Locale } from "@/i18n/locale";
 import { formatBankCard, formatCurrency, formatDateTime } from "@/lib/format";
 import { getRepaymentResult } from "@/lib/loan-api";
+import { readSubmittedRepaymentAmount } from "@/lib/repayment-result-cache";
 import {
+  parseRepaymentResultEntry,
+  resolveRepaymentDisplayAmount,
   resolveRepaymentResultSubtitle,
   resolveRepaymentResultTime,
   shouldPollRepaymentResult,
 } from "@/pages/repayment-result.logic";
 import { shouldRequestLocalizedData } from "@/lib/localized-request";
-import { getQueryParam } from "@/lib/route";
 import type { RepaymentResult } from "@/types/loan.types";
 import { Calendar, CheckCircle2, CircleAlert, Clock3, CreditCard, Info, TrendingDown, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -88,7 +90,9 @@ export default function RepaymentSuccessPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const repaymentId = getQueryParam("repaymentId") ?? loan.repaymentId;
+  const entry = parseRepaymentResultEntry(typeof window === "undefined" ? "" : window.location.search);
+  const repaymentId = entry.repaymentId ?? loan.repaymentId;
+  const cachedSubmittedAmount = repaymentId ? readSubmittedRepaymentAmount(repaymentId) : null;
 
   useEffect(() => {
     if (repaymentId && repaymentId !== loan.repaymentId) {
@@ -181,6 +185,9 @@ export default function RepaymentSuccessPage() {
     result?.remark,
   );
   const displayTime = result ? resolveRepaymentResultTime(result.repaymentTime, result.status) : "--";
+  const displayAmount = result
+    ? resolveRepaymentDisplayAmount(result.amount, entry.amount, cachedSubmittedAmount)
+    : 0;
   const primaryActionLabel = result?.status === "processing"
     ? RESULT_COPY[locale].refresh
     : RESULT_COPY[locale].backHome;
@@ -208,7 +215,7 @@ export default function RepaymentSuccessPage() {
               <p className="mt-4 text-white text-center leading-none">
                 <span className="text-base">{t("repaymentSuccess.amountLabel")}</span>
                 <span className="text-[36px] font-bold tracking-[0.4px]">
-                  {formatCurrency(result.amount, locale)}
+                  {formatCurrency(displayAmount, locale)}
                 </span>
                 <span className="text-base">元</span>
               </p>

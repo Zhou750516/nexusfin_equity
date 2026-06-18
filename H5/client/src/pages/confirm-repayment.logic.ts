@@ -51,6 +51,15 @@ export function buildConfirmRepaymentCleanPath(loanId: number): string {
   return `/confirm-repayment?loanId=${loanId}`;
 }
 
+export function buildRepaymentSuccessPath(repaymentId: string, amount: number): string {
+  const params = new URLSearchParams();
+  params.set("repaymentId", repaymentId);
+  if (Number.isFinite(amount) && amount > 0) {
+    params.set("amount", String(amount));
+  }
+  return `/repayment-success?${params.toString()}`;
+}
+
 export function resolveDefaultRepaymentSubmitType(): "scheduled" {
   return "scheduled";
 }
