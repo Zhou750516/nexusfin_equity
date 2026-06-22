@@ -1,5 +1,6 @@
 package com.nexusfin.equity.thirdparty.yunka;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 
 public interface YunkaGatewayClient {
@@ -13,6 +14,7 @@ public interface YunkaGatewayClient {
     ) {
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     record YunkaGatewayResponse(
             int code,
             String message,

@@ -340,6 +340,63 @@ class RepaymentServiceTest {
     }
 
     @Test
+    void shouldMapRepayQueryKjStatusesFromDirectDataWithoutProviderFields() throws Exception {
+        when(loanApplicationMappingRepository.selectOne(any()))
+                .thenReturn(loanMapping("mem-test-001", "cid-test-001", 20260501));
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                        0,
+                        "SUCCESS",
+                        objectMapper.readTree("""
+                                {
+                                  "status": "8001",
+                                  "amount": 1040.26,
+                                  "swiftNumber": "RP-20260501",
+                                  "successTime": 1780044935000,
+                                  "remark": "还款成功"
+                                }
+                                """)
+                ))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                        0,
+                        "SUCCESS",
+                        objectMapper.readTree("""
+                                {
+                                  "status": "8004",
+                                  "amount": 0,
+                                  "swiftNumber": "RP-20260501",
+                                  "remark": "还款处理中"
+                                }
+                                """)
+                ))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                        0,
+                        "SUCCESS",
+                        objectMapper.readTree("""
+                                {
+                                  "status": "8006",
+                                  "amount": 0,
+                                  "swiftNumber": "RP-20260501",
+                                  "remark": "未查询到还款记录"
+                                }
+                                """)
+                ));
+
+        RepaymentResultResponse success = repaymentService.getResult("mem-test-001", "RP-20260501");
+        RepaymentResultResponse processing = repaymentService.getResult("mem-test-001", "RP-20260501");
+        RepaymentResultResponse failed = repaymentService.getResult("mem-test-001", "RP-20260501");
+
+        assertThat(success.status()).isEqualTo("success");
+        assertThat(success.amount()).isEqualByComparingTo("1040.26");
+        assertThat(success.repaymentTime()).isEqualTo("2026-05-29T16:55:35+08:00");
+        assertThat(success.remark()).isEqualTo("还款成功");
+        assertThat(processing.status()).isEqualTo("processing");
+        assertThat(processing.remark()).isEqualTo("还款处理中");
+        assertThat(failed.status()).isEqualTo("failed");
+        assertThat(failed.remark()).isEqualTo("未查询到还款记录");
+    }
+
+    @Test
     void shouldQueryRepaymentResultUsingStoredSwiftNumberReference() throws Exception {
         String swiftNumber = "xhqbapi20260529163815470019";
         IdempotencyRecord repaymentReference = new IdempotencyRecord();
@@ -669,6 +726,13 @@ class RepaymentServiceTest {
         when(sensitiveDataCipher.decrypt("mobile-cipher")).thenReturn("13800138000");
         when(sensitiveDataCipher.decrypt("id-cipher")).thenReturn("110101199003071234");
         when(sensitiveDataCipher.decrypt("name-cipher")).thenReturn("测试用户");
+        JsonNode repayApplyResponseData = objectMapper.readTree("""
+                {
+                  "swiftNumber": "xhqbapi20260529163815470019",
+                  "status": "5001",
+                  "remark": "还款已受理"
+                }
+                """);
         when(yunkaGatewayClient.proxy(any()))
                 .thenAnswer(invocation -> {
                     YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
@@ -684,13 +748,7 @@ class RepaymentServiceTest {
                     return new YunkaGatewayClient.YunkaGatewayResponse(
                             0,
                             "SUCCESS",
-                            objectMapper.readTree("""
-                                    {
-                                      "swiftNumber":"xhqbapi20260529163815470019",
-                                      "status":"5001",
-                                      "remark":"还款已受理"
-                                    }
-                                    """)
+                            repayApplyResponseData
                     );
                 });
         when(idempotencyRecordRepository.insert(any())).thenReturn(1);
@@ -701,6 +759,8 @@ class RepaymentServiceTest {
         );
 
         assertThat(response.repaymentId()).isEqualTo("xhqbapi20260529163815470019");
+        assertThat(response.status()).isEqualTo("processing");
+        assertThat(response.message()).isEqualTo("还款已受理");
 
         ArgumentCaptor<IdempotencyRecord> captor = ArgumentCaptor.forClass(IdempotencyRecord.class);
         verify(idempotencyRecordRepository, times(2)).insert(captor.capture());
@@ -710,6 +770,19 @@ class RepaymentServiceTest {
                 .orElseThrow();
         assertThat(reference.getBizKey()).isEqualTo("mem-test-001:xhqbapi20260529163815470019");
         assertThat(reference.getResponseBody()).isEqualTo("20260510");
+
+        ArgumentCaptor<YunkaGatewayRequest> requestCaptor = ArgumentCaptor.forClass(YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient, times(2)).proxy(requestCaptor.capture());
+        YunkaGatewayRequest repayApplyRequest = requestCaptor.getAllValues().stream()
+                .filter(request -> "/repay/apply".equals(request.path()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(repayApplyResponseData.has("providerCode")).isFalse();
+        assertThat(repayApplyResponseData.has("providerMessage")).isFalse();
+        assertThat(repayApplyResponseData.has("payload")).isFalse();
+        JsonNode repayApplyPayload = objectMapper.valueToTree(repayApplyRequest.data());
+        assertThat(repayApplyPayload.path("repayType").asInt()).isEqualTo(2);
+        assertThat(repayApplyPayload.path("periods").asText()).isEqualTo("2");
     }
 
     private LoanRepayPlanResponse repayPlanWithDuePeriods() {

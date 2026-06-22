@@ -106,7 +106,7 @@ class LoanApplicationServiceTest {
         assertThat(response.applicationId()).startsWith("APP-");
         assertThat(response.status()).isEqualTo("pending");
         assertThat(response.benefitOrderNo()).isEqualTo("BEN-001");
-        assertThat(response.message()).isEqualTo("处理中");
+        assertThat(response.message()).isEqualTo("确认借款成功");
 
         ArgumentCaptor<com.nexusfin.equity.dto.request.CreateBenefitOrderRequest> benefitOrderCaptor =
                 ArgumentCaptor.forClass(com.nexusfin.equity.dto.request.CreateBenefitOrderRequest.class);
@@ -617,8 +617,8 @@ class LoanApplicationServiceTest {
                 objectMapper.readTree("""
                         {
                           "loanId": %d,
-                          "status": "4002",
-                          "remark": "处理中"
+                          "status": 4001,
+                          "remark": "确认借款成功"
                         }
                         """.formatted(loanId))
         );

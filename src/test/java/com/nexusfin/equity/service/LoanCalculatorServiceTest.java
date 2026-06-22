@@ -178,10 +178,6 @@ class LoanCalculatorServiceTest {
         when(yunkaCallTemplate.executeForData(any()))
                 .thenReturn(objectMapper.readTree("""
                         {
-                          "status": "SUCCESS",
-                          "providerCode": "0",
-                          "providerMessage": "success",
-                          "retryable": false,
                           "originalRefund": 3000.0,
                           "receiveAmount": 3120.75,
                           "repayAmount": 3120.75,

@@ -171,9 +171,9 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
                 )));
         JsonNode yunkaData = objectMapper.readTree("""
                 {
-                  "status": "PROCESSING",
+                  "status": "5001",
                   "swiftNumber": "REP202604130001",
-                  "remark": "还款请求已提交，正在处理中"
+                  "remark": "还款已受理"
                 }
                 """);
         when(yunkaGatewayClient.proxy(any()))
@@ -206,7 +206,7 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.repaymentId").value("REP202604130001"))
                 .andExpect(jsonPath("$.data.status").value("processing"))
-                .andExpect(jsonPath("$.data.message").value("还款请求已提交，正在处理中"));
+                .andExpect(jsonPath("$.data.message").value("还款已受理"));
 
         ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> requestCaptor =
                 ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
@@ -239,7 +239,7 @@ class Phase9TaskGroupDIntegrationTest extends AbstractYunkaXiaohuaIT {
         createApplicationMapping(memberInfo, "APP-REPAY-RESULT-001", 2026041302);
         JsonNode yunkaData = objectMapper.readTree("""
                 {
-                  "status": "SUCCESS",
+                  "status": "8001",
                   "amount": 1018.50,
                   "successTime": "2026-04-13T14:32:00+08:00",
                   "remark": "还款成功",

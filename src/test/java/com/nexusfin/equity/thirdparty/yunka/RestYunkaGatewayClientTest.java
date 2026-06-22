@@ -167,6 +167,56 @@ class RestYunkaGatewayClientTest {
     }
 
     @Test
+    void shouldIgnoreNonEnvelopeTopLevelFieldsWhenParsingGatewayResponse() {
+        TraceIdUtil.bindTraceId("TRACE-IGNORE-LEGACY-001");
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        server.expect(requestTo("http://127.0.0.1:18081/api/gateway/proxy"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("""
+                        {
+                          "code": 0,
+                          "message": "SUCCESS",
+                          "traceId": "TRACE-IGNORE-LEGACY-001",
+                          "requestId": "REQ-IGNORE-LEGACY-001",
+                          "providerCode": "5001",
+                          "providerMessage": "old internal field",
+                          "retryable": false,
+                          "errorType": "OLD_INTERNAL",
+                          "payload": {"status": "PROCESSING"},
+                          "ykGateway": {"providerMessage": "old gateway"},
+                          "data": {
+                            "status": "5001",
+                            "swiftNumber": "xhqbapi20260618181657154625"
+                          }
+                        }
+                        """, MediaType.APPLICATION_JSON));
+        RestYunkaGatewayClient client = new RestYunkaGatewayClient(
+                yunkaProperties("REST", "http://127.0.0.1:18081"),
+                restClientBuilder.baseUrl("http://127.0.0.1:18081").build(),
+                () -> "1746955200888"
+        );
+
+        YunkaGatewayClient.YunkaGatewayResponse response = client.proxy(new YunkaGatewayClient.YunkaGatewayRequest(
+                "REQ-IGNORE-LEGACY-001",
+                "/repay/apply",
+                JsonNodeFactory.instance.objectNode()
+        ));
+
+        assertThat(response.code()).isEqualTo(0);
+        assertThat(response.message()).isEqualTo("SUCCESS");
+        assertThat(response.traceId()).isEqualTo("TRACE-IGNORE-LEGACY-001");
+        assertThat(response.requestId()).isEqualTo("REQ-IGNORE-LEGACY-001");
+        assertThat(response.data().path("status").asText()).isEqualTo("5001");
+        assertThat(response.data().path("swiftNumber").asText()).isEqualTo("xhqbapi20260618181657154625");
+        assertThat(response.data().has("payload")).isFalse();
+        assertThat(response.data().has("ykGateway")).isFalse();
+        assertThat(response.data().has("providerCode")).isFalse();
+        assertThat(response.data().has("providerMessage")).isFalse();
+        server.verify();
+    }
+
+    @Test
     void shouldRedactLoanApplyImageInfoInLogsButSendOriginalPayload(CapturedOutput output) {
         TraceIdUtil.bindTraceId("TRACE-IMAGE-REDACT-001");
         String timestamp = "1746955200124";
@@ -230,7 +280,7 @@ class RestYunkaGatewayClientTest {
     }
 
     @Test
-    void shouldLogUtf8ProviderMessageWithoutGarbledCharacters(CapturedOutput output) {
+    void shouldLogTopLevelGatewayMessageInNewEnvelopeWithoutGarbledCharacters(CapturedOutput output) {
         TraceIdUtil.bindTraceId("TRACE-UTF8-001");
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
@@ -240,16 +290,10 @@ class RestYunkaGatewayClientTest {
                         """
                         {
                           "code": 1002,
-                          "message": "SIGNATURE_INVALID",
+                          "message": "签名IP未授权",
                           "traceId": "TRACE-UTF8-001",
                           "requestId": "REQ-UTF8-001",
-                          "data": {
-                            "status": "UNKNOWN",
-                            "providerMessage": "签名IP未授权",
-                            "retryable": false,
-                            "errorType": "SIGNATURE_INVALID",
-                            "payload": null
-                          }
+                          "data": {}
                         }
                         """.getBytes(StandardCharsets.UTF_8),
                         MediaType.APPLICATION_JSON
@@ -270,6 +314,10 @@ class RestYunkaGatewayClientTest {
         ));
 
         assertThat(response.code()).isEqualTo(1002);
+        assertThat(response.message()).isEqualTo("签名IP未授权");
+        assertThat(response.data()).isNotNull();
+        assertThat(response.data().isObject()).isTrue();
+        assertThat(response.data().isEmpty()).isTrue();
         assertThat(output).contains("requestId=REQ-UTF8-001");
         assertThat(output).contains("path=/user/token");
         assertThat(output).contains("appId=" + TEST_APP_ID);
@@ -288,7 +336,12 @@ class RestYunkaGatewayClientTest {
         assertThat(output).contains("\"requestId\":\"REQ-UTF8-001\"");
         assertThat(output).contains("\"path\":\"/user/token\"");
         assertThat(output).contains("responseBodyJson=");
-        assertThat(output).contains("\"providerMessage\":\"签名IP未授权\"");
+        assertThat(output).contains("errorMsg=签名IP未授权");
+        assertThat(output).contains("\"message\":\"签名IP未授权\"");
+        assertThat(output).doesNotContain("providerMessage");
+        assertThat(output).doesNotContain("retryable");
+        assertThat(output).doesNotContain("errorType");
+        assertThat(output).doesNotContain("payload");
         assertThat(output).doesNotContain("\"X-Signature\"");
         assertThat(output).doesNotContain(TEST_APP_SECRET);
         assertThat(output).doesNotContain("???IP??????");

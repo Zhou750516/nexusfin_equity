@@ -59,6 +59,41 @@ class YunkaCallTemplateTest {
     }
 
     @Test
+    void shouldReturnDirectKjDataWithoutPayloadOrYunkaInternalFields() {
+        YunkaCallTemplate template = new YunkaCallTemplate(yunkaGatewayClient);
+        JsonNode data = JsonNodeFactory.instance.objectNode()
+                .put("status", "5001")
+                .put("swiftNumber", "xhqbapi20260618181657154625");
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                        0,
+                        "SUCCESS",
+                        "TRACE-NEW-001",
+                        "REQ-NEW-001",
+                        data
+                ));
+
+        JsonNode response = template.executeForData(
+                YunkaCallTemplate.YunkaCall.of(
+                        "repay apply",
+                        "REQ-NEW-001",
+                        "/repay/apply",
+                        "20260501",
+                        JsonNodeFactory.instance.objectNode()
+                )
+        );
+
+        assertThat(response.path("status").asText()).isEqualTo("5001");
+        assertThat(response.path("swiftNumber").asText()).isEqualTo("xhqbapi20260618181657154625");
+        assertThat(response.has("payload")).isFalse();
+        assertThat(response.has("ykGateway")).isFalse();
+        assertThat(response.has("providerCode")).isFalse();
+        assertThat(response.has("providerMessage")).isFalse();
+        assertThat(response.has("retryable")).isFalse();
+        assertThat(response.has("errorType")).isFalse();
+    }
+
+    @Test
     void shouldConvertMissingDataIntoEmptyObjectNode() {
         YunkaCallTemplate template = new YunkaCallTemplate(yunkaGatewayClient);
         when(yunkaGatewayClient.proxy(any()))
@@ -73,16 +108,25 @@ class YunkaCallTemplateTest {
     }
 
     @Test
-    void shouldThrowBizExceptionWhenStrictDataCallIsRejected() {
+    void shouldThrowBizExceptionWhenStrictDataCallIsRejectedByNewGatewayEnvelope() {
         YunkaCallTemplate template = new YunkaCallTemplate(yunkaGatewayClient);
         when(yunkaGatewayClient.proxy(any()))
-                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(10003, "invalid state", null));
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                        10003,
+                        "invalid state",
+                        JsonNodeFactory.instance.objectNode()
+                                .put("providerMessage", "old provider message must not be used")
+                                .put("errorType", "OLD_ERROR_TYPE")
+                ));
 
         assertThatThrownBy(() -> template.executeForData(
                 YunkaCallTemplate.YunkaCall.of("benefit sync", "SYNC-001", "/vip/orderNotice", "BEN-001", new Object())
         )).isInstanceOf(BizException.class)
-                .extracting(ex -> ((BizException) ex).getErrorNo())
-                .isEqualTo(ErrorCodes.YUNKA_UPSTREAM_REJECTED);
+                .extracting(
+                        ex -> ((BizException) ex).getErrorNo(),
+                        ex -> ((BizException) ex).getErrorMsg()
+                )
+                .containsExactly(ErrorCodes.YUNKA_UPSTREAM_REJECTED, "invalid state");
     }
 
     @Test
