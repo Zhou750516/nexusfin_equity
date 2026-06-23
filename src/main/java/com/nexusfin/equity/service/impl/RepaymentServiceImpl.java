@@ -72,7 +72,7 @@ public class RepaymentServiceImpl implements RepaymentService {
     private static final String REPAYMENT_SUBMIT_DUPLICATED = "REPAYMENT_SUBMIT_DUPLICATED";
     private static final String REPAYMENT_SUBMIT_BIZ_TYPE = "REPAYMENT_SUBMIT";
     private static final String REPAYMENT_RESULT_BIZ_TYPE = "REPAYMENT_RESULT";
-    private static final int REPAYMENT_SUBMIT_DUPLICATE_WINDOW_SECONDS = 120;
+    private static final int REPAYMENT_SUBMIT_DUPLICATE_WINDOW_SECONDS = 5;
 
     private final H5LoanProperties h5LoanProperties;
     private final H5RepaymentProperties h5RepaymentProperties;

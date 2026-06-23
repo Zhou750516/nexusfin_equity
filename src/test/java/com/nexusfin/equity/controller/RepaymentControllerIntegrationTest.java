@@ -2,6 +2,7 @@ package com.nexusfin.equity.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexusfin.equity.entity.IdempotencyRecord;
 import com.nexusfin.equity.entity.LoanApplicationMapping;
 import com.nexusfin.equity.entity.MemberInfo;
 import com.nexusfin.equity.entity.MemberReceivingAccount;
@@ -482,6 +483,69 @@ class RepaymentControllerIntegrationTest extends AbstractYunkaXiaohuaIT {
         ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> captor =
                 ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
         verify(yunkaGatewayClient, times(3)).proxy(captor.capture());
+        long repayApplyCalls = captor.getAllValues().stream()
+                .filter(request -> "/repay/apply".equals(request.path()))
+                .count();
+        org.assertj.core.api.Assertions.assertThat(repayApplyCalls).isEqualTo(1);
+    }
+
+    @Test
+    void shouldAllowRepaymentSubmitAfterFiveSecondDuplicateWindow() throws Exception {
+        MemberInfo memberInfo = createMember("mem-repay-window-expired", "user-repay-window-expired");
+        insertReceivingAccount(memberInfo.getMemberId(), "acc-mem-repay-window-expired", "招商银行", "8648");
+        createApplicationMapping(memberInfo, "APP-REPAY-WINDOW-EXPIRED-001", 20260516);
+        IdempotencyRecord expiredGuard = new IdempotencyRecord();
+        expiredGuard.setRequestId("repay-submit-expired-window");
+        expiredGuard.setBizType("REPAYMENT_SUBMIT");
+        expiredGuard.setBizKey(memberInfo.getMemberId() + ":20260516:101850");
+        expiredGuard.setResponseBody("IN_FLIGHT");
+        expiredGuard.setProcessedTs(LocalDateTime.now().minusSeconds(6));
+        idempotencyRecordRepository.insert(expiredGuard);
+        when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("20260516"), any()))
+                .thenReturn(new LoanRepayPlanResponse(List.of(
+                        new LoanRepayPlanItem(1, 1, 1, "2026-05-07", 100000L, 4500L, 104500L),
+                        new LoanRepayPlanItem(2, 2, 1, "2026-06-07", 100000L, 3000L, 103000L),
+                        new LoanRepayPlanItem(3, 3, 1, "2026-07-07", 100000L, 3000L, 103000L)
+                )));
+        when(yunkaGatewayClient.proxy(any()))
+                .thenAnswer(invocation -> {
+                    YunkaGatewayClient.YunkaGatewayRequest gatewayRequest = invocation.getArgument(0);
+                    if ("/repay/trial".equals(gatewayRequest.path())) {
+                        return new YunkaGatewayClient.YunkaGatewayResponse(
+                                0,
+                                "SUCCESS",
+                                objectMapper.readTree("""
+                                        {"repayAmount":1018.50}
+                                        """)
+                        );
+                    }
+                    return new YunkaGatewayClient.YunkaGatewayResponse(
+                            0,
+                            "SUCCESS",
+                            objectMapper.readTree("""
+                                    {"swiftNumber":"RP-20260516","status":"5001","remark":"还款已受理"}
+                                    """)
+                    );
+                });
+
+        mockMvc.perform(post("/api/repayment/submit")
+                        .cookie(authCookie(memberInfo))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "loanId": 20260516,
+                                  "amount": 1018.50,
+                                  "bankCardId": "acc-mem-repay-window-expired",
+                                  "repaymentType": "scheduled"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.repaymentId").value("RP-20260516"));
+
+        ArgumentCaptor<YunkaGatewayClient.YunkaGatewayRequest> captor =
+                ArgumentCaptor.forClass(YunkaGatewayClient.YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient, times(2)).proxy(captor.capture());
         long repayApplyCalls = captor.getAllValues().stream()
                 .filter(request -> "/repay/apply".equals(request.path()))
                 .count();

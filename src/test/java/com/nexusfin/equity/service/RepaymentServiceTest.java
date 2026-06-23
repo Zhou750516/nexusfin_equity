@@ -33,6 +33,7 @@ import com.nexusfin.equity.thirdparty.yunka.UserCardSummary;
 import com.nexusfin.equity.thirdparty.yunka.YunkaGatewayClient;
 import com.nexusfin.equity.util.SensitiveDataCipher;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -605,6 +606,46 @@ class RepaymentServiceTest {
         assertThat(captor.getAllValues().stream()
                 .filter(request -> "/repay/apply".equals(request.path())))
                 .hasSize(1);
+    }
+
+    @Test
+    void shouldRejectDuplicateRepaymentSubmitWithinFiveSecondsBeforeRepayApplyCall() throws Exception {
+        when(loanApplicationMappingRepository.selectOne(any())).thenReturn(loanMapping("mem-test-001", "cid-test-001", 20260516));
+        when(xiaohuaGatewayService.queryLoanRepayPlan(any(), eq("20260516"), any()))
+                .thenReturn(repayPlanWithDuePeriods());
+        when(yunkaGatewayClient.proxy(any()))
+                .thenReturn(new YunkaGatewayClient.YunkaGatewayResponse(
+                        0,
+                        "SUCCESS",
+                        objectMapper.readTree("""
+                                {"repayAmount":1018.50}
+                                """)
+                ));
+        IdempotencyRecord existing = new IdempotencyRecord();
+        existing.setRequestId("repay-submit-existing");
+        existing.setProcessedTs(LocalDateTime.now().minusSeconds(4));
+        when(idempotencyRecordRepository.selectOne(any())).thenReturn(existing);
+
+        assertThatThrownBy(() -> repaymentService.submit(
+                "mem-test-001",
+                new RepaymentSubmitRequest(20260516, BigDecimal.valueOf(1018.50), "acc_001", "scheduled")
+        ))
+                .isInstanceOf(BizException.class)
+                .extracting(
+                        throwable -> ((BizException) throwable).getErrorNo(),
+                        throwable -> ((BizException) throwable).getErrorMsg()
+                )
+                .containsExactly(
+                        "REPAYMENT_SUBMIT_DUPLICATED",
+                        "Repayment request is duplicated"
+                );
+
+        ArgumentCaptor<YunkaGatewayRequest> captor = ArgumentCaptor.forClass(YunkaGatewayRequest.class);
+        verify(yunkaGatewayClient).proxy(captor.capture());
+        assertThat(captor.getAllValues().stream()
+                .filter(request -> "/repay/apply".equals(request.path())))
+                .isEmpty();
+        verify(idempotencyRecordRepository, never()).insert(any());
     }
 
     @Test
